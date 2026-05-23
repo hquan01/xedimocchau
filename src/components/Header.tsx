@@ -65,9 +65,11 @@ export default function Header({
               className="flex items-center space-x-2 cursor-pointer pb-1"
               id="logo_btn"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1b4332] to-[#40916c] flex items-center justify-center text-white shadow-md shadow-emerald-900/10">
-                <Bus className="w-5.5 h-5.5 text-stone-100 animate-pulse" />
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="Xe Đi Mộc Châu Logo" 
+                className="w-10 h-10 rounded-xl object-contain shadow-md shadow-emerald-900/10"
+              />
               <div className="flex flex-col text-left">
                 <span className="font-extrabold text-base sm:text-lg text-[#1b4332] tracking-normal leading-none uppercase">
                   Xe Đi Mộc Châu

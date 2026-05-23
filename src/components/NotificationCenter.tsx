@@ -33,7 +33,7 @@ export default function NotificationCenter({ notifications, onMarkAsRead, onClea
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("Thông báo thử nghiệm ✅", {
         body: "Tuyệt vời! Hệ thống thông báo của bạn đã hoạt động bình thường.",
-        icon: "/favicon.ico"
+        icon: "/logo.png"
       });
     } else {
       handleRequestPermission();

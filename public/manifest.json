@@ -8,12 +8,12 @@
   "description": "Đặt vé xe Limousine VIP Hà Nội - Mộc Châu đón trả tận nhà. Combo du lịch cực ưu đãi.",
   "icons": [
     {
-      "src": "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=192&q=80",
+      "src": "/logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=512&q=80",
+      "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }

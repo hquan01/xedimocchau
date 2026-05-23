@@ -95,7 +95,7 @@ export default function App() {
       if (permission === "granted") {
         new Notification("Đã bật thông báo thành công", {
           body: "Bạn sẽ là người đầu tiên biết khi có khách đặt vé mới!",
-          icon: "/favicon.ico",
+          icon: "/logo.png",
           tag: "welcome-notification"
         });
       } else if (permission === "denied") {
@@ -112,7 +112,7 @@ export default function App() {
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, {
           body: message,
-          icon: "/favicon.ico"
+          icon: "/logo.png"
         });
       }
     } catch (error) {
