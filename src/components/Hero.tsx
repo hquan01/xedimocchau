@@ -208,12 +208,12 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           id="search_box_container"
         >
           {/* Booking type tabs */}
-          <div className="flex space-x-2 border-b border-stone-100 pb-4 mb-4">
+          <div className="flex space-x-2 border-b border-stone-100 pb-4 mb-4 overflow-x-auto no-scrollbar whitespace-nowrap">
             <button
               onClick={() => setSubType('limousine')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+              className={`flex-shrink-0 flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
                 subType === 'limousine'
-                  ? "bg-[#1b4332] text-white"
+                  ? "bg-[#1b4332] text-white shadow-md shadow-emerald-900/10"
                   : "bg-stone-50 text-stone-600 hover:bg-stone-100"
               }`}
             >
@@ -222,9 +222,9 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
             </button>
             <button
               onClick={() => setSubType('combo')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+              className={`flex-shrink-0 flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
                 subType === 'combo'
-                  ? "bg-[#1b4332] text-white"
+                  ? "bg-[#1b4332] text-white shadow-md shadow-emerald-900/10"
                   : "bg-stone-50 text-stone-600 hover:bg-stone-100"
               }`}
             >
@@ -233,20 +233,23 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
             </button>
           </div>
 
-          <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+          <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-end">
             {/* Route swap / Select Origin */}
-            <div className="md:col-span-5 grid grid-cols-9 gap-2 items-center">
-              <div className="col-span-4 space-y-1.5">
-                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Điểm đi</label>
+            <div className="md:col-span-5 grid grid-cols-11 md:grid-cols-9 gap-1 sm:gap-2 items-center">
+              <div className="col-span-5 md:col-span-4 space-y-1.5">
+                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block ml-1">Điểm đi</label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-3 w-4 h-4 text-emerald-600 z-10 pointer-events-none" />
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 z-10 pointer-events-none" />
                   <select
                     value={routeFrom}
                     onChange={(e) => handleRouteFromChange(e.target.value)}
-                    className="w-full pl-9 pr-2 py-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-semibold text-stone-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    className="w-full pl-9 pr-6 py-3 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm font-semibold text-stone-800 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none"
                   >
                     {provinceOptions}
                   </select>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400">
+                    <Compass className="w-3 h-3" />
+                  </div>
                 </div>
               </div>
 
@@ -255,67 +258,70 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
                 <button
                   type="button"
                   onClick={swapRoute}
-                  className="p-1.5 rounded-full bg-stone-100 hover:bg-emerald-100 text-[#1b4332] transition-colors shadow-sm cursor-pointer"
+                  className="p-2 rounded-full bg-stone-100 hover:bg-emerald-100 text-[#1b4332] transition-colors shadow-sm cursor-pointer z-20"
                   title="Đổi chiều đi"
                 >
-                  ⇄
+                  <span className="text-sm font-bold rotate-90 md:rotate-0 block">⇄</span>
                 </button>
               </div>
 
-              <div className="col-span-4 space-y-1.5">
-                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Điểm đến</label>
+              <div className="col-span-5 md:col-span-4 space-y-1.5">
+                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block ml-1">Điểm đến</label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-3 w-4 h-4 text-emerald-600 z-10 pointer-events-none" />
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 z-10 pointer-events-none" />
                   <select
                     value={routeTo}
                     onChange={(e) => handleRouteToChange(e.target.value)}
                     disabled={subType === 'combo'}
-                    className="w-full pl-9 pr-2 py-2.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-semibold text-stone-800 focus:outline-none focus:border-emerald-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full pl-9 pr-6 py-3 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm font-semibold text-stone-800 focus:outline-none focus:border-emerald-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
                   >
                     {provinceOptions}
                   </select>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400">
+                    <Compass className="w-3 h-3" />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Travel Date */}
             <div className="md:col-span-3 space-y-1.5">
-              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Ngày khởi hành</label>
+              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block ml-1">Ngày khởi hành</label>
               <div className="relative font-sans">
-                <CalendarDays className="absolute left-3 top-3 w-4 h-4 text-stone-400" />
+                <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 z-10 pointer-events-none" />
                 <input
                   type="date"
                   value={travelDate}
                   min={getTodayString()}
                   onChange={(e) => setTravelDate(e.target.value)}
-                  className="w-full pl-9 pr-2 py-2.5 bg-stone-50 border border-stone-200 rounded-lg text-sm font-semibold text-stone-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  className="w-full pl-9 pr-3 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm font-semibold text-stone-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
                 />
               </div>
             </div>
 
             {/* Travel Time */}
             <div className="md:col-span-2 space-y-1.5">
-              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Giờ khởi hành</label>
+              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block ml-1">Giờ khởi hành</label>
               <div className="relative font-sans">
-                <Compass className="absolute left-3 top-3 w-4 h-4 text-emerald-600 z-10 pointer-events-none" />
+                <Compass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 z-10 pointer-events-none" />
                 <input
                   type="time"
                   required
                   value={travelTime}
                   onChange={(e) => setTravelTime(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-lg text-sm font-semibold text-[#1b4332] focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  className="w-full pl-9 pr-3 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm font-semibold text-[#1b4332] focus:outline-none focus:border-emerald-500 cursor-pointer"
                 />
               </div>
             </div>
 
             {/* Search Submit trigger */}
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 pt-2 md:pt-0">
               <button
                 type="submit"
                 id="search_form_submit"
-                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-[#1b4332] text-white rounded-lg font-bold text-sm tracking-wide shadow-md shadow-emerald-800/20 hover:from-emerald-700 hover:to-[#122e22] transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-[#1b4332] text-white rounded-xl font-bold text-sm sm:text-base tracking-wide shadow-lg shadow-emerald-800/30 hover:from-emerald-700 hover:to-[#122e22] transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-[0.98]"
               >
-                <Search className="w-4 h-4" />
+                <Search className="w-5 h-5" />
                 <span>Tìm kiếm</span>
               </button>
             </div>

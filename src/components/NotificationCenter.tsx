@@ -35,17 +35,17 @@ export default function NotificationCenter({ notifications, onMarkAsRead, onClea
   };
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[100]" id="notification_center_root">
+    <div className="fixed bottom-6 right-4 sm:bottom-8 sm:right-8 z-[100]" id="notification_center_root">
       {/* Badge Button */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`relative p-2.5 sm:p-3 rounded-full shadow-2xl transition-all cursor-pointer group ${
-          isOpen ? 'bg-stone-900 text-white scale-90' : 'bg-[#1b4332] text-white hover:scale-110 active:scale-95'
+        className={`relative p-3.5 sm:p-4 rounded-full shadow-2xl transition-all cursor-pointer group active:scale-90 ${
+          isOpen ? 'bg-stone-900 text-white' : 'bg-[#1b4332] text-white hover:scale-110'
         }`}
       >
         <Bell className={`w-5 h-5 sm:w-6 sm:h-6 ${unreadCount > 0 && !isOpen ? 'animate-bounce' : ''}`} />
         {unreadCount > 0 && !isOpen && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[9px] font-black flex items-center justify-center rounded-full border-2 border-white animate-pulse">
+          <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white animate-pulse shadow-lg">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -73,16 +73,19 @@ export default function NotificationCenter({ notifications, onMarkAsRead, onClea
                   <h3 className="text-sm font-black text-stone-900 uppercase tracking-tighter">Thông báo mới</h3>
                   <p className="text-[10px] text-stone-500 font-bold">Quản lý các lượt đặt vé gần nhất</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {permissionState !== "granted" && (
-                    <button 
-                      onClick={handleRequestPermission}
-                      title="Bật thông báo điện thoại"
-                      className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-full transition-all cursor-pointer"
-                    >
-                      <Settings className="w-4 h-4" />
-                    </button>
-                  )}
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={handleRequestPermission}
+                    title="Cài đặt thông báo điện thoại"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all cursor-pointer ${
+                      permissionState === "granted" 
+                        ? "bg-stone-100 text-stone-400 cursor-not-allowed" 
+                        : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:scale-95"
+                    }`}
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span className="text-[10px] font-black uppercase">Cài đặt</span>
+                  </button>
                   {unreadCount > 0 && (
                     <button 
                       onClick={onClearAll}

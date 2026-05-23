@@ -70,16 +70,30 @@ export default function App() {
   const [comboSearch, setComboSearch] = useState<{ hotelId: string; date: string; from?: string; to?: string; time?: string } | null>(null);
 
   const requestNotificationPermission = () => {
-    if ("Notification" in window) {
-      Notification.requestPermission().then(permission => {
-        if (permission === "granted") {
-          new Notification("Đã bật thông báo", {
-            body: "Bạn sẽ nhận được thông báo khi có khách đặt vé mới.",
-            icon: "/favicon.ico"
-          });
-        }
-      });
+    if (!("Notification" in window)) {
+      alert("Trình duyệt của bạn hiện không hỗ trợ thông báo đẩy trực tiếp. Hãy mở trang web bằng Chrome hoặc Safari để sử dụng tính năng này.");
+      return;
     }
+
+    if (Notification.permission === "denied") {
+      alert("Thông báo đã bị chặn. Vui lòng vào cài đặt trình duyệt của bạn để cho phép xedimocchau.com gửi thông báo.");
+      return;
+    }
+
+    Notification.requestPermission().then(permission => {
+      if (permission === "granted") {
+        new Notification("Đã bật thông báo thành công", {
+          body: "Hệ thống sẽ thông báo ngay khi có khách hàng đặt vé mới.",
+          icon: "/favicon.ico"
+        });
+      } else if (permission === "denied") {
+        alert("Bạn đã từ chối quyền thông báo. Bạn sẽ không nhận được tin nhắn khi có khách mới.");
+      }
+    }).catch(err => {
+      console.error("Error requesting notification permission:", err);
+      // Fallback for some mobile browsers
+      alert("Không thể yêu cầu quyền thông báo trên trình duyệt này.");
+    });
   };
 
   const sendSystemNotification = (title: string, message: string) => {

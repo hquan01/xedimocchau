@@ -54,7 +54,7 @@ export default function FloatingContact() {
   ];
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 print:hidden flex flex-col items-start gap-2">
+    <div className="fixed bottom-6 left-4 sm:bottom-8 sm:left-8 z-50 print:hidden flex flex-col items-start gap-2">
       {/* Scroll to Top Button (Hidden via state if preferred, but leaving behavior same) */}
       <AnimatePresence>
         {isOpen && (
