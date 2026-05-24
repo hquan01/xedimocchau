@@ -393,7 +393,15 @@ export default function App() {
           />
         )}
 
-        {activeTab === "explore" && <ExploreMocChau destinations={destinations} />}
+        {activeTab === "explore" && (
+          <ExploreMocChau 
+            destinations={destinations} 
+            onSelectBooking={() => {
+              setActiveTab("limousine");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
+        )}
         {activeTab === "guide" && <TravelGuide articles={articles} />}
         {activeTab === "ai" && <AIPlanner />}
 

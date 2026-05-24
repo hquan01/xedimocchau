@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { Destination } from "../types";
-import { Clock, Info, Check, Sparkles, MapPin, Compass } from "lucide-react";
+import { Clock, Info, Check, Sparkles, MapPin, Compass, Ticket } from "lucide-react";
 import { motion } from "motion/react";
 
 interface ExploreMocChauProps {
   destinations: Destination[];
+  onSelectBooking?: () => void;
 }
 
-export default function ExploreMocChau({ destinations }: ExploreMocChauProps) {
+export default function ExploreMocChau({ destinations, onSelectBooking }: ExploreMocChauProps) {
   const [displayCount, setDisplayCount] = useState(4);
   const visibleDestinations = destinations.slice(0, displayCount);
 
@@ -86,26 +87,90 @@ export default function ExploreMocChau({ destinations }: ExploreMocChauProps) {
         </div>
       )}
 
-      <div className="bg-[#1b4332] text-stone-100 rounded-3xl p-8 mt-12 text-center max-w-4xl mx-auto relative overflow-hidden shadow-md">
-        <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl" />
+      {/* Premium Conversion CTA - Big Brand Style */}
+      <section className="mt-16 relative group">
+        <div className="absolute inset-0 bg-emerald-500 blur-[80px] opacity-10 group-hover:opacity-15 transition-opacity" />
         
-        <h3 className="text-base sm:text-lg font-extrabold text-white flex items-center justify-center space-x-2">
-          <Compass className="w-5.5 h-5.5 text-emerald-400 animate-spin-slow" />
-          <span>Bạn cần đặt một chuyến đi đến các địa danh này?</span>
-        </h3>
-        <p className="text-stone-300 text-xs mt-1.5 max-w-xl mx-auto font-sans leading-relaxed">
-          Sử dụng gói Combo hoặc thuê trọn xe phục vụ khứ hồi đón tại nhà riêng Hà Nội. Điều hành viên của Xe Đi Mộc Châu hỗ trợ tư vấn thiết kế lộ trình chụp ảnh đẹp nhất Tây Bắc miễn phí.
-        </p>
-        <div className="mt-5">
-          <a
-            href="tel:0971050324"
-            className="inline-flex items-center bg-gradient-to-r from-amber-500 to-amber-600 text-stone-900 font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-md transition-transform hover:scale-[1.02]"
-          >
-            Liên Hệ Đặt Lịch Trình Chụp Ảnh: 0971.050.324
-          </a>
+        <div className="relative bg-stone-950 border border-stone-800 rounded-[2rem] overflow-hidden shadow-2xl">
+          <div className="flex flex-col lg:flex-row items-stretch">
+            {/* Left side: Benefit & Content */}
+            <div className="flex-1 p-6 sm:p-10 lg:p-12 text-left">
+              <div className="flex items-center space-x-2 mb-5">
+                <span className="w-6 h-[2px] bg-emerald-500" />
+                <span className="text-emerald-500 text-[10px] sm:text-xs font-black uppercase tracking-[0.3em]">Ưu đãi dành riêng cho bạn</span>
+              </div>
+              
+              <h2 className="text-xl sm:text-3xl lg:text-4xl font-black text-white leading-tight mb-5 font-sans">
+                Gác Lại Âu Lo - Tự Do <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">Sống Ảo Trọn Vẹn</span>
+              </h2>
+              
+              <p className="text-stone-400 text-xs sm:text-base mb-8 leading-relaxed max-w-xl opacity-90">
+                Đừng để đường đèo dốc làm bạn chùn bước. Hệ thống xe VIP <strong>Limousine đời mới 2024</strong> của chúng tôi đón tận cửa, trả tận nơi mọi tọa độ hot nhất Mộc Châu.
+              </p>
+              
+              <div className="flex flex-wrap gap-4 mb-8">
+                <div className="bg-stone-900 border border-stone-800 px-4 py-2.5 rounded-xl">
+                  <div className="text-[9px] text-stone-500 font-bold uppercase tracking-widest mb-0.5">Giá chỉ từ</div>
+                  <div className="text-lg font-black text-emerald-400">300.000đ<span className="text-xs text-stone-500 font-normal ml-1">/vé</span></div>
+                </div>
+                <div className="bg-stone-900 border border-stone-800 px-4 py-2.5 rounded-xl">
+                  <div className="text-[9px] text-stone-500 font-bold uppercase tracking-widest mb-0.5">Tần suất</div>
+                  <div className="text-lg font-black text-white">60 Phút<span className="text-xs text-stone-500 font-normal ml-1">/chuyến</span></div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={onSelectBooking}
+                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black text-xs sm:text-sm px-8 py-4 rounded-xl shadow-xl shadow-emerald-500/20 transition-all flex items-center justify-center space-x-3 cursor-pointer"
+                >
+                  <span>MỞ FORM ĐẶT XE NGAY</span>
+                  <Compass className="w-5 h-5" />
+                </motion.button>
+                
+                <a
+                  href="tel:0971050324"
+                  className="w-full sm:w-auto px-6 py-4 text-white font-black text-xs sm:text-sm rounded-xl border border-stone-700 hover:border-emerald-500 transition-all flex items-center justify-center space-x-3"
+                >
+                  <Ticket className="w-5 h-5 text-emerald-500" />
+                  <span>HOTLINE: 0971.050.324</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Right side: Trust Badges / Stats (Bento style) */}
+            <div className="lg:w-1/3 bg-stone-900/50 p-6 sm:p-8 lg:p-10 border-l border-stone-800 flex flex-col justify-center space-y-6">
+              {[
+                { icon: Check, title: "Đưa đón tận nơi", desc: "Không cần ra bến, đón trả nội thành Hà Nội & Mộc Châu." },
+                { icon: Clock, title: "Giữ đúng số ghế", desc: "Cam kết 100% không bắt khách dọc đường, chuẩn giờ." },
+                { icon: Sparkles, title: "Hỗ trợ thiết kế tour", desc: "Tư vấn điểm check-in & lộ trình miễn phí cho đoàn." }
+              ].map((benefit, i) => (
+                <div key={i} className="flex space-x-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                    <benefit.icon className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-bold text-xs mb-0.5">{benefit.title}</h4>
+                    <p className="text-stone-500 text-[10px] leading-snug">{benefit.desc}</p>
+                  </div>
+                </div>
+              ))}
+              
+              <div className="pt-5 border-t border-stone-800 opacity-60">
+                <div className="flex items-center space-x-3">
+                  <div className="flex -space-x-1.5">
+                    {[1,2,3].map(i => <div key={i} className="w-5 h-5 rounded-full border-2 border-stone-900 bg-stone-700" />)}
+                  </div>
+                  <span className="text-[9px] text-stone-400 font-bold uppercase tracking-tight">3,400+ Lượt đặt tuần qua</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
