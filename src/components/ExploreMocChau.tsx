@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Destination } from "../types";
-import { Clock, Info, Check, Sparkles, MapPin, Compass, Ticket } from "lucide-react";
+import { Clock, Info, Check, Sparkles, MapPin, Compass, Ticket, List, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
 
 interface ExploreMocChauProps {
@@ -12,9 +12,31 @@ export default function ExploreMocChau({ destinations, onSelectBooking }: Explor
   const [displayCount, setDisplayCount] = useState(4);
   const visibleDestinations = destinations.slice(0, displayCount);
 
+  const scrollToDestination = (id: string, index: number) => {
+    // If the destination is currently hidden by displayCount, expand the list
+    if (index >= displayCount) {
+      setDisplayCount(index + 1);
+    }
+    
+    // Small delay to allow state update and DOM rendering
+    setTimeout(() => {
+      const element = document.getElementById(`dest_card_${id}`);
+      if (element) {
+        const headerOffset = 100;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth"
+        });
+      }
+    }, 50);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10" id="explore_moc_chau_section">
-      <div className="text-center max-w-2xl mx-auto mb-12">
+      <div className="text-center max-w-2xl mx-auto mb-10">
         <span className="text-xs bg-emerald-100 text-emerald-800 font-extrabold px-3.5 py-1.5 rounded-full uppercase tracking-wider">
           Cẩm Nang Tây Bắc
         </span>
@@ -24,6 +46,38 @@ export default function ExploreMocChau({ destinations, onSelectBooking }: Explor
         <p className="text-stone-500 mt-2 text-sm font-sans">
           Mộc Châu bốn mùa ngập tràn hương sắc hoa trái thiên nhiên mộc mạc. Điểm qua danh sách các tọa độ vàng không thể bỏ lỡ khi xách vali lướt trên cao nguyên.
         </p>
+      </div>
+
+      {/* Table of Contents (Mục lục) */}
+      <div className="mb-12 max-w-4xl mx-auto">
+        <div className="bg-stone-50 border border-stone-200 rounded-2xl p-5 sm:p-6 shadow-sm overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12" />
+          
+          <div className="flex items-center space-x-2 text-[#1b4332] mb-4">
+            <div className="bg-emerald-600 p-1.5 rounded-lg">
+              <List className="w-4 h-4 text-white" />
+            </div>
+            <h3 className="font-black text-sm uppercase tracking-widest">Mục Lục Bài Viết</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+            {destinations.map((dest, idx) => (
+              <button
+                key={dest.id}
+                onClick={() => scrollToDestination(dest.id, idx)}
+                className="flex items-center text-left group transition-colors hover:text-emerald-600"
+              >
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-stone-200 flex items-center justify-center text-[10px] font-black text-stone-500 group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-colors mr-2.5">
+                  {idx + 1}
+                </div>
+                <span className="text-[11px] sm:text-xs font-bold text-stone-600 group-hover:text-emerald-700 transition-colors line-clamp-1 border-b border-stone-200 group-hover:border-emerald-200 pb-0.5 w-full">
+                  {dest.name}
+                </span>
+                <ChevronRight className="w-3 h-3 text-stone-300 group-hover:text-emerald-400 transform group-hover:translate-x-1 transition-all ml-1" />
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
