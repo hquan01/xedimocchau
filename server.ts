@@ -81,8 +81,8 @@ Hãy tạo cấu trúc lịch trình chất lượng cao sử dụng Markdown. S
 
 Vui lòng chia sẻ lịch trình theo từng ngày, nêu rõ thời gian khởi hành bằng xe Limousine từ Hà Nội (khoảng 4-5 tiếng đi xe dọc quốc lộ 6), các điểm dừng nghỉ dọc đường, điểm chụp ảnh check-in tuyệt đẹp, các quán ăn ngon nổi tiếng của người bản xứ và lời khuyên chuẩn bị trang phục, thời tiết Mộc Châu.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+    const result = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         systemInstruction,
@@ -91,15 +91,17 @@ Vui lòng chia sẻ lịch trình theo từng ngày, nêu rõ thời gian khởi
       }
     });
 
-    const text = response.text;
+    console.log("[AI Planner] Generation successful");
+    const text = result.text;
     if (!text) {
+      console.error("[AI Planner] No text in response", JSON.stringify(result));
       throw new Error("Mô hình không trả về nội dung (có thể do bộ lọc an toàn hoặc giới hạn kĩ thuật).");
     }
 
     res.json({
       success: true,
       itinerary: text,
-      groundingMetadata: response.candidates?.[0]?.groundingMetadata
+      groundingMetadata: result.candidates?.[0]?.groundingMetadata
     });
 
   } catch (error: any) {

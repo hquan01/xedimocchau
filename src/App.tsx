@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { doc, deleteDoc, writeBatch } from "firebase/firestore";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
@@ -167,16 +168,26 @@ export default function App() {
     setNotifications(updated);
   };
 
-  const deleteNotification = (id: string) => {
-    const updated = notifications.filter(n => n.id !== id);
-    setNotifications(updated);
-    // Note: We could also delete from Firebase here if persistent deletion is required
+  const deleteNotification = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "notifications", id));
+      // Local state is updated via useFirebaseSync as it listens real-time
+    } catch (error) {
+      console.error("Failed to delete notification:", error);
+    }
   };
 
-  const deleteAllNotifications = () => {
+  const deleteAllNotifications = async () => {
     if (confirm("Bạn có chắc chắn muốn xóa tất cả thông báo?")) {
-      setNotifications([]);
-      // Note: We could also clear in Firebase here
+      try {
+        const batch = writeBatch(db);
+        notifications.forEach((n) => {
+          batch.delete(doc(db, "notifications", n.id));
+        });
+        await batch.commit();
+      } catch (error) {
+        console.error("Failed to delete all notifications:", error);
+      }
     }
   };
 
