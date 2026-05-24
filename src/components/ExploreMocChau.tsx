@@ -7,13 +7,16 @@ import DestinationReview from "./DestinationReview";
 interface ExploreMocChauProps {
   destinations: Destination[];
   onSelectBooking?: () => void;
+  currentUser?: any;
 }
 
-export default function ExploreMocChau({ destinations, onSelectBooking }: ExploreMocChauProps) {
+export default function ExploreMocChau({ destinations, onSelectBooking, currentUser }: ExploreMocChauProps) {
   const [displayCount, setDisplayCount] = useState(4);
   const [searchQuery, setSearchQuery] = useState("");
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [interactions, setInteractions] = useState<{ [key: string]: { liked: boolean, saved: boolean, likes: number, views: number } }>({});
+
+  const isAdmin = currentUser?.role === "operator";
 
   const filteredDestinations = useMemo(() => {
     if (!searchQuery.trim()) return destinations;
@@ -315,6 +318,7 @@ export default function ExploreMocChau({ destinations, onSelectBooking }: Explor
               <DestinationReview 
                 destinationId={dest.id} 
                 destinationName={dest.name} 
+                isAdmin={isAdmin}
               />
             </div>
           </motion.div>

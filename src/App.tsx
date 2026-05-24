@@ -396,6 +396,7 @@ export default function App() {
         {activeTab === "explore" && (
           <ExploreMocChau 
             destinations={destinations} 
+            currentUser={currentUser}
             onSelectBooking={() => {
               setActiveTab("limousine");
               window.scrollTo({ top: 0, behavior: "smooth" });

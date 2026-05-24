@@ -1,26 +1,39 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Star, MessageSquare, Send, Mail, Facebook, User, X, Edit2, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Review } from "../types";
+import { saveReviewToFirebase, deleteReviewFromFirebase, listenToReviews } from "../lib/firebaseUtils";
 
 interface DestinationReviewProps {
   destinationId: string;
   destinationName: string;
+  isAdmin?: boolean;
 }
 
-export default function DestinationReview({ destinationId, destinationName }: DestinationReviewProps) {
+export default function DestinationReview({ destinationId, destinationName, isAdmin }: DestinationReviewProps) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userProfile, setUserProfile] = useState<{name: string, email: string, avatar?: string} | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("xemc_user_profile"));
+  const [userProfile, setUserProfile] = useState<{name: string, email: string, avatar?: string} | null>(() => {
+    const saved = localStorage.getItem("xemc_user_profile");
+    return saved ? JSON.parse(saved) : null;
+  });
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [editRating, setEditRating] = useState(5);
   const [editComment, setEditComment] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Listen to real-time updates from Firebase
+    const unsubscribe = listenToReviews(destinationId, (fetchedReviews) => {
+      setReviews(fetchedReviews);
+    });
+    return () => unsubscribe();
+  }, [destinationId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!comment.trim()) return;
 
@@ -30,7 +43,7 @@ export default function DestinationReview({ destinationId, destinationName }: De
     }
 
     const newReview: Review = {
-      id: `rev_${Date.now()}`,
+      id: `rev_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       destinationId,
       userName: userProfile?.name || "Khách hàng",
       userEmail: userProfile?.email,
@@ -40,29 +53,35 @@ export default function DestinationReview({ destinationId, destinationName }: De
       timestamp: new Date().toISOString(),
     };
 
-    setReviews([newReview, ...reviews]);
+    await saveReviewToFirebase(newReview);
     setComment("");
     setRating(5);
     setShowForm(false);
   };
 
-  const handleUpdate = (e: React.FormEvent) => {
+  const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editComment.trim() || !editingReviewId) return;
 
-    setReviews(prev => prev.map(rev => 
-      rev.id === editingReviewId 
-        ? { ...rev, comment: editComment, rating: editRating, timestamp: new Date().toISOString() }
-        : rev
-    ));
+    const reviewToUpdate = reviews.find(r => r.id === editingReviewId);
+    if (reviewToUpdate) {
+      const updatedReview = { 
+        ...reviewToUpdate, 
+        comment: editComment, 
+        rating: editRating, 
+        timestamp: new Date().toISOString() 
+      };
+      await saveReviewToFirebase(updatedReview);
+    }
+    
     setEditingReviewId(null);
     setEditComment("");
     setEditRating(5);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa đánh giá này không?")) {
-      setReviews(prev => prev.filter(rev => rev.id !== id));
+      await deleteReviewFromFirebase(id);
     }
   };
 
@@ -73,18 +92,22 @@ export default function DestinationReview({ destinationId, destinationName }: De
   };
 
   const loginWithEmail = (name: string, email: string) => {
-    setUserProfile({ name, email, avatar: `https://ui-avatars.com/api/?name=${name}&background=10b981&color=fff` });
+    const profile = { name, email, avatar: `https://ui-avatars.com/api/?name=${name}&background=10b981&color=fff` };
+    setUserProfile(profile);
     setIsLoggedIn(true);
+    localStorage.setItem("xemc_user_profile", JSON.stringify(profile));
     setShowAuthModal(false);
   };
 
   const loginWithFB = () => {
-    setUserProfile({ 
+    const profile = { 
       name: "Người dùng Facebook", 
       email: "fb_user@facebook.com", 
       avatar: "https://www.facebook.com/images/fb_icon_325x325.png" 
-    });
+    };
+    setUserProfile(profile);
     setIsLoggedIn(true);
+    localStorage.setItem("xemc_user_profile", JSON.stringify(profile));
     setShowAuthModal(false);
   };
 
@@ -237,14 +260,16 @@ export default function DestinationReview({ destinationId, destinationName }: De
                         <button className="hover:text-emerald-600 transition-colors">Phản hồi</button>
                       </div>
                       
-                      {isLoggedIn && userProfile?.email === review.userEmail && (
+                      {((isLoggedIn && userProfile?.email === review.userEmail) || isAdmin) && (
                         <div className="flex items-center space-x-3">
-                          <button 
-                            onClick={() => startEditing(review)}
-                            className="text-stone-400 hover:text-emerald-600 transition-colors"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
+                          {isLoggedIn && userProfile?.email === review.userEmail && (
+                            <button 
+                              onClick={() => startEditing(review)}
+                              className="text-stone-400 hover:text-emerald-600 transition-colors"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
                           <button 
                             onClick={() => handleDelete(review.id)}
                             className="text-stone-400 hover:text-rose-500 transition-colors"

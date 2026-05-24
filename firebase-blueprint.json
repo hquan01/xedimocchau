@@ -50,6 +50,22 @@
        "description": "Global config models for coupons, combos, articles, etc",
        "type": "object",
        "properties": {}
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Customer reviews for destinations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "destinationId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "destinationId", "userName", "rating", "comment", "timestamp"]
     }
   },
   "firestore": {
@@ -68,6 +84,10 @@
     "configs": {
          "schema": { "$ref": "#/entities/Config" },
          "description": "Global configs."
+    },
+    "reviews": {
+         "schema": { "$ref": "#/entities/Review" },
+         "description": "Customer reviews for destinations."
     }
   }
 }

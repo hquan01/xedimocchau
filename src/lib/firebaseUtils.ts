@@ -1,6 +1,6 @@
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
-import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification } from "../types";
+import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review } from "../types";
 
 // Let's get things from localStorage
 export const getDeviceId = (): string => {
@@ -28,6 +28,43 @@ export const setLocalList = <T>(key: string, data: T[]) => {
   } catch (e) {
     console.error(e);
   }
+};
+
+export const saveReviewToFirebase = async (review: Review) => {
+  try {
+    const sanitizedReview = JSON.parse(JSON.stringify(review));
+    await setDoc(doc(db, "reviews", review.id), sanitizedReview);
+    console.log("Review saved to Firebase successfully");
+  } catch (error) {
+    console.error("Error saving review to Firebase:", error);
+  }
+};
+
+export const deleteReviewFromFirebase = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, "reviews", id));
+    console.log("Review deleted from Firebase successfully");
+  } catch (error) {
+    console.error("Error deleting review from Firebase:", error);
+  }
+};
+
+export const listenToReviews = (destinationId: string, callback: (reviews: Review[]) => void) => {
+  const q = query(
+    collection(db, "reviews"),
+    where("destinationId", "==", destinationId),
+    orderBy("timestamp", "desc")
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const reviews: Review[] = [];
+    snapshot.forEach((doc) => {
+      reviews.push(doc.data() as Review);
+    });
+    callback(reviews);
+  }, (error) => {
+    console.error("Error listening to reviews:", error);
+  });
 };
 
 export const saveBookingToFirebase = async (booking: Booking) => {
