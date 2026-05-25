@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Destination } from "../../types";
-import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, MapPin, Tag, Clock, Info } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, MapPin, Tag, Clock, Info, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface DestinationManagementProps {
@@ -10,6 +10,26 @@ interface DestinationManagementProps {
 
 export default function DestinationManagement({ destinations, onUpdateDestinations }: DestinationManagementProps) {
   const [editingDest, setEditingDest] = useState<Destination | null>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || !editingDest) return;
+
+    (Array.from(files) as File[]).forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setEditingDest(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            image: base64String
+          };
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
   const handleSave = (updated: Destination) => {
     const exists = destinations.find(d => d.id === updated.id);
@@ -125,11 +145,24 @@ export default function DestinationManagement({ destinations, onUpdateDestinatio
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Link Ảnh bài viết</label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Link Ảnh bài viết</label>
+                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
+                        <Upload className="w-3 h-3" />
+                        CHỌN ẢNH TỪ MÁY
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                        />
+                      </label>
+                    </div>
                     <input 
-                      className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+                      className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" 
                       value={editingDest.image} 
                       onChange={e => setEditingDest({...editingDest, image: e.target.value})}
+                      placeholder="https://..."
                     />
                   </div>
                   <div className="col-span-2">

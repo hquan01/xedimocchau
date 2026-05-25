@@ -172,9 +172,9 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
               <div className="col-span-2">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Danh sách Ảnh (Mỗi link 1 dòng)</label>
-                  <label className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black cursor-pointer hover:bg-emerald-100 transition-colors">
+                  <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
                     <Upload className="w-3 h-3" />
-                    TẢI ẢNH TỪ MÁY
+                    TẢI ẢNH TỪ MÁY TÍNH
                     <input 
                       type="file" 
                       className="hidden" 

@@ -95,14 +95,14 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
                 <div className="space-y-1">
                   <h4 className="font-bold text-stone-900 leading-tight">{acc.name}</h4>
                   <div className="flex items-center gap-1 text-amber-500">
-                    {acc.type.toLowerCase().includes('khách sạn') || acc.type.toLowerCase().includes('resort') ? (
-                      Array.from({ length: acc.rating }).map((_, i) => (
+                    {acc.rating === 0 ? (
+                      <span className="bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded text-[9px] font-black border border-stone-200">TIÊU CHUẨN</span>
+                    ) : acc.rating === 1 ? (
+                      <span className="bg-stone-50 text-stone-500 px-1.5 py-0.5 rounded text-[9px] font-black border border-stone-200">0 SAO</span>
+                    ) : (
+                      Array.from({ length: acc.rating - 1 }).map((_, i) => (
                         <Star key={i} className="w-3 h-3 fill-current" />
                       ))
-                    ) : (
-                      <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded text-[10px] font-black uppercase">
-                        <Star className="w-3 h-3 fill-current" /> {acc.rating}/5 CHẤT LƯỢNG
-                      </div>
                     )}
                   </div>
                   <p className="text-stone-500 text-xs font-medium">{acc.type}</p>
@@ -177,22 +177,20 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
 
               <div>
                 <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
-                  {editingAcc.type.toLowerCase().includes('khách sạn') || editingAcc.type.toLowerCase().includes('resort') 
-                    ? "Xếp hạng (Sao)" 
-                    : "Tiêu chuẩn (Hạng)"}
+                  Xếp hạng / Tiêu chuẩn
                 </label>
                 <select 
-                  className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                   value={editingAcc.rating}
                   onChange={e => setEditingAcc({...editingAcc, rating: Number(e.target.value)})}
                 >
-                  {[1, 2, 3, 4, 5].map(s => (
-                    <option key={s} value={s}>
-                      {editingAcc.type.toLowerCase().includes('khách sạn') || editingAcc.type.toLowerCase().includes('resort') 
-                        ? `${s} Sao` 
-                        : `Cấp độ ${s}`}
-                    </option>
-                  ))}
+                  <option value={0}>Tiêu Chuẩn</option>
+                  <option value={1}>0 Sao</option>
+                  <option value={2}>1 Sao</option>
+                  <option value={3}>2 Sao</option>
+                  <option value={4}>3 Sao</option>
+                  <option value={5}>4 Sao</option>
+                  <option value={6}>5 Sao</option>
                 </select>
               </div>
 
@@ -208,9 +206,9 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
               <div className="sm:col-span-2">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Danh sách Ảnh (Mỗi link 1 dòng)</label>
-                  <label className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black cursor-pointer hover:bg-emerald-100 transition-colors">
+                  <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
                     <Upload className="w-3 h-3" />
-                    TẢI ẢNH TỪ MÁY
+                    TẢI ẢNH TỪ MÁY TÍNH
                     <input 
                       type="file" 
                       className="hidden" 

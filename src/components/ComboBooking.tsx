@@ -984,12 +984,12 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                             <div className="flex items-center gap-3">
                               <h5 className="font-bold text-stone-900">{acc.name}</h5>
                               <div className="flex text-amber-500">
-                                {acc.type.toLowerCase().includes('khách sạn') || acc.type.toLowerCase().includes('resort') ? (
-                                  Array.from({ length: acc.rating }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)
+                                {acc.rating === 0 ? (
+                                  <span className="bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded text-[9px] font-black border border-stone-200">TIÊU CHUẨN</span>
+                                ) : acc.rating === 1 ? (
+                                  <span className="bg-stone-50 text-stone-500 px-1.5 py-0.5 rounded text-[9px] font-black border border-stone-200">0 SAO</span>
                                 ) : (
-                                  <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded text-[9px] font-black uppercase">
-                                    <Star className="w-3 h-3 fill-current" /> {acc.rating}/5 CHẤT LƯỢNG
-                                  </div>
+                                  Array.from({ length: acc.rating - 1 }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)
                                 )}
                               </div>
                             </div>

@@ -202,9 +202,9 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
                   <div className="col-span-2">
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Link Ảnh bìa</label>
-                      <label className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black cursor-pointer hover:bg-emerald-100 transition-colors">
+                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
                         <Upload className="w-3 h-3" />
-                        CHỌN TỪ MÁY
+                        CHỌN ẢNH TỪ MÁY
                         <input 
                           type="file" 
                           className="hidden" 
@@ -222,7 +222,7 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
                   <div className="col-span-2">
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Album ảnh thực tế (Tách bằng dấu xuống dòng)</label>
-                      <label className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black cursor-pointer hover:bg-emerald-100 transition-colors">
+                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
                         <Plus className="w-3 h-3" />
                         TẢI LÊN NHIỀU ẢNH
                         <input 
