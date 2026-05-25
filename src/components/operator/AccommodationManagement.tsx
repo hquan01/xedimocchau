@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Accommodation } from "../../types";
-import { Plus, Edit2, Save, X, Building, Star, MapPin, Trash2, Upload } from "lucide-react";
+import { Plus, Edit2, Save, X, Building, Star, MapPin, Trash2, Upload, Loader2 } from "lucide-react";
+import { compressImage } from "../../lib/imageUtils";
 
 interface AccommodationManagementProps {
   accommodations: Accommodation[];
@@ -9,6 +10,7 @@ interface AccommodationManagementProps {
 
 export default function AccommodationManagement({ accommodations, onUpdateAccommodations }: AccommodationManagementProps) {
   const [editingAcc, setEditingAcc] = useState<Accommodation | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const handleDelete = (id: string) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa khách sạn này?")) {
@@ -17,24 +19,28 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !editingAcc) return;
 
-    (Array.from(files) as File[]).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
+    setIsCompressing(true);
+    try {
+      for (const file of Array.from(files) as File[]) {
+        const compressedBase64 = await compressImage(file, 800, 800, 0.6);
         setEditingAcc(prev => {
           if (!prev) return prev;
           return {
             ...prev,
-            images: [...prev.images, base64String]
+            images: [...prev.images, compressedBase64]
           };
         });
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+    } catch (error) {
+      console.error("Compression error:", error);
+      alert("Lỗi khi xử lý ảnh.");
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleSave = (updated: Accommodation) => {
@@ -206,14 +212,15 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
               <div className="sm:col-span-2">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Danh sách Ảnh (Mỗi link 1 dòng)</label>
-                  <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
-                    <Upload className="w-3 h-3" />
-                    TẢI ẢNH TỪ MÁY TÍNH
+                  <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50">
+                    {isCompressing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                    {isCompressing ? "ĐANG XỬ LÝ..." : "TẢI ẢNH TỪ MÁY TÍNH"}
                     <input 
                       type="file" 
                       className="hidden" 
                       accept="image/*"
                       multiple
+                      disabled={isCompressing}
                       onChange={handleFileUpload}
                     />
                   </label>

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { GuideArticle } from "../../types";
-import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Calendar, Clock, Flame, User as UserIcon, Eye, Heart, Bookmark, Upload } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Calendar, Clock, Flame, User as UserIcon, Eye, Heart, Bookmark, Upload, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { compressImage } from "../../lib/imageUtils";
 
 interface ArticleManagementProps {
   articles: GuideArticle[];
@@ -12,6 +13,7 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
   const [editingArticle, setEditingArticle] = useState<GuideArticle | null>(null);
   const [contentRaw, setContentRaw] = useState("");
   const [albumRaw, setAlbumRaw] = useState("");
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const handleSave = (updated: GuideArticle) => {
     // Convert raw strings back to arrays
@@ -38,24 +40,28 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isAlbum: boolean = false) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isAlbum: boolean = false) => {
     const files = e.target.files;
     if (!files) return;
 
     const fileList = Array.from(files) as File[];
+    setIsCompressing(true);
     
-    fileList.forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
+    try {
+      for (const file of fileList) {
+        const compressedBase64 = await compressImage(file, 800, 800, 0.6);
         if (isAlbum) {
-          setAlbumRaw(prev => prev ? `${prev}\n${base64String}` : base64String);
+          setAlbumRaw(prev => prev ? `${prev}\n${compressedBase64}` : compressedBase64);
         } else if (editingArticle) {
-          setEditingArticle({ ...editingArticle, imageUrl: base64String });
+          setEditingArticle({ ...editingArticle, imageUrl: compressedBase64 });
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+    } catch (error) {
+      console.error("Compression error:", error);
+      alert("Lỗi khi xử lý ảnh. Vui lòng thử lại.");
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const startNew = () => {
@@ -202,13 +208,14 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
                   <div className="col-span-2">
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Link Ảnh bìa</label>
-                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
-                        <Upload className="w-3 h-3" />
-                        CHỌN ẢNH TỪ MÁY
+                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50">
+                        {isCompressing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                        {isCompressing ? "ĐANG XỬ LÝ..." : "CHỌN ẢNH TỪ MÁY"}
                         <input 
                           type="file" 
                           className="hidden" 
                           accept="image/*"
+                          disabled={isCompressing}
                           onChange={e => handleFileUpload(e, false)}
                         />
                       </label>
@@ -222,14 +229,15 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
                   <div className="col-span-2">
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Album ảnh thực tế (Tách bằng dấu xuống dòng)</label>
-                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
-                        <Plus className="w-3 h-3" />
-                        TẢI LÊN NHIỀU ẢNH
+                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50">
+                        {isCompressing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                        {isCompressing ? "ĐANG TẢI LÊN..." : "TẢI LÊN NHIỀU ẢNH"}
                         <input 
                           type="file" 
                           className="hidden" 
                           accept="image/*"
                           multiple
+                          disabled={isCompressing}
                           onChange={e => handleFileUpload(e, true)}
                         />
                       </label>

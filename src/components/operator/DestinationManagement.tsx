@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Destination } from "../../types";
-import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, MapPin, Tag, Clock, Info, Upload } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, MapPin, Tag, Clock, Info, Upload, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { compressImage } from "../../lib/imageUtils";
 
 interface DestinationManagementProps {
   destinations: Destination[];
@@ -10,25 +11,30 @@ interface DestinationManagementProps {
 
 export default function DestinationManagement({ destinations, onUpdateDestinations }: DestinationManagementProps) {
   const [editingDest, setEditingDest] = useState<Destination | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !editingDest) return;
 
-    (Array.from(files) as File[]).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
+    setIsCompressing(true);
+    try {
+      for (const file of Array.from(files) as File[]) {
+        const compressedBase64 = await compressImage(file, 800, 800, 0.6);
         setEditingDest(prev => {
           if (!prev) return prev;
           return {
             ...prev,
-            image: base64String
+            image: compressedBase64
           };
         });
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+    } catch (error) {
+      console.error("Compression error:", error);
+      alert("Lỗi khi xử lý ảnh.");
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleSave = (updated: Destination) => {
@@ -147,13 +153,14 @@ export default function DestinationManagement({ destinations, onUpdateDestinatio
                   <div className="col-span-2">
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Link Ảnh bài viết</label>
-                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm">
-                        <Upload className="w-3 h-3" />
-                        CHỌN ẢNH TỪ MÁY
+                      <label className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50">
+                        {isCompressing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                        {isCompressing ? "ĐANG XỬ LÝ..." : "CHỌN ẢNH TỪ MÁY"}
                         <input 
                           type="file" 
                           className="hidden" 
                           accept="image/*"
+                          disabled={isCompressing}
                           onChange={handleFileUpload}
                         />
                       </label>
