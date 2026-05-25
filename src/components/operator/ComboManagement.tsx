@@ -27,7 +27,7 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
     setIsCompressing(true);
     try {
       for (const file of Array.from(files) as File[]) {
-        const compressedBase64 = await compressImage(file, 800, 800, 0.6);
+        const compressedBase64 = await compressImage(file, 500, 500, 0.4);
         setEditingCombo(prev => {
           if (!prev) return prev;
           return {
@@ -48,8 +48,8 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
     // Clean up empty lines from arrays
     const cleaned: TourCombo = {
       ...updated,
-      images: updated.images.filter(img => img.trim()),
-      highlights: updated.highlights.filter(h => h.trim()),
+      images: (updated.images || []).filter(img => img && img.trim()),
+      highlights: (updated.highlights || []).filter(h => h && h.trim()),
       itinerary: updated.itinerary 
         ? updated.itinerary.filter(i => i.title.trim() || i.content.trim())
         : undefined
@@ -218,7 +218,7 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
                 <textarea 
                   className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" 
                   rows={4}
-                  value={editingCombo.images.join('\n')} 
+                  value={(editingCombo.images || []).join('\n')} 
                   onChange={e => setEditingCombo({...editingCombo, images: e.target.value.split('\n')})}
                   placeholder="Link ảnh 1&#10;Link ảnh 2"
                 />
@@ -237,7 +237,7 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
                 <textarea 
                   className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" 
                   rows={4}
-                  value={editingCombo.highlights.join('\n')} 
+                  value={(editingCombo.highlights || []).join('\n')} 
                   onChange={e => setEditingCombo({...editingCombo, highlights: e.target.value.split('\n')})}
                 />
               </div>

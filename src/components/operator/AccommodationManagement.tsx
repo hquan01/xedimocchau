@@ -26,7 +26,7 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
     setIsCompressing(true);
     try {
       for (const file of Array.from(files) as File[]) {
-        const compressedBase64 = await compressImage(file, 800, 800, 0.6);
+        const compressedBase64 = await compressImage(file, 500, 500, 0.4);
         setEditingAcc(prev => {
           if (!prev) return prev;
           return {
@@ -47,8 +47,8 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
     // Clean up empty lines from arrays
     const cleaned: Accommodation = {
       ...updated,
-      images: updated.images.filter(img => img.trim()),
-      amenities: updated.amenities.filter(a => a.trim())
+      images: (updated.images || []).filter(img => img && img.trim()),
+      amenities: (updated.amenities || []).filter(a => a && a.trim())
     };
 
     const exists = accommodations.find(a => a.id === cleaned.id);
@@ -136,7 +136,7 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
             </div>
             
             <div className="flex flex-wrap gap-1.5">
-              {acc.amenities.map((amen, i) => (
+              {(acc.amenities || []).map((amen, i) => (
                 <span key={i} className="text-[9px] px-2 py-0.5 bg-stone-50 border border-stone-200 text-stone-500 rounded-lg">
                   {amen}
                 </span>
@@ -150,7 +150,9 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
         <div className="fixed inset-0 bg-stone-900/50 flex items-center justify-center p-4 backdrop-blur-sm z-50">
           <div className="bg-white p-6 sm:p-8 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-black text-lg text-[#1b4332]">Chỉnh sửa Khách sạn</h3>
+              <h3 className="font-black text-lg text-[#1b4332]">
+                {accommodations.find(a => a.id === editingAcc.id) ? `Chỉnh sửa: ${editingAcc.name}` : "Thêm Khách sạn Mới"}
+              </h3>
               <button onClick={() => setEditingAcc(null)} className="p-2 hover:bg-stone-100 rounded-full">
                 <X className="w-5 h-5 text-stone-400" />
               </button>

@@ -162,20 +162,57 @@ export const saveConfigToFirebase = async (key: string, data: any) => {
     console.error(e);
   }
 
-  // Split storage: Save each key into its own document to avoid 1MB limit for global config
+  // Split storage: Save each key into its own document or collection
   try {
     const sanitizedData = JSON.parse(JSON.stringify(data));
-    // Save to its own document (e.g., configs/accommodations)
-    await setDoc(doc(db, "configs", key), { [key]: sanitizedData });
-    console.log(`Config ${key} saved to its own document in Firebase successfully`);
+    
+    // Helper function for collection batch update
+    const updateCollection = async (collectionName: string, items: any[]) => {
+      const { writeBatch, collection, doc, getDocs } = await import("firebase/firestore");
+      const existingDocs = await getDocs(collection(db, collectionName));
+      const currentIds = new Set(items.map(i => i.id));
+      
+      const batch = writeBatch(db);
+      // Delete removed items
+      existingDocs.docs.forEach(docSnap => {
+        if (!currentIds.has(docSnap.id)) batch.delete(docSnap.ref);
+      });
+      // Upsert current items
+      items.forEach((item: any) => {
+        if (!item.id) {
+           console.warn(`Item in ${collectionName} missing ID, skipping:`, item);
+           return;
+        }
+        const ref = doc(collection(db, collectionName), String(item.id));
+        batch.set(ref, item);
+      });
+      await batch.commit();
+      console.log(`Collection ${collectionName} updated successfully`);
+    };
+
+    if (key === "combos" && Array.isArray(sanitizedData)) {
+       await updateCollection("tour_combos", sanitizedData);
+    } else if (key === "accommodations" && Array.isArray(sanitizedData)) {
+       await updateCollection("accommodations", sanitizedData);
+    } else if (key === "articles" && Array.isArray(sanitizedData)) {
+       await updateCollection("guide_articles", sanitizedData);
+    } else if (key === "coupons" && Array.isArray(sanitizedData)) {
+       await updateCollection("coupons", sanitizedData);
+    } else if (key === "destinations" && Array.isArray(sanitizedData)) {
+       await updateCollection("destinations", sanitizedData);
+    } else {
+       // Save smaller configs to its own document (e.g., configs/limousineConfig)
+       await setDoc(doc(db, "configs", key), { [key]: sanitizedData });
+       console.log(`Config ${key} saved to Firestore successfully`);
+    }
   } catch (error: any) {
-    console.error(`ERROR: Could not save config ${key} to Firebase (permissions/network):`, error);
+    console.error(`ERROR: Could not save config ${key} to Firebase:`, error);
     if (error.code === 'permission-denied') {
        alert(`Lỗi: Bạn không có quyền sửa nội dung này trên máy chủ (Permission Denied).`);
     } else {
        alert(`Lỗi khi lưu ${key} lên máy chủ: ${error.message || 'Lỗi mạng'}. Dữ liệu chỉ được lưu tạm thời trên máy này.`);
     }
-    console.warn("Saved locally only.");
+    throw error;
   }
 };
 

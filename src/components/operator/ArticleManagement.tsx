@@ -92,7 +92,7 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
 
   const startEdit = (article: GuideArticle) => {
     setEditingArticle(article);
-    setContentRaw(article.content.join('\n'));
+    setContentRaw((article.content || []).join('\n'));
     setAlbumRaw(article.albumImages?.join('\n') || '');
   };
 

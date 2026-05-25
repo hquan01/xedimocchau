@@ -89,5 +89,25 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read, write: if true;
     }
+
+    match /tour_combos/{comboId} {
+      allow read, write: if true;
+    }
+
+    match /accommodations/{accId} {
+      allow read, write: if true;
+    }
+
+    match /guide_articles/{articleId} {
+      allow read, write: if true;
+    }
+
+    match /coupons/{couponId} {
+      allow read, write: if true;
+    }
+
+    match /destinations/{destId} {
+      allow read, write: if true;
+    }
   }
 }

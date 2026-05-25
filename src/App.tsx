@@ -493,15 +493,17 @@ export default function App() {
                   saveConfigToFirebase("notifications", updated); 
               }}
               combos={combos}
-              onUpdateCombos={(updated) => { 
+              onUpdateCombos={async (updated) => { 
                   console.log("Saving combos configuration to Firebase...");
                   setCombos(updated); 
-                  saveConfigToFirebase("combos", updated); 
+                  await saveConfigToFirebase("combos", updated); 
+                  alert("Đã cập nhật danh sách Combo thành công!");
               }}
               accommodations={accommodations}
-              onUpdateAccommodations={(updated) => { 
+              onUpdateAccommodations={async (updated) => { 
                   setAccommodations(updated); 
-                  saveConfigToFirebase("accommodations", updated); 
+                  await saveConfigToFirebase("accommodations", updated); 
+                  alert("Đã cập nhật danh sách Khách sạn thành công!");
               }}
               limousineConfig={limousineConfig}
               onUpdateLimousineConfig={(updated) => { 
@@ -515,9 +517,10 @@ export default function App() {
                   saveConfigToFirebase("sharedCarConfig", updated); 
               }}
               coupons={coupons}
-              onUpdateCoupons={(updated) => { 
+              onUpdateCoupons={async (updated) => { 
                   setCoupons(updated); 
-                  saveConfigToFirebase("coupons", updated); 
+                  await saveConfigToFirebase("coupons", updated); 
+                  alert("Đã cập nhật Mã giảm giá thành công!");
               }}
               locations={locations}
               onUpdateLocations={(updated) => { 
@@ -526,14 +529,16 @@ export default function App() {
                 saveConfigToFirebase("locations", updated); 
               }}
               destinations={destinations}
-              onUpdateDestinations={(updated) => { 
+              onUpdateDestinations={async (updated) => { 
                   setDestinations(updated); 
-                  saveConfigToFirebase("destinations", updated); 
+                  await saveConfigToFirebase("destinations", updated); 
+                  alert("Đã cập nhật Điểm đến thành công!");
               }}
               articles={articles}
-              onUpdateArticles={(updated) => { 
+              onUpdateArticles={async (updated) => { 
                   setArticles(updated); 
-                  saveConfigToFirebase("articles", updated); 
+                  await saveConfigToFirebase("articles", updated); 
+                  alert("Đã cập nhật Bài viết thành công!");
               }}
             />
           )}

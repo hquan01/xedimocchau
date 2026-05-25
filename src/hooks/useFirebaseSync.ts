@@ -86,6 +86,11 @@ export function useFirebaseSync() {
     let unsubBlocked = () => {};
     let unsubConfigs = () => {};
     let unsubNotifications = () => {};
+    let unsubCombosCol = () => {};
+    let unsubAccCol = () => {};
+    let unsubArticlesCol = () => {};
+    let unsubCouponsCol = () => {};
+    let unsubDestinationsCol = () => {};
 
     if (authReady) {
       // Bookings: Public read access now allowed by rules, operator gets all, customers can filter frontend
@@ -101,6 +106,76 @@ export function useFirebaseSync() {
           setBookings(allBookings.filter(b => (b as any).deviceId === deviceId));
         }
       }, (error) => handleFirestoreError(error, OperationType.LIST, "bookings"));
+
+      unsubCombosCol = onSnapshot(collection(db, "tour_combos"), (snap) => {
+        if (snap.empty) {
+          setCombos(INITIAL_COMBOS);
+          if (currentUser?.role === 'operator' && auth.currentUser) {
+            console.log("Seeding initial combos to tour_combos...");
+            INITIAL_COMBOS.forEach(item => {
+              setDoc(doc(db, "tour_combos", item.id), item).catch(console.error);
+            });
+          }
+        } else {
+          setCombos(snap.docs.map(d => d.data() as TourCombo));
+        }
+      });
+
+      unsubAccCol = onSnapshot(collection(db, "accommodations"), (snap) => {
+        if (snap.empty) {
+          setAccommodations(INITIAL_ACCOMMODATIONS);
+          if (currentUser?.role === 'operator' && auth.currentUser) {
+            console.log("Seeding initial accommodations...");
+            INITIAL_ACCOMMODATIONS.forEach(item => {
+              setDoc(doc(db, "accommodations", item.id), item).catch(console.error);
+            });
+          }
+        } else {
+          setAccommodations(snap.docs.map(d => d.data() as Accommodation));
+        }
+      });
+
+      unsubArticlesCol = onSnapshot(collection(db, "guide_articles"), (snap) => {
+        if (snap.empty) {
+          setArticles(INITIAL_ARTICLES);
+          if (currentUser?.role === 'operator' && auth.currentUser) {
+            console.log("Seeding initial guide articles...");
+            INITIAL_ARTICLES.forEach(item => {
+              setDoc(doc(db, "guide_articles", item.id), item).catch(console.error);
+            });
+          }
+        } else {
+          setArticles(snap.docs.map(d => d.data() as GuideArticle));
+        }
+      });
+
+      unsubCouponsCol = onSnapshot(collection(db, "coupons"), (snap) => {
+        if (snap.empty) {
+          setCoupons(INITIAL_COUPONS);
+          if (currentUser?.role === 'operator' && auth.currentUser) {
+            console.log("Seeding initial coupons...");
+            INITIAL_COUPONS.forEach(item => {
+              setDoc(doc(db, "coupons", item.id), item).catch(console.error);
+            });
+          }
+        } else {
+          setCoupons(snap.docs.map(d => d.data() as Coupon));
+        }
+      });
+
+      unsubDestinationsCol = onSnapshot(collection(db, "destinations"), (snap) => {
+        if (snap.empty) {
+          setDestinations(INITIAL_DESTINATIONS);
+          if (currentUser?.role === 'operator' && auth.currentUser) {
+            console.log("Seeding initial destinations...");
+            INITIAL_DESTINATIONS.forEach(item => {
+              setDoc(doc(db, "destinations", item.id), item).catch(console.error);
+            });
+          }
+        } else {
+          setDestinations(snap.docs.map(d => d.data() as Destination));
+        }
+      });
       
       if (currentUser?.role === 'operator' && auth.currentUser) {
          const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
@@ -116,19 +191,14 @@ export function useFirebaseSync() {
          setBlockedSeats(snap.docs.map(d => d.data() as BlockedSeat));
       }, (error) => handleFirestoreError(error, OperationType.LIST, "blocked_seats"));
 
-      // Configurations - public read from whole collection to support split storage
+      // Configurations - public read from configs collection for global static params
       unsubConfigs = onSnapshot(collection(db, "configs"), (snap) => {
          if (!snap.empty) {
            snap.docs.forEach(docSnap => {
              const data = docSnap.data();
              if (data.limousineConfig) setLimousineConfig({ ...DEFAULT_LIMOUSINE_CONFIG, ...data.limousineConfig });
              if (data.sharedCarConfig) setSharedCarConfig({ ...DEFAULT_SHARED_CAR_CONFIG, ...data.sharedCarConfig });
-             if (data.combos) setCombos(data.combos);
-             if (data.accommodations) setAccommodations(data.accommodations);
-             if (data.coupons) setCoupons(data.coupons);
              if (data.locations) setLocations(data.locations);
-             if (data.destinations) setDestinations(data.destinations);
-             if (data.articles) setArticles(data.articles);
            });
          } else {
            // Create initial configs document quietly if operator exists (first run)
@@ -136,12 +206,7 @@ export function useFirebaseSync() {
              const initialData = {
                limousineConfig: DEFAULT_LIMOUSINE_CONFIG,
                sharedCarConfig: DEFAULT_SHARED_CAR_CONFIG,
-               combos: INITIAL_COMBOS,
-               accommodations: INITIAL_ACCOMMODATIONS,
-               coupons: INITIAL_COUPONS,
                locations: INITIAL_LOCATIONS,
-               destinations: INITIAL_DESTINATIONS,
-               articles: INITIAL_ARTICLES
              };
              Object.entries(initialData).forEach(([key, val]) => {
                setDoc(doc(db, "configs", key), { [key]: val }).catch(console.error);
@@ -168,6 +233,11 @@ export function useFirebaseSync() {
       unsubBlocked();
       unsubConfigs();
       unsubNotifications();
+      unsubCombosCol();
+      unsubAccCol();
+      unsubArticlesCol();
+      unsubCouponsCol();
+      unsubDestinationsCol();
     };
   }, [authReady, currentUser?.role, currentUser?.id]);
 
