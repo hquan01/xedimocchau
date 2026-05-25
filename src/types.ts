@@ -23,7 +23,7 @@ export interface Accommodation {
   id: string;
   name: string;
   rating: number; // 1-5 stars
-  type: 'Khách sạn 5*' | 'Resort Sinh Thái' | 'Homestay cao cấp' | 'Nhà Gỗ container';
+  type: string; // Khách Sạn, Resort, Homestay, Nhà Nghỉ, Căn Hộ
   description: string;
   images: string[];
   location: string;

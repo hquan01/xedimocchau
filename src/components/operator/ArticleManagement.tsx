@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { GuideArticle } from "../../types";
-import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Calendar, Clock, Flame, User as UserIcon, Eye, Heart, Bookmark } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Calendar, Clock, Flame, User as UserIcon, Eye, Heart, Bookmark, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface ArticleManagementProps {
@@ -36,6 +36,26 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
     if (confirm("Bạn có chắc chắn muốn xóa bài viết này?")) {
       onUpdateArticles(articles.filter(a => a.id !== id));
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isAlbum: boolean = false) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const fileList = Array.from(files) as File[];
+    
+    fileList.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        if (isAlbum) {
+          setAlbumRaw(prev => prev ? `${prev}\n${base64String}` : base64String);
+        } else if (editingArticle) {
+          setEditingArticle({ ...editingArticle, imageUrl: base64String });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const startNew = () => {
@@ -180,7 +200,19 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Link Ảnh bìa</label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Link Ảnh bìa</label>
+                      <label className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black cursor-pointer hover:bg-emerald-100 transition-colors">
+                        <Upload className="w-3 h-3" />
+                        CHỌN TỪ MÁY
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={e => handleFileUpload(e, false)}
+                        />
+                      </label>
+                    </div>
                     <input 
                       className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" 
                       value={editingArticle.imageUrl} 
@@ -190,6 +222,17 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
                   <div className="col-span-2">
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Album ảnh thực tế (Tách bằng dấu xuống dòng)</label>
+                      <label className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black cursor-pointer hover:bg-emerald-100 transition-colors">
+                        <Plus className="w-3 h-3" />
+                        TẢI LÊN NHIỀU ẢNH
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          multiple
+                          onChange={e => handleFileUpload(e, true)}
+                        />
+                      </label>
                     </div>
                     <textarea 
                       className="w-full p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" 

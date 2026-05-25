@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { TourCombo, Accommodation } from "../../types";
-import { Plus, Edit2, Save, X, Image as ImageIcon, Building, Trash2 } from "lucide-react";
+import { Plus, Edit2, Save, X, Image as ImageIcon, Building, Trash2, Upload } from "lucide-react";
 
 interface ComboManagementProps {
   combos: TourCombo[];
@@ -16,6 +16,26 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
       const nextCombos = combos.filter(c => c.id !== id);
       onUpdateCombos(nextCombos);
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || !editingCombo) return;
+
+    (Array.from(files) as File[]).forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setEditingCombo(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            images: [...prev.images, base64String]
+          };
+        });
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleSave = (updated: TourCombo) => {
@@ -150,7 +170,20 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
                 />
               </div>
               <div className="col-span-2">
-                <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Danh sách Ảnh (Mỗi link 1 dòng)</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Danh sách Ảnh (Mỗi link 1 dòng)</label>
+                  <label className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black cursor-pointer hover:bg-emerald-100 transition-colors">
+                    <Upload className="w-3 h-3" />
+                    TẢI ẢNH TỪ MÁY
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileUpload}
+                    />
+                  </label>
+                </div>
                 <textarea 
                   className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" 
                   rows={4}

@@ -984,7 +984,13 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                             <div className="flex items-center gap-3">
                               <h5 className="font-bold text-stone-900">{acc.name}</h5>
                               <div className="flex text-amber-500">
-                                {Array.from({ length: acc.rating }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)}
+                                {acc.type.toLowerCase().includes('khách sạn') || acc.type.toLowerCase().includes('resort') ? (
+                                  Array.from({ length: acc.rating }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)
+                                ) : (
+                                  <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded text-[9px] font-black uppercase">
+                                    <Star className="w-3 h-3 fill-current" /> {acc.rating}/5 CHẤT LƯỢNG
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

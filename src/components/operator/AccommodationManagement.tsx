@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Accommodation } from "../../types";
-import { Plus, Edit2, Save, X, Building, Star, MapPin, Trash2 } from "lucide-react";
+import { Plus, Edit2, Save, X, Building, Star, MapPin, Trash2, Upload } from "lucide-react";
 
 interface AccommodationManagementProps {
   accommodations: Accommodation[];
@@ -15,6 +15,26 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
       const nextAccs = accommodations.filter(a => a.id !== id);
       onUpdateAccommodations(nextAccs);
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || !editingAcc) return;
+
+    (Array.from(files) as File[]).forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setEditingAcc(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            images: [...prev.images, base64String]
+          };
+        });
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleSave = (updated: Accommodation) => {
@@ -38,7 +58,7 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
       id: `acc_${Date.now()}`,
       name: "",
       rating: 5,
-      type: "Khách sạn 5*",
+      type: "Khách Sạn",
       description: "",
       images: [],
       location: "",
@@ -75,9 +95,15 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
                 <div className="space-y-1">
                   <h4 className="font-bold text-stone-900 leading-tight">{acc.name}</h4>
                   <div className="flex items-center gap-1 text-amber-500">
-                    {Array.from({ length: acc.rating }).map((_, i) => (
-                      <Star key={i} className="w-3 h-3 fill-current" />
-                    ))}
+                    {acc.type.toLowerCase().includes('khách sạn') || acc.type.toLowerCase().includes('resort') ? (
+                      Array.from({ length: acc.rating }).map((_, i) => (
+                        <Star key={i} className="w-3 h-3 fill-current" />
+                      ))
+                    ) : (
+                      <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded text-[10px] font-black uppercase">
+                        <Star className="w-3 h-3 fill-current" /> {acc.rating}/5 CHẤT LƯỢNG
+                      </div>
+                    )}
                   </div>
                   <p className="text-stone-500 text-xs font-medium">{acc.type}</p>
                   <p className="text-stone-400 text-[10px] flex items-center gap-1">
@@ -137,26 +163,35 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
               <div>
                 <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Loại hình</label>
                 <select 
-                  className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                   value={editingAcc.type}
-                  onChange={e => setEditingAcc({...editingAcc, type: e.target.value as any})}
+                  onChange={e => setEditingAcc({...editingAcc, type: e.target.value})}
                 >
-                  <option value="Khách sạn 5*">Khách sạn 5*</option>
-                  <option value="Resort Sinh Thái">Resort Sinh Thái</option>
-                  <option value="Homestay cao cấp">Homestay cao cấp</option>
-                  <option value="Nhà Gỗ container">Nhà Gỗ container</option>
+                  <option value="Khách Sạn">Khách Sạn</option>
+                  <option value="Resort">Resort</option>
+                  <option value="Homestay">Homestay</option>
+                  <option value="Nhà Nghỉ">Nhà Nghỉ</option>
+                  <option value="Căn Hộ">Căn Hộ</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Xếp hạng (Sao)</label>
+                <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                  {editingAcc.type.toLowerCase().includes('khách sạn') || editingAcc.type.toLowerCase().includes('resort') 
+                    ? "Xếp hạng (Sao)" 
+                    : "Tiêu chuẩn (Hạng)"}
+                </label>
                 <select 
                   className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   value={editingAcc.rating}
                   onChange={e => setEditingAcc({...editingAcc, rating: Number(e.target.value)})}
                 >
                   {[1, 2, 3, 4, 5].map(s => (
-                    <option key={s} value={s}>{s} Sao</option>
+                    <option key={s} value={s}>
+                      {editingAcc.type.toLowerCase().includes('khách sạn') || editingAcc.type.toLowerCase().includes('resort') 
+                        ? `${s} Sao` 
+                        : `Cấp độ ${s}`}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -171,7 +206,20 @@ export default function AccommodationManagement({ accommodations, onUpdateAccomm
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Danh sách Ảnh (Mỗi link 1 dòng)</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Danh sách Ảnh (Mỗi link 1 dòng)</label>
+                  <label className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black cursor-pointer hover:bg-emerald-100 transition-colors">
+                    <Upload className="w-3 h-3" />
+                    TẢI ẢNH TỪ MÁY
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileUpload}
+                    />
+                  </label>
+                </div>
                 <textarea 
                   className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" 
                   rows={4}
