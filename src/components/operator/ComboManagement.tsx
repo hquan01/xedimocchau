@@ -70,10 +70,15 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
           <div key={combo.id} className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm space-y-4">
             <div className="flex justify-between items-start">
               <div className="flex gap-4">
-                <img src={combo.images?.[0] || null} alt={combo.name} className="w-20 h-20 rounded-lg object-cover" />
+                <img 
+                  src={combo.images?.[0] || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=cover&w=400&q=80"} 
+                  alt={combo.name} 
+                  className="w-20 h-20 rounded-lg object-cover bg-stone-100" 
+                />
                 <div>
-                  <h4 className="font-bold text-stone-900">{combo.name}</h4>
-                  <p className="text-stone-500 text-xs">{combo.pricePerPerson.toLocaleString()} đ / người</p>
+                  <h4 className="font-bold text-stone-900 line-clamp-1">{combo.name}</h4>
+                  <p className="text-stone-500 text-xs mt-1">{combo.pricePerPerson.toLocaleString()} đ / người</p>
+                  <p className="text-[10px] text-stone-400 mt-1 uppercase tracking-wider font-bold">{combo.durationText || "Lịch trình tùy chọn"}</p>
                 </div>
               </div>
               <div className="flex gap-1">

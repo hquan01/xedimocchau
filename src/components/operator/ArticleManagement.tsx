@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { GuideArticle } from "../../types";
-import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Calendar, Clock, Flame, User as UserIcon } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Check, Image as ImageIcon, Calendar, Clock, Flame, User as UserIcon, Eye, Heart, Bookmark } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface ArticleManagementProps {
@@ -88,15 +88,20 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
           <div key={article.id} className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm space-y-4">
             <div className="flex justify-between items-start">
               <div className="flex gap-4">
-                <img src={article.imageUrl || null} alt={article.title} className="w-24 h-24 rounded-lg object-cover" />
-                <div>
+                <img src={article.imageUrl || "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=cover&w=400&q=80"} alt={article.title} className="w-24 h-24 rounded-lg object-cover" />
+                <div className="flex-1">
                   <h4 className="font-bold text-stone-900 line-clamp-1">{article.title}</h4>
                   <p className="text-stone-500 text-xs mt-1 line-clamp-2">{article.excerpt}</p>
-                  <div className="flex items-center gap-3 mt-2">
+                  <div className="flex flex-wrap items-center gap-3 mt-2">
                     <span className="text-[10px] bg-stone-100 text-[#1b4332] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">{article.categoryLabel}</span>
                     <span className="text-[10px] text-stone-400 font-bold flex items-center gap-1">
                       <Calendar className="w-3 h-3" /> {article.date}
                     </span>
+                    <div className="flex items-center gap-2 border-l border-stone-200 pl-3 ml-1">
+                      <span className="text-[10px] text-stone-400 flex items-center gap-1" title="Lượt xem"><Eye className="w-3 h-3" /> {article.views || 0}</span>
+                      <span className="text-[10px] text-rose-400 flex items-center gap-1" title="Yêu thích"><Heart className="w-3 h-3" /> {article.likes || 0}</span>
+                      <span className="text-[10px] text-stone-400 flex items-center gap-1" title="Lượt lưu"><Bookmark className="w-3 h-3" /> {article.saves || 0}</span>
+                    </div>
                     {article.isHot && <span className="text-[10px] text-amber-600 font-black flex items-center gap-0.5"><Flame className="w-3 h-3" /> HOT</span>}
                   </div>
                 </div>
@@ -193,6 +198,35 @@ export default function ArticleManagement({ articles, onUpdateArticles }: Articl
                       onChange={e => setAlbumRaw(e.target.value)}
                       placeholder="Dán link ảnh tại đây, mỗi dòng 1 link..."
                     />
+                  </div>
+                  <div className="col-span-2 grid grid-cols-3 gap-4 border-t border-stone-100 pt-4 mt-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Số lượt xem (Views)</label>
+                      <input 
+                        type="number"
+                        className="w-full mt-1 p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+                        value={editingArticle.views} 
+                        onChange={e => setEditingArticle({...editingArticle, views: Number(e.target.value)})}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Số lượt thích (Likes)</label>
+                      <input 
+                        type="number"
+                        className="w-full mt-1 p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+                        value={editingArticle.likes} 
+                        onChange={e => setEditingArticle({...editingArticle, likes: Number(e.target.value)})}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Số lượt lưu (Saves)</label>
+                      <input 
+                        type="number"
+                        className="w-full mt-1 p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+                        value={editingArticle.saves} 
+                        onChange={e => setEditingArticle({...editingArticle, saves: Number(e.target.value)})}
+                      />
+                    </div>
                   </div>
                   <div className="col-span-2">
                     <div className="flex justify-between items-center mb-1">
