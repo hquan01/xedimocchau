@@ -131,6 +131,22 @@ export default function OperatorPanel({
   }, [lockFrom, lockTo, lockService, lockDate, limousineConfig]);
 
   // Statistics calculation helpers
+  const today = new Date().toISOString().substring(0, 10);
+  
+  const todayBookings = bookings.filter(b => b.travelDate === today && b.status !== "cancelled");
+  const todayLimousine = todayBookings.filter(b => b.type === "limousine" || b.type === "shared_car");
+  const todayCombos = todayBookings.filter(b => b.type === "combo");
+
+  // Group limousine by trip for reminder
+  const tripGroups: Record<string, { count: number, time: string, route: string }> = {};
+  todayLimousine.forEach(b => {
+    const key = `${b.routeSelection}_${b.departureTime}`;
+    if (!tripGroups[key]) {
+      tripGroups[key] = { count: 0, time: b.departureTime || "", route: b.routeSelection || "" };
+    }
+    tripGroups[key].count += (b.seatNumbers?.length || b.seatCount || 1);
+  });
+
   const totalRevenue = bookings
     .filter((b) => b.status === "success" || b.status === "completed")
     .reduce((val, b) => val + b.totalPrice, 0);
@@ -491,7 +507,56 @@ export default function OperatorPanel({
       </div>
 
       {panelTab === "bookings" && (
-        /* PROFESSIONAL HIGH-TECH ROUTE FILLING STATISTICS BOARD (Bento View) */
+        <div className="mb-6 space-y-4">
+          {/* DAILY REMINDER CARD */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-emerald-600 rounded-lg text-white">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-black text-emerald-950 text-sm uppercase tracking-tight">NHẮC NHỞ HÀNH TRÌNH HÔM NAY</h3>
+                <p className="text-[10px] text-emerald-700 font-bold">Ngày {new Date().toLocaleDateString('vi-VN')}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Bus Reminders */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-black text-emerald-900 border-b border-emerald-100 pb-1 flex items-center gap-1.5">
+                  <ArrowRight className="w-3 h-3" /> CHUYẾN XE XUẤT PHÁT
+                </h4>
+                {Object.keys(tripGroups).length > 0 ? (
+                  Object.values(tripGroups).map((trip, idx) => (
+                    <div key={idx} className="bg-white/60 p-3 rounded-xl border border-emerald-100 text-xs text-stone-800 flex justify-between items-center">
+                      <span>Hôm nay có <strong className="text-emerald-700">{trip.count} khách</strong> đặt vé chuyến <strong className="text-emerald-900">{trip.route}</strong></span>
+                      <span className="font-mono bg-emerald-600 text-white px-2 py-0.5 rounded-md font-bold">{trip.time}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-stone-400 italic py-2">Hôm nay chưa có chuyến limousine nào khởi hành.</p>
+                )}
+              </div>
+
+              {/* Combo Reminders */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-black text-amber-900 border-b border-amber-100 pb-1 flex items-center gap-1.5">
+                  <Star className="w-3 h-3" /> ĐẶT PHÒNG & COMBO
+                </h4>
+                {todayCombos.length > 0 ? (
+                  todayCombos.map((combo, idx) => (
+                    <div key={idx} className="bg-white/60 p-3 rounded-xl border border-amber-100 text-xs text-stone-800">
+                      Hôm nay có <strong className="text-amber-700">{combo.passengerName}</strong> đặt combo <strong className="text-amber-900">{combo.accommodationName}</strong> ({combo.roomQuantity} phòng) vào lúc <strong className="text-stone-900 font-mono italic">{combo.departureTime || "Sáng"}</strong>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-stone-400 italic py-2">Hôm nay chưa có lượt khách đặt combo.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* PROFESSIONAL HIGH-TECH ROUTE FILLING STATISTICS BOARD (Bento View) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="bento_route_visualizers">
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 flex flex-col justify-between shadow-xs">
             <div>
@@ -542,10 +607,8 @@ export default function OperatorPanel({
             </div>
           </div>
         </div>
-      )}
-
-      {panelTab === "bookings" && (
-        /* TAB 1: BOOKING & TICKETS LIST MANAGER */
+        
+        {/* TAB 1: BOOKING & TICKETS LIST MANAGER */}
         <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden" id="bookings_manager_section">
           {/* Controls Bar */}
           <div className="p-4 sm:p-6 bg-stone-50 border-b border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -931,6 +994,7 @@ export default function OperatorPanel({
             </div>
           )}
         </div>
+      </div>
       )}
       {panelTab === "seatLock" && (
         /* TAB 2: SEAT LOCK CONTROL PANEL FOR TRIPS */
