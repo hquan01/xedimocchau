@@ -13,6 +13,8 @@ export const INITIAL_COMBOS: TourCombo[] = [
     tag: "Khuyên Dùng / Nghỉ Dưỡng",
     durationText: "2 Ngày 1 Đêm (Hỗ trợ đổi 3N2Đ)",
     pricePerPerson: 1090000,
+    priceWeekday: 1090000,
+    priceWeekend: 1290000,
     originalPrice: 1450000,
     highlights: [
       "Vé xe Limousine VIP khứ hồi Hà Nội - Mộc Châu đón trả tận cổng khách sạn",
@@ -39,6 +41,8 @@ export const INITIAL_COMBOS: TourCombo[] = [
     tag: "Thơ Mộng / Cặp Đôi",
     durationText: "2 Ngày 1 Đêm",
     pricePerPerson: 890000,
+    priceWeekday: 890000,
+    priceWeekend: 990000,
     originalPrice: 1190000,
     highlights: [
       "Vé xe Limousine khứ hồi khứ hồi thương gia đón trả tận Đồi Thông Bản Áng",

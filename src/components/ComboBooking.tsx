@@ -128,17 +128,26 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
   const calculateTotalComboPrice = () => {
     if (!selectedCombo || !selectedAcc) return 0;
     
-    // Core calculation formula for combo:
-    // Base combo price covers: (2 roundtrip tickets of Limousine + 1 night of stay) for 2 people.
-    // So per person base combo is selectedCombo.pricePerPerson!
+    // Determine price based on selected travel date (Weekday/Weekend)
+    let currentPricePerPerson = selectedCombo.pricePerPerson;
+    if (travelDate) {
+      const date = new Date(travelDate);
+      const day = date.getDay(); // 0 is Sunday, 1-4 is Mon-Thu, 5-6 is Fri-Sat
+      
+      // User requested: Mon-Thu (1-4) is Weekday, Fri-Sun (5,6,0) is Weekend
+      if (day >= 1 && day <= 4) {
+        currentPricePerPerson = selectedCombo.priceWeekday || selectedCombo.pricePerPerson;
+      } else {
+        currentPricePerPerson = selectedCombo.priceWeekend || selectedCombo.pricePerPerson;
+      }
+    }
+    
     const payingPassengers = adults + children; // Children >= 4 paid full
-    const baseComboPriceForGroup = selectedCombo.pricePerPerson * payingPassengers;
+    const baseComboPriceForGroup = currentPricePerPerson * payingPassengers;
 
     // Surcharge for extra nights:
-    // Extra nights beyond day 1 adds Room rate per night
     const extraNights = nights - 1;
     const roomRatePerNight = selectedAcc.roomTypes[roomTypeIndex].pricePerNight;
-    // Surcharge for extra room nights (assuming 2 persons share 1 room)
     const roomQuantityNeeded = Math.ceil(payingPassengers / 2);
     const extraNightsSurcharge = extraNights > 0 ? (roomRatePerNight * extraNights * roomQuantityNeeded) : 0;
 
@@ -379,16 +388,31 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                         </div>
                         <div className="mt-1">
                           {pickupPoint.trim().toLowerCase() === "hà nội" ? (
-                            <span className="text-xl font-extrabold text-amber-600 font-mono">
-                              {combo.pricePerPerson.toLocaleString()}đ
-                            </span>
+                            <div className="flex flex-col">
+                              {travelDate ? (
+                                <span className="text-xl font-extrabold text-amber-600 font-mono">
+                                  {(() => {
+                                    const date = new Date(travelDate);
+                                    const day = date.getDay();
+                                    const price = (day >= 1 && day <= 4) 
+                                      ? (combo.priceWeekday || combo.pricePerPerson)
+                                      : (combo.priceWeekend || combo.pricePerPerson);
+                                    return price.toLocaleString();
+                                  })()}đ
+                                </span>
+                              ) : (
+                                <span className="text-xl font-extrabold text-[#1b4332] font-mono">
+                                  Chỉ từ {(combo.priceWeekday || combo.pricePerPerson).toLocaleString()}đ
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-sm font-bold text-emerald-600 font-sans">
                               Liên hệ để được tư vấn
                             </span>
                           )}
                           {pickupPoint.trim().toLowerCase() === "hà nội" && (
-                            <span className="text-[10px] text-stone-400 font-sans ml-1">/khách</span>
+                            <span className="text-[10px] text-stone-400 font-sans mt-0.5 block">/khách (Giá {travelDate ? "ngày bạn chọn" : "ngày thường"})</span>
                           )}
                         </div>
                         <span className="text-[9px] text-stone-400 block font-sans">*Áp dụng khi đặt từ 2 người lớn</span>
@@ -1038,8 +1062,18 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="text-2xl font-black text-emerald-400 font-mono">{detailCombo.pricePerPerson.toLocaleString()}đ</span>
-                          <span className="text-[9px] text-stone-300 block font-bold">/ khách</span>
+                          <span className="text-2xl font-black text-emerald-400 font-mono">
+                            {(() => {
+                              if (!travelDate) return (detailCombo.priceWeekday || detailCombo.pricePerPerson).toLocaleString();
+                              const date = new Date(travelDate);
+                              const day = date.getDay();
+                              const price = (day >= 1 && day <= 4) 
+                                ? (detailCombo.priceWeekday || detailCombo.pricePerPerson)
+                                : (detailCombo.priceWeekend || detailCombo.pricePerPerson);
+                              return price.toLocaleString();
+                            })()}đ
+                          </span>
+                          <span className="text-[9px] text-stone-300 block font-bold">/ khách ({travelDate ? "Ngày bạn chọn" : "Ngày thường"})</span>
                         </div>
                       </div>
                       <button 

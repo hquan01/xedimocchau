@@ -45,6 +45,8 @@ export interface TourCombo {
   tag: string;
   durationText: string; // e.g., "2N1Đ hoặc 3N2Đ"
   pricePerPerson: number;
+  priceWeekday: number;
+  priceWeekend: number;
   originalPrice: number;
   highlights: string[];
   description: string;

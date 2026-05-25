@@ -75,6 +75,8 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
       highlights: [],
       description: "",
       pricePerPerson: 0,
+      priceWeekday: 0,
+      priceWeekend: 0,
       originalPrice: 0
     });
   };
@@ -103,7 +105,10 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
                 />
                 <div>
                   <h4 className="font-bold text-stone-900 line-clamp-1">{combo.name}</h4>
-                  <p className="text-stone-500 text-xs mt-1">{combo.pricePerPerson.toLocaleString()} đ / người</p>
+                  <div className="flex flex-col mt-1">
+                    <p className="text-emerald-700 text-[10px] font-bold">Thường: {combo.priceWeekday?.toLocaleString() || combo.pricePerPerson.toLocaleString()} đ</p>
+                    <p className="text-orange-600 text-[10px] font-bold">Cuối tuần: {combo.priceWeekend?.toLocaleString() || combo.pricePerPerson.toLocaleString()} đ</p>
+                  </div>
                   <p className="text-[10px] text-stone-400 mt-1 uppercase tracking-wider font-bold">{combo.durationText || "Lịch trình tùy chọn"}</p>
                 </div>
               </div>
@@ -156,17 +161,25 @@ export default function ComboManagement({ combos, onUpdateCombos, accommodations
                   ))}
                 </select>
               </div>
-
               <div>
-                <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Giá bán mỗi người (đ)</label>
+                <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Giá Ngày Thường (T2-T5)</label>
                 <input 
                   type="number"
-                  className="w-full mt-1 p-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" 
-                  value={editingCombo.pricePerPerson} 
-                  onChange={e => setEditingCombo({...editingCombo, pricePerPerson: Number(e.target.value) || 0})}
+                  className="w-full mt-1 p-2.5 border border-emerald-100 bg-emerald-50/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" 
+                  value={editingCombo.priceWeekday || editingCombo.pricePerPerson} 
+                  onChange={e => setEditingCombo({...editingCombo, priceWeekday: Number(e.target.value) || 0, pricePerPerson: Number(e.target.value) || 0})}
                 />
               </div>
               <div>
+                <label className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">Giá Cuối Tuần (T6-CN)</label>
+                <input 
+                  type="number"
+                  className="w-full mt-1 p-2.5 border border-orange-100 bg-orange-50/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono" 
+                  value={editingCombo.priceWeekend || editingCombo.pricePerPerson} 
+                  onChange={e => setEditingCombo({...editingCombo, priceWeekend: Number(e.target.value) || 0})}
+                />
+              </div>
+              <div className="col-span-2">
                 <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Giá gốc chưa giảm (đ)</label>
                 <input 
                   type="number"
