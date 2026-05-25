@@ -116,22 +116,24 @@ export function useFirebaseSync() {
          setBlockedSeats(snap.docs.map(d => d.data() as BlockedSeat));
       }, (error) => handleFirestoreError(error, OperationType.LIST, "blocked_seats"));
 
-      // Configurations - public read
-      unsubConfigs = onSnapshot(doc(db, "configs", "global"), (snap) => {
-         if (snap.exists()) {
-           const data = snap.data();
-           if (data.limousineConfig) setLimousineConfig({ ...DEFAULT_LIMOUSINE_CONFIG, ...data.limousineConfig });
-           if (data.sharedCarConfig) setSharedCarConfig({ ...DEFAULT_SHARED_CAR_CONFIG, ...data.sharedCarConfig });
-           if (data.combos) setCombos(data.combos);
-           if (data.accommodations) setAccommodations(data.accommodations);
-           if (data.coupons) setCoupons(data.coupons);
-           if (data.locations) setLocations(data.locations);
-           if (data.destinations) setDestinations(data.destinations);
-           if (data.articles) setArticles(data.articles);
+      // Configurations - public read from whole collection to support split storage
+      unsubConfigs = onSnapshot(collection(db, "configs"), (snap) => {
+         if (!snap.empty) {
+           snap.docs.forEach(docSnap => {
+             const data = docSnap.data();
+             if (data.limousineConfig) setLimousineConfig({ ...DEFAULT_LIMOUSINE_CONFIG, ...data.limousineConfig });
+             if (data.sharedCarConfig) setSharedCarConfig({ ...DEFAULT_SHARED_CAR_CONFIG, ...data.sharedCarConfig });
+             if (data.combos) setCombos(data.combos);
+             if (data.accommodations) setAccommodations(data.accommodations);
+             if (data.coupons) setCoupons(data.coupons);
+             if (data.locations) setLocations(data.locations);
+             if (data.destinations) setDestinations(data.destinations);
+             if (data.articles) setArticles(data.articles);
+           });
          } else {
-           // Create initial configs document quietly if operator exists
+           // Create initial configs document quietly if operator exists (first run)
            if (currentUser?.role === 'operator' && auth.currentUser) {
-             setDoc(doc(db, "configs", "global"), {
+             const initialData = {
                limousineConfig: DEFAULT_LIMOUSINE_CONFIG,
                sharedCarConfig: DEFAULT_SHARED_CAR_CONFIG,
                combos: INITIAL_COMBOS,
@@ -140,10 +142,13 @@ export function useFirebaseSync() {
                locations: INITIAL_LOCATIONS,
                destinations: INITIAL_DESTINATIONS,
                articles: INITIAL_ARTICLES
-             }).catch(console.error);
+             };
+             Object.entries(initialData).forEach(([key, val]) => {
+               setDoc(doc(db, "configs", key), { [key]: val }).catch(console.error);
+             });
            }
          }
-      }, (error) => handleFirestoreError(error, OperationType.GET, "configs/global"));
+      }, (error) => handleFirestoreError(error, OperationType.LIST, "configs"));
 
       // Notifications
       unsubNotifications = onSnapshot(collection(db, "notifications"), (snap) => {

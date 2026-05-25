@@ -162,11 +162,12 @@ export const saveConfigToFirebase = async (key: string, data: any) => {
     console.error(e);
   }
 
-  // Attempt to save to Firebase even if auth.currentUser is not present
+  // Split storage: Save each key into its own document to avoid 1MB limit for global config
   try {
     const sanitizedData = JSON.parse(JSON.stringify(data));
-    await setDoc(doc(db, "configs", "global"), { [key]: sanitizedData }, { merge: true });
-    console.log(`Config ${key} saved to Firebase successfully`);
+    // Save to its own document (e.g., configs/accommodations)
+    await setDoc(doc(db, "configs", key), { [key]: sanitizedData });
+    console.log(`Config ${key} saved to its own document in Firebase successfully`);
   } catch (error: any) {
     console.error(`ERROR: Could not save config ${key} to Firebase (permissions/network):`, error);
     if (error.code === 'permission-denied') {
