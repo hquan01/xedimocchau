@@ -152,6 +152,10 @@ export interface BlockedSeat {
   travelDate: string; // format "YYYY-MM-DD" or similar
   seatId: string; // s1-s9
   customerPhone?: string;
+  customerName?: string;
+  pickupPoint?: string;
+  dropoffPoint?: string;
+  note?: string;
 }
 
 export interface LocationPoint {

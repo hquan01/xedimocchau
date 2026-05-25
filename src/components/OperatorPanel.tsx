@@ -120,6 +120,19 @@ export default function OperatorPanel({
   const [lockTime, setLockTime] = useState("06:00");
   const [lockPhone, setLockPhone] = useState("");
 
+  // Seat editing/details state
+  const [selectedSeatForEdit, setSelectedSeatForEdit] = useState<{
+    seat: Seat;
+    isVip: boolean;
+  } | null>(null);
+
+  const [seatPassengerName, setSeatPassengerName] = useState("");
+  const [seatPassengerPhone, setSeatPassengerPhone] = useState("");
+  const [seatPickupPoint, setSeatPickupPoint] = useState("");
+  const [seatDropoffPoint, setSeatDropoffPoint] = useState("");
+  const [seatNotes, setSeatNotes] = useState("");
+  const [isUpdatingSeat, setIsUpdatingSeat] = useState(false);
+
   // Dynamic feedback update on hour change mapping safety
   useEffect(() => {
     const hours = lockService === "limousine"
@@ -254,33 +267,205 @@ export default function OperatorPanel({
     );
   };
 
-  const handleToggleBlockSeat = (seatId: string) => {
-    const pathTripId = lockService === "limousine" 
-      ? `trip_custom_${lockTime.replace(":", "_")}` 
-      : `shared_car_trip_custom_${lockTime.replace(":", "_")}`;
-    onToggleBlockedSeat(seatId, lockDate, pathTripId, lockPhone.trim());
+  const handleSaveSeatEdit = async () => {
+    if (!selectedSeatForEdit) return;
+    const { seat } = selectedSeatForEdit;
+    const onlineBooking = getOnlineBookingForSeat(seat.number);
+
+    setIsUpdatingSeat(true);
+    try {
+      if (onlineBooking) {
+        const { db } = await import("../firebase");
+        const { doc, updateDoc } = await import("firebase/firestore");
+        await updateDoc(doc(db, "bookings", onlineBooking.id), {
+          passengerName: seatPassengerName,
+          passengerPhone: seatPassengerPhone,
+          pickupPoint: seatPickupPoint,
+          dropoffPoint: seatDropoffPoint,
+          notes: seatNotes,
+        });
+
+        const getLocalList = <T,>(keyName: string, fallback: T[]): T[] => {
+          try {
+            const stored = localStorage.getItem(`xemc_list_${keyName}`);
+            return stored ? JSON.parse(stored) : fallback;
+          } catch {
+            return fallback;
+          }
+        };
+        const setLocalList = <T,>(keyName: string, list: T[]) => {
+          localStorage.setItem(`xemc_list_${keyName}`, JSON.stringify(list));
+          window.dispatchEvent(new Event("xedimocchau_db_update"));
+        };
+        const current = getLocalList<Booking>("bookings", []);
+        const idx = current.findIndex(b => b.id === onlineBooking.id);
+        if (idx > -1) {
+          current[idx] = {
+            ...current[idx],
+            passengerName: seatPassengerName,
+            passengerPhone: seatPassengerPhone,
+            pickupPoint: seatPickupPoint,
+            dropoffPoint: seatDropoffPoint,
+            notes: seatNotes,
+          };
+          setLocalList("bookings", current);
+        }
+      } else {
+        const pathTripId = lockService === "limousine" 
+          ? `trip_custom_${lockTime.replace(":", "_")}` 
+          : `shared_car_trip_custom_${lockTime.replace(":", "_")}`;
+        const key = seat.id + pathTripId + lockDate;
+
+        const seatParams = {
+          seatId: seat.id,
+          travelDate: lockDate,
+          tripId: pathTripId,
+          customerPhone: seatPassengerPhone,
+          customerName: seatPassengerName,
+          pickupPoint: seatPickupPoint,
+          dropoffPoint: seatDropoffPoint,
+          note: seatNotes,
+        };
+
+        const { db } = await import("../firebase");
+        const { doc, setDoc } = await import("firebase/firestore");
+        await setDoc(doc(db, "blocked_seats", key), seatParams);
+
+        const getLocalList = <T,>(keyName: string, fallback: T[]): T[] => {
+          try {
+            const stored = localStorage.getItem(`xemc_list_${keyName}`);
+            return stored ? JSON.parse(stored) : fallback;
+          } catch {
+            return fallback;
+          }
+        };
+        const setLocalList = <T,>(keyName: string, list: T[]) => {
+          localStorage.setItem(`xemc_list_${keyName}`, JSON.stringify(list));
+          window.dispatchEvent(new Event("xedimocchau_db_update"));
+        };
+        const current = getLocalList<BlockedSeat>("blocked_seats", []);
+        const idx = current.findIndex(s => s.seatId === seat.id && s.travelDate === lockDate && s.tripId === pathTripId);
+        if (idx > -1) {
+          current[idx] = seatParams;
+        } else {
+          current.push(seatParams);
+        }
+        setLocalList("blocked_seats", current);
+      }
+      setSelectedSeatForEdit(null);
+    } catch (e) {
+      console.error(e);
+      alert("Đã xảy ra lỗi khi lưu thông tin ghế.");
+    } finally {
+      setIsUpdatingSeat(false);
+    }
+  };
+
+  const handleUnlockSeatDirect = async () => {
+    if (!selectedSeatForEdit) return;
+    const { seat } = selectedSeatForEdit;
+    
+    setIsUpdatingSeat(true);
+    try {
+      const pathTripId = lockService === "limousine" 
+        ? `trip_custom_${lockTime.replace(":", "_")}` 
+        : `shared_car_trip_custom_${lockTime.replace(":", "_")}`;
+      const key = seat.id + pathTripId + lockDate;
+
+      const { db } = await import("../firebase");
+      const { doc, deleteDoc } = await import("firebase/firestore");
+      await deleteDoc(doc(db, "blocked_seats", key));
+
+      const getLocalList = <T,>(keyName: string, fallback: T[]): T[] => {
+        try {
+          const stored = localStorage.getItem(`xemc_list_${keyName}`);
+          return stored ? JSON.parse(stored) : fallback;
+        } catch {
+          return fallback;
+        }
+      };
+      const setLocalList = <T,>(keyName: string, list: T[]) => {
+        localStorage.setItem(`xemc_list_${keyName}`, JSON.stringify(list));
+        window.dispatchEvent(new Event("xedimocchau_db_update"));
+      };
+      const current = getLocalList<BlockedSeat>("blocked_seats", []);
+      const nextList = current.filter(s => !(s.seatId === seat.id && s.travelDate === lockDate && s.tripId === pathTripId));
+      setLocalList("blocked_seats", nextList);
+
+      setSelectedSeatForEdit(null);
+    } catch (e) {
+      console.error(e);
+      alert("Đã xảy ra lỗi khi mở khóa ghế.");
+    } finally {
+      setIsUpdatingSeat(false);
+    }
+  };
+
+  const handleEditBlockedSeatFromList = (bs: BlockedSeat) => {
+    const template = lockService === "limousine" ? INITIAL_SEATS_TEMPLATE : INITIAL_SEATS_SHARED;
+    const foundSeat = template.find(s => s.id === bs.seatId) || {
+      id: bs.seatId,
+      number: bs.seatId.toUpperCase().replace("S", "A"),
+      type: "standard",
+      price: 300000,
+      isBooked: false
+    };
+    setSelectedSeatForEdit({
+      seat: foundSeat,
+      isVip: foundSeat.type.includes("vip")
+    });
+    setSeatPassengerName(bs.customerName || "");
+    setSeatPassengerPhone(bs.customerPhone || "");
+    setSeatPickupPoint(bs.pickupPoint || "");
+    setSeatDropoffPoint(bs.dropoffPoint || "");
+    setSeatNotes(bs.note || "");
   };
 
   const renderSeatMapButton = (seat: Seat, isVip: boolean) => {
     const onlineBooking = getOnlineBookingForSeat(seat.number);
     const blockedItem = getBlockedItemForSeat(seat.id);
 
+    const handleSeatClick = () => {
+      setSelectedSeatForEdit({ seat, isVip });
+      if (onlineBooking) {
+        setSeatPassengerName(onlineBooking.passengerName || "");
+        setSeatPassengerPhone(onlineBooking.passengerPhone || "");
+        setSeatPickupPoint(onlineBooking.pickupPoint || "");
+        setSeatDropoffPoint(onlineBooking.dropoffPoint || "");
+        setSeatNotes(onlineBooking.notes || "");
+      } else if (blockedItem) {
+        setSeatPassengerName(blockedItem.customerName || "");
+        setSeatPassengerPhone(blockedItem.customerPhone || "");
+        setSeatPickupPoint(blockedItem.pickupPoint || "");
+        setSeatDropoffPoint(blockedItem.dropoffPoint || "");
+        setSeatNotes(blockedItem.note || "");
+      } else {
+        setSeatPassengerName("");
+        setSeatPassengerPhone(lockPhone.trim());
+        setSeatPickupPoint("");
+        setSeatDropoffPoint("");
+        setSeatNotes("");
+      }
+    };
+
     if (onlineBooking) {
       return (
-        <div
+        <button
           key={seat.id}
-          className={`px-1 rounded-xl border border-indigo-700 bg-indigo-600 text-white font-sans text-center flex flex-col items-center justify-center gap-0.5 shrink-0 select-none shadow-md ${
+          type="button"
+          onClick={handleSeatClick}
+          className={`px-1 rounded-xl border border-indigo-700 bg-indigo-600 hover:bg-indigo-750 hover:scale-[1.02] transition-all text-white font-sans text-center flex flex-col items-center justify-center gap-0.5 shrink-0 select-none shadow-md cursor-pointer ${
             isVip ? "h-24 py-4" : "h-20 py-3"
           }`}
-          title={`Đã Đặt Online: ${onlineBooking.passengerName} (${onlineBooking.passengerPhone})`}
+          title={`Đã Đặt Online: ${onlineBooking.passengerName} (${onlineBooking.passengerPhone}). Click để xem/sửa chi tiết.`}
         >
           <User className="w-3.5 h-3.5 text-indigo-200" />
           <span className="text-[10px] font-black block leading-none">Ghế {seat.number} {isVip ? "(VIP)" : ""}</span>
           <span className="text-[9px] bg-indigo-800/80 px-1 py-0.5 rounded-md font-bold truncate max-w-full text-indigo-100 font-mono mt-0.5">
             📞 {onlineBooking.passengerPhone}
           </span>
-          <span className="text-[8px] opacity-80 leading-none truncate max-w-full block font-semibold">Khách: {onlineBooking.passengerName}</span>
-        </div>
+          <span className="text-[8px] opacity-85 leading-none truncate max-w-full block font-semibold">Khách: {onlineBooking.passengerName}</span>
+        </button>
       );
     }
 
@@ -289,11 +474,11 @@ export default function OperatorPanel({
         <button
           key={seat.id}
           type="button"
-          onClick={() => handleToggleBlockSeat(seat.id)}
-          className={`px-1 rounded-xl border border-red-700 bg-red-600 text-white font-sans text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shrink-0 shadow-md ${
+          onClick={handleSeatClick}
+          className={`px-1 rounded-xl border border-red-700 bg-red-600 hover:bg-red-750 hover:scale-[1.02] text-white font-sans text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shrink-0 shadow-md ${
             isVip ? "h-24 py-4" : "h-20 py-3"
           }`}
-          title={`Nhấn vào để HỦY khóa ghế`}
+          title={`Đã Khóa: Click để xem/sửa thông tin hoặc giải phóng.`}
         >
           <Lock className="w-3.5 h-3.5 text-red-200" />
           <span className="text-[10px] font-black block leading-none">Ghế {seat.number} {isVip ? "(VIP)" : ""}</span>
@@ -306,7 +491,13 @@ export default function OperatorPanel({
               ĐÃ KHÓA
             </span>
           )}
-          <span className="text-[8px] opacity-80 leading-none block font-mono font-bold">Mở Khóa</span>
+          {blockedItem.customerName ? (
+            <span className="text-[8px] opacity-90 leading-none truncate max-w-full block font-bold text-red-100">
+              Khách: {blockedItem.customerName}
+            </span>
+          ) : (
+            <span className="text-[8px] opacity-80 leading-none block font-mono font-bold">Mở Khóa</span>
+          )}
         </button>
       );
     }
@@ -315,13 +506,13 @@ export default function OperatorPanel({
       <button
         key={seat.id}
         type="button"
-        onClick={() => handleToggleBlockSeat(seat.id)}
-        className={`px-1 rounded-xl border font-sans text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shrink-0 ${
+        onClick={handleSeatClick}
+        className={`px-1 rounded-xl border font-sans text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shrink-0 hover:scale-[1.02] ${
           isVip
             ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 h-24 py-4"
             : "border-stone-200 bg-white hover:bg-stone-50 text-stone-800 h-20 py-3"
         }`}
-        title={`Khóa ghế này`}
+        title={`Bấm để nhập thông tin & khóa ghế`}
       >
         <Unlock className={`w-3.5 h-3.5 ${isVip ? "text-emerald-600" : "text-stone-400"}`} />
         <span className="text-[10px] font-extrabold block leading-none">Ghế {seat.number} {isVip ? "(VIP)" : ""}</span>
@@ -1088,13 +1279,21 @@ export default function OperatorPanel({
                           Giờ: <strong className="text-stone-900 font-mono">{bs.tripId.replace("shared_car_trip_custom_", "").replace("trip_custom_", "").replace("_", ":")}</strong> | Ngày: {bs.travelDate} | Ghế: {bs.seatId.toUpperCase().replace("S", "A")}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
                         {bs.customerPhone && <span className="font-mono text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 font-bold">📞 {bs.customerPhone}</span>}
+                        <button 
+                          onClick={() => {
+                            handleEditBlockedSeatFromList(bs);
+                          }}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-extrabold uppercase transition cursor-pointer"
+                        >
+                          Sửa
+                        </button>
                         <button 
                           onClick={() => {
                             onRemoveBlockedSeat(bs);
                           }}
-                          className="px-2.5 py-1 bg-red-600 text-white rounded-md text-[10px] font-extrabold uppercase hover:bg-red-700 transition"
+                          className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md text-[10px] font-extrabold uppercase transition cursor-pointer"
                         >
                           Mở khóa
                         </button>
@@ -1418,6 +1617,176 @@ export default function OperatorPanel({
               >
                 Có
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedSeatForEdit && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] font-black tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase">
+                  {getOnlineBookingForSeat(selectedSeatForEdit.seat.number) ? "VÉ ĐẶT ONLINE" : getBlockedItemForSeat(selectedSeatForEdit.seat.id) ? "GHẾ ĐANG KHÓA OFFLINE" : "GHẾ TRỐNG"}
+                </span>
+                <h3 className="text-xl font-black text-[#1b4332] mt-1">
+                  Thông tin Ghế {selectedSeatForEdit.seat.number} {selectedSeatForEdit.isVip ? "(VIP)" : ""}
+                </h3>
+                <p className="text-[11px] text-stone-500 font-bold font-mono mt-0.5">
+                  Xe: {lockService === "limousine" ? "Limousine 9 chỗ" : "Xe ghép 7 chỗ"} • Lộ trình: {lockFrom} ➔ {lockTo} • Giờ: {lockTime} • Ngày: {lockDate}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedSeatForEdit(null)}
+                className="p-1.5 hover:bg-stone-100 rounded-full transition-colors text-stone-400 hover:text-stone-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Passenger Name Field */}
+              <div>
+                <label className="text-[10px] font-black text-stone-500 uppercase block tracking-wider mb-1">Khách hàng</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-stone-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Nhập tên khách hàng..."
+                    value={seatPassengerName}
+                    onChange={(e) => setSeatPassengerName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Passenger Phone Field */}
+              <div>
+                <label className="text-[10px] font-black text-stone-500 uppercase block tracking-wider mb-1">Số điện thoại</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-stone-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Nhập SĐT..."
+                    value={seatPassengerPhone}
+                    onChange={(e) => setSeatPassengerPhone(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Pickup Point Field */}
+              <div>
+                <label className="text-[10px] font-black text-stone-500 uppercase block tracking-wider mb-1">Điểm đón</label>
+                <input
+                  type="text"
+                  placeholder="Nhập điểm đón..."
+                  value={seatPickupPoint}
+                  onChange={(e) => setSeatPickupPoint(e.target.value)}
+                  className="w-full px-3 py-2 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                />
+                
+                {((locations || []).filter(l => l.type === "pickup" && l.city === lockFrom && (l.serviceType === "both" || l.serviceType === (lockService === "limousine" ? "limousine" : "shared"))).length > 0) && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    <span className="text-[9px] text-stone-400 self-center mr-1 font-semibold">Gợi ý:</span>
+                    {(locations || [])
+                      .filter(l => l.type === "pickup" && l.city === lockFrom && (l.serviceType === "both" || l.serviceType === (lockService === "limousine" ? "limousine" : "shared")))
+                      .slice(0, 5)
+                      .map((p) => (
+                        <button
+                          key={`pick-sug-${p.id}`}
+                          type="button"
+                          onClick={() => setSeatPickupPoint(p.name)}
+                          className="px-2 py-0.5 bg-stone-100 hover:bg-emerald-50 hover:text-emerald-700 text-stone-600 border border-stone-200 rounded text-[9px] font-bold transition-colors cursor-pointer"
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Dropoff Point Field */}
+              <div>
+                <label className="text-[10px] font-black text-stone-500 uppercase block tracking-wider mb-1">Điểm trả</label>
+                <input
+                  type="text"
+                  placeholder="Nhập điểm trả..."
+                  value={seatDropoffPoint}
+                  onChange={(e) => setSeatDropoffPoint(e.target.value)}
+                  className="w-full px-3 py-2 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                />
+
+                {((locations || []).filter(l => l.type === "dropoff" && l.city === lockTo && (l.serviceType === "both" || l.serviceType === (lockService === "limousine" ? "limousine" : "shared"))).length > 0) && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    <span className="text-[9px] text-stone-400 self-center mr-1 font-semibold">Gợi ý:</span>
+                    {(locations || [])
+                      .filter(l => l.type === "dropoff" && l.city === lockTo && (l.serviceType === "both" || l.serviceType === (lockService === "limousine" ? "limousine" : "shared")))
+                      .slice(0, 5)
+                      .map((d) => (
+                        <button
+                          key={`drop-sug-${d.id}`}
+                          type="button"
+                          onClick={() => setSeatDropoffPoint(d.name)}
+                          className="px-2 py-0.5 bg-stone-100 hover:bg-emerald-50 hover:text-emerald-700 text-stone-600 border border-stone-200 rounded text-[9px] font-bold transition-colors cursor-pointer"
+                        >
+                          {d.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Notes / Ghi chú */}
+              <div>
+                <label className="text-[10px] font-black text-stone-500 uppercase block tracking-wider mb-1">Ghi chú</label>
+                <textarea
+                  placeholder="Ghi chú thêm thông tin..."
+                  value={seatNotes}
+                  onChange={(e) => setSeatNotes(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-stone-200 rounded-xl text-stone-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Actions Footer */}
+            <div className="pt-2 border-t border-stone-100 flex flex-wrap justify-between items-center gap-3">
+              <div>
+                {!getOnlineBookingForSeat(selectedSeatForEdit.seat.number) && getBlockedItemForSeat(selectedSeatForEdit.seat.id) && (
+                  <button
+                    type="button"
+                    disabled={isUpdatingSeat}
+                    onClick={handleUnlockSeatDirect}
+                    className="px-4 py-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Mở khóa ghế
+                  </button>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={isUpdatingSeat}
+                  onClick={() => setSelectedSeatForEdit(null)}
+                  className="px-4 py-2 text-stone-500 hover:bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  disabled={isUpdatingSeat}
+                  onClick={handleSaveSeatEdit}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isUpdatingSeat ? (
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : null}
+                  Cập nhật & Lưu
+                </button>
+              </div>
             </div>
           </div>
         </div>
