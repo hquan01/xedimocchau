@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification } from "../types";
-import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin } from "lucide-react";
+import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star } from "lucide-react";
 import { motion } from "motion/react";
 import { getOfficialSchedulesForRoute } from "./LimousineBooking";
 import { getSharedCarSchedules } from "./SharedCarBooking";
@@ -607,8 +607,11 @@ export default function OperatorPanel({
             </div>
           </div>
         </div>
-        
-        {/* TAB 1: BOOKING & TICKETS LIST MANAGER */}
+      </div>
+    )}
+
+      {panelTab === "bookings" && (
+        /* TAB 1: BOOKING & TICKETS LIST MANAGER */
         <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden" id="bookings_manager_section">
           {/* Controls Bar */}
           <div className="p-4 sm:p-6 bg-stone-50 border-b border-stone-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -994,7 +997,6 @@ export default function OperatorPanel({
             </div>
           )}
         </div>
-      </div>
       )}
       {panelTab === "seatLock" && (
         /* TAB 2: SEAT LOCK CONTROL PANEL FOR TRIPS */
