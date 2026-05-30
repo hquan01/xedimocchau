@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Seat, SharedCarConfig, LocationPoint } from "../types";
 import { Users, User, Phone, Mail, MapPin, Armchair, ChevronRight, Check, Compass, Info, ShieldCheck, Award, Tag } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -91,12 +91,17 @@ export default function SharedCarBooking({
   );
 
   // Derive dynamic location lists for defaults based on route
-  const safeLocations = Array.isArray(locations) ? locations : [];
-  const currentPickups = safeLocations.filter(l => (l.city === from || (!l.city && from === "Hà Nội")) && l.type === "pickup" && (l.serviceType === "shared" || l.serviceType === "both" || !l.serviceType)).map(l => l.name);
-  const currentDropoffs = safeLocations.filter(l => (l.city === to || (!l.city && to === "Hà Nội")) && l.type === "dropoff" && (l.serviceType === "shared" || l.serviceType === "both" || !l.serviceType)).map(l => l.name);
-  
-  const finalPickupPoints = currentPickups.length > 0 ? currentPickups : [`Đón tận nhà tại ${from}`];
-  const finalDropoffPoints = currentDropoffs.length > 0 ? currentDropoffs : [`Trả tận nhà tại ${to}`];
+  const finalPickupPoints = useMemo(() => {
+    const safeLocations = Array.isArray(locations) ? locations : [];
+    const currentPickups = safeLocations.filter(l => (l.city === from || (!l.city && from === "Hà Nội")) && l.type === "pickup" && (l.serviceType === "shared" || l.serviceType === "both" || !l.serviceType)).map(l => l.name);
+    return currentPickups.length > 0 ? currentPickups : [`Đón tận nhà tại ${from}`];
+  }, [from, locations]);
+
+  const finalDropoffPoints = useMemo(() => {
+    const safeLocations = Array.isArray(locations) ? locations : [];
+    const currentDropoffs = safeLocations.filter(l => (l.city === to || (!l.city && to === "Hà Nội")) && l.type === "dropoff" && (l.serviceType === "shared" || l.serviceType === "both" || !l.serviceType)).map(l => l.name);
+    return currentDropoffs.length > 0 ? currentDropoffs : [`Trả tận nhà tại ${to}`];
+  }, [to, locations]);
 
   // Determine if it is weekend for pricing (Weekend = Fri, Sat, Sun)
   const isWeekend = (dateStr: string) => {
