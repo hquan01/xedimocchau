@@ -22,6 +22,7 @@ import {
   Save,
   Compass,
   Star,
+  Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth } from "../firebase";
@@ -33,6 +34,7 @@ interface CustomerDashboardProps {
   onUpdateUser: (updated: User) => void;
   bookings: Booking[];
   onCancelBooking: (id: string) => void;
+  onDeleteBooking?: (id: string) => void;
   onSignOut: () => void;
   onOpenPayment: (booking: Booking) => void;
   coupons?: Coupon[];
@@ -51,6 +53,7 @@ export default function CustomerDashboard({
   onUpdateUser,
   bookings,
   onCancelBooking,
+  onDeleteBooking,
   onSignOut,
   onOpenPayment,
   coupons = [],
@@ -74,6 +77,7 @@ export default function CustomerDashboard({
   const [toastMsg, setToastMsg] = useState("");
   const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Load custom extended profile details from Firebase (injected via currentUser)
   useEffect(() => {
@@ -628,6 +632,26 @@ export default function CustomerDashboard({
                 <div className="space-y-4">
                   {userBookings.map((bk, idx) => {
                     const isLimo = bk.type === "limousine";
+                    const isPastOrInactive = bk.status === "cancelled" || bk.status === "completed" || (() => {
+                      try {
+                        if (bk.travelDate && typeof bk.travelDate === "string") {
+                          let parts: string[] = [];
+                          if (bk.travelDate.includes("/")) parts = bk.travelDate.split("/");
+                          else if (bk.travelDate.includes("-")) parts = bk.travelDate.split("-");
+                          if (parts.length === 3) {
+                            const dateObj = parts[0].length === 4 
+                              ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+                              : new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                            if (dateObj && !isNaN(dateObj.getTime())) {
+                              const today = new Date();
+                              today.setHours(0,0,0,0);
+                              return dateObj < today;
+                            }
+                          }
+                        }
+                      } catch(e) {}
+                      return false;
+                    })();
                     return (
                       <div
                         key={bk.id || `user_bk_${idx}`}
@@ -754,6 +778,35 @@ export default function CustomerDashboard({
                                     : "Yêu cầu hủy vé"}
                                 </button>
                               )}
+
+                            {isPastOrInactive && onDeleteBooking && (
+                              <button
+                                onClick={() => {
+                                  if (confirmDeleteId === bk.id) {
+                                    onDeleteBooking(bk.id);
+                                    showToast(
+                                      "Đã xóa vĩnh viễn vé khỏi lịch sử thành công! 🗑️",
+                                    );
+                                    setConfirmDeleteId(null);
+                                  } else {
+                                    setConfirmDeleteId(bk.id);
+                                    setTimeout(
+                                      () => setConfirmDeleteId(null),
+                                      4000,
+                                    );
+                                  }
+                                }}
+                                className={`w-full block text-center text-[10px] font-bold pt-2 border-t border-stone-100 mt-2 transition-colors cursor-pointer ${
+                                  confirmDeleteId === bk.id
+                                    ? "text-white bg-red-650 hover:bg-red-750 py-1 rounded-md"
+                                    : "text-red-650 hover:text-red-850 hover:underline"
+                                }`}
+                              >
+                                {confirmDeleteId === bk.id
+                                  ? "⚠️ Bấm thêm lần nữa để Xóa"
+                                  : "Xóa vé khỏi lịch sử"}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

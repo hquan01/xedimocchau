@@ -118,6 +118,19 @@ export const updateBookingStatusInFirebase = async (bookingId: string, booking: 
   await updateStatusInFirebase(bookingId, booking, "bookings");
 };
 
+export const deleteBookingFromFirebase = async (bookingId: string) => {
+  const current = getLocalList<Booking>("bookings", []);
+  const nextList = current.filter(b => b.id !== bookingId);
+  setLocalList("bookings", nextList);
+
+  try {
+    await deleteDoc(doc(db, "bookings", bookingId));
+    console.log("Booking deleted from Firebase successfully");
+  } catch (error) {
+    console.warn("Could not delete booking from Firebase, removed locally:", error);
+  }
+};
+
 export const saveBlockedSeatToFirebase = async (seat: BlockedSeat) => {
   const key = seat.seatId + seat.tripId + seat.travelDate;
   const current = getLocalList<BlockedSeat>("blocked_seats", []);

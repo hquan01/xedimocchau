@@ -182,17 +182,26 @@ export default function LimousineBooking({
   const [dropoffPoint, setDropoffPoint] = useState("");
   const [customHanoiAddress, setCustomHanoiAddress] = useState("");
 
-  // Sync pickupPoint and dropoffPoint automatically when route changes or locations load
+  // Sync pickupPoint and dropoffPoint automatically when route changes, or when the current selected point is not available in the list
   useEffect(() => {
     if (finalPickupPoints.length > 0) {
-      const doorToDoor = finalPickupPoints.find(p => p.toLowerCase().includes("tận nơi") || p.toLowerCase().includes("tận nhà"));
-      setPickupPoint(doorToDoor || finalPickupPoints[0]);
+      const isValid = finalPickupPoints.includes(pickupPoint);
+      if (!isValid) {
+        const doorToDoor = finalPickupPoints.find(p => p.toLowerCase().includes("tận nơi") || p.toLowerCase().includes("tận nhà"));
+        setPickupPoint(doorToDoor || finalPickupPoints[0]);
+      }
     }
+  }, [from, finalPickupPoints]);
+
+  useEffect(() => {
     if (finalDropoffPoints.length > 0) {
-      const doorToDoor = finalDropoffPoints.find(p => p.toLowerCase().includes("tận nơi") || p.toLowerCase().includes("tận nhà"));
-      setDropoffPoint(doorToDoor || finalDropoffPoints[0]);
+      const isValid = finalDropoffPoints.includes(dropoffPoint);
+      if (!isValid) {
+        const doorToDoor = finalDropoffPoints.find(p => p.toLowerCase().includes("tận nơi") || p.toLowerCase().includes("tận nhà"));
+        setDropoffPoint(doorToDoor || finalDropoffPoints[0]);
+      }
     }
-  }, [from, to, finalPickupPoints, finalDropoffPoints]);
+  }, [to, finalDropoffPoints]);
 
   // Point deduction state for customers
   const [usePoints, setUsePoints] = useState(false);

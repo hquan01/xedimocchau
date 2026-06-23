@@ -8,6 +8,7 @@ interface BookingListProps {
   isOpen: boolean;
   onClose: () => void;
   onCancelBooking: (id: string) => void;
+  onDeleteBooking?: (id: string) => void;
 }
 
 // Simulated real-time centralized cloud reservation database for Xe Di Moc Chau
@@ -65,10 +66,11 @@ const CENTRAL_ONLINE_RESERVATIONS: Booking[] = [
   }
 ];
 
-export default function BookingList({ bookings, isOpen, onClose, onCancelBooking }: BookingListProps) {
+export default function BookingList({ bookings, isOpen, onClose, onCancelBooking, onDeleteBooking }: BookingListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "search">("all");
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -209,6 +211,26 @@ export default function BookingList({ bookings, isOpen, onClose, onCancelBooking
               combinedResults.map((bk, idx) => {
                 const isLimo = bk.type === 'limousine';
                 const isFromCloud = onlineMatched.some((o) => o.id === bk.id);
+                const isPastOrInactive = bk.status === "cancelled" || bk.status === "completed" || (() => {
+                  try {
+                    if (bk.travelDate) {
+                      let parts: string[] = [];
+                      if (bk.travelDate.includes("/")) parts = bk.travelDate.split("/");
+                      else if (bk.travelDate.includes("-")) parts = bk.travelDate.split("-");
+                      if (parts.length === 3) {
+                        const dateObj = parts[0].length === 4 
+                          ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+                          : new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                        if (dateObj && !isNaN(dateObj.getTime())) {
+                          const today = new Date();
+                          today.setHours(0,0,0,0);
+                          return dateObj < today;
+                        }
+                      }
+                    }
+                  } catch(e) {}
+                  return false;
+                })();
                 return (
                   <div
                     key={bk.id || `comb_res_${idx}`}
@@ -369,6 +391,30 @@ export default function BookingList({ bookings, isOpen, onClose, onCancelBooking
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>{confirmCancelId === bk.id ? "Xác nhận hủy!" : "Hủy"}</span>
+                            </button>
+                          )}
+
+                          {isPastOrInactive && onDeleteBooking && (
+                            <button
+                              onClick={() => {
+                                if (confirmDeleteId === bk.id) {
+                                  onDeleteBooking(bk.id);
+                                  setConfirmDeleteId(null);
+                                } else {
+                                  setConfirmDeleteId(bk.id);
+                                  setTimeout(() => setConfirmDeleteId(null), 4000);
+                                }
+                              }}
+                              className={`p-1 px-2.5 border rounded-lg text-xs font-semibold flex items-center space-x-1 transition-all cursor-pointer ${
+                                confirmDeleteId === bk.id 
+                                  ? "bg-red-600 border-red-650 text-white hover:bg-red-700" 
+                                  : "border-red-200 text-red-650 hover:bg-red-50 hover:border-red-400"
+                              }`}
+                              title={confirmDeleteId === bk.id ? "Bấm một lần nữa để xác nhận xóa vĩnh viễn vé này khỏi thiết bị!" : "Xóa vĩnh viễn vé này"}
+                              id={`delete_btn_${bk.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>{confirmDeleteId === bk.id ? "Xác nhận xóa!" : "Xóa vé"}</span>
                             </button>
                           )}
                         </div>

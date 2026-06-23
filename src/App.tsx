@@ -29,6 +29,7 @@ import {
   saveUserToFirebase,
   saveConfigToFirebase,
   saveNotificationToFirebase,
+  deleteBookingFromFirebase,
   getDeviceId
 } from "./lib/firebaseUtils";
 
@@ -243,6 +244,10 @@ export default function App() {
     }
   };
 
+  const handleDeleteBooking = async (id: string) => {
+    await deleteBookingFromFirebase(id);
+  };
+
   const handleConfirmPaymentSuccess = async (id: string, newTotal?: number) => {
     console.log("Payment submitted for booking:", id, "New Price:", newTotal);
     const bk = bookings.find(b => b.id === id);
@@ -434,6 +439,7 @@ export default function App() {
               }}
               bookings={bookings}
               onCancelBooking={handleCancelBooking}
+              onDeleteBooking={handleDeleteBooking}
               onSignOut={handleSignOut}
               onOpenPayment={setActivePaymentBooking}
               coupons={coupons}
@@ -577,6 +583,7 @@ export default function App() {
           isOpen={isBookingListOpen}
           onClose={() => setIsBookingListOpen(false)}
           onCancelBooking={handleCancelBooking}
+          onDeleteBooking={handleDeleteBooking}
         />
       </Suspense>
 
@@ -643,25 +650,14 @@ export default function App() {
                   <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-md uppercase">Leo dốc tốt</span>
                   <h4 className="font-bold text-stone-800 text-sm mt-1.5">Xe Số (Wave Alpha / RSX)</h4>
                   <p className="text-[11px] text-stone-500 font-sans mt-0.5">Tiết kiệm xăng, khỏe dẻo dai bám đường tốt</p>
-                  <p className="text-[#1b4332] font-black text-sm mt-2">120.000đ <span className="text-[10px] text-stone-400 font-sans font-normal">/ngày</span></p>
+                  <p className="text-[#1b4332] font-black text-sm mt-2">200.000đ <span className="text-[10px] text-stone-400 font-sans font-normal">/ngày</span></p>
                 </div>
 
                 <div className="border border-stone-200 rounded-2xl p-3 bg-stone-50 hover:border-emerald-600 transition-colors">
                   <span className="text-[10px] bg-blue-100 text-blue-800 font-extrabold px-2 py-0.5 rounded-md uppercase">Dễ lái nhất</span>
                   <h4 className="font-bold text-stone-800 text-sm mt-1.5">Xe Ga (Vision / Air Blade)</h4>
                   <p className="text-[11px] text-stone-500 font-sans mt-0.5">Thời thượng, cốp rộng chứa đồ, đi êm ái nhẹ nhàng</p>
-                  <p className="text-[#1b4332] font-black text-sm mt-2">150.000đ <span className="text-[10px] text-stone-400 font-sans font-normal">/ngày</span></p>
-                </div>
-
-                <div className="border border-stone-200 rounded-2xl p-3 bg-stone-50 hover:border-emerald-600 transition-colors col-span-2">
-                  <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded-md uppercase">Phượt đèo chuyên nghiệp</span>
-                  <div className="flex justify-between items-start mt-1.5">
-                    <div>
-                      <h4 className="font-bold text-stone-850 text-sm">Xe Côn Tay / XR150 Cào Cào</h4>
-                      <p className="text-[11px] text-stone-500 font-sans mt-0.5">Siêu dã chiến, chinh phục Tà Xùa, Chiềng Khoa, Pha Luông</p>
-                    </div>
-                    <p className="text-[#1b4332] font-black text-sm whitespace-nowrap">250k - 350kđ <span className="text-[10px] text-stone-400 font-sans font-normal">/ngày</span></p>
-                  </div>
+                  <p className="text-[#1b4332] font-black text-sm mt-2">200.000đ <span className="text-[10px] text-stone-400 font-sans font-normal">/ngày</span></p>
                 </div>
               </div>
 

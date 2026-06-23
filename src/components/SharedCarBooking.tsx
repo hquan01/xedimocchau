@@ -258,14 +258,23 @@ export default function SharedCarBooking({
   // Handle pickup/dropoff defaults based on direct path
   useEffect(() => {
     if (finalPickupPoints.length > 0) {
-      const doorToDoor = finalPickupPoints.find(p => p.toLowerCase().includes("tận nơi") || p.toLowerCase().includes("tận nhà"));
-      setPickupPoint(doorToDoor || finalPickupPoints[0]);
+      const isValid = finalPickupPoints.includes(pickupPoint);
+      if (!isValid) {
+        const doorToDoor = finalPickupPoints.find(p => p.toLowerCase().includes("tận nơi") || p.toLowerCase().includes("tận nhà"));
+        setPickupPoint(doorToDoor || finalPickupPoints[0]);
+      }
     }
+  }, [from, finalPickupPoints]);
+
+  useEffect(() => {
     if (finalDropoffPoints.length > 0) {
-      const doorToDoor = finalDropoffPoints.find(p => p.toLowerCase().includes("tận nơi") || p.toLowerCase().includes("tận nhà"));
-      setDropoffPoint(doorToDoor || finalDropoffPoints[0]);
+      const isValid = finalDropoffPoints.includes(dropoffPoint);
+      if (!isValid) {
+        const doorToDoor = finalDropoffPoints.find(p => p.toLowerCase().includes("tận nơi") || p.toLowerCase().includes("tận nhà"));
+        setDropoffPoint(doorToDoor || finalDropoffPoints[0]);
+      }
     }
-  }, [from, to, finalPickupPoints, finalDropoffPoints]);
+  }, [to, finalDropoffPoints]);
 
   // Dynamic retrieval of matching official operator schedules
   const scheduleTimes = getSharedCarSchedules();
