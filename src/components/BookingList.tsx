@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Booking } from "../types";
-import { CalendarDays, MapPin, Ticket, User, Phone, Check, Trash2, X, Compass, Printer, Info, Search, Cloud, Sparkles } from "lucide-react";
+import { CalendarDays, MapPin, Ticket, User, Phone, Check, Trash2, X, Compass, Printer, Info, Search, Cloud, Sparkles, Hotel, Car, Gift, Tag, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { INITIAL_COMBOS } from "../data/combos";
 
 interface BookingListProps {
   bookings: Booking[];
@@ -307,11 +308,87 @@ export default function BookingList({ bookings, isOpen, onClose, onCancelBooking
                               <span className="font-extrabold text-sky-700 text-xs">{bk.seatCount} ghế</span>
                             </div>
                           ) : (
-                            <div className="col-span-2 pt-1.5 border-t border-stone-200/50">
-                              <span className="block text-[9px] text-stone-400 uppercase font-bold">Chi tiết combo đặt phòng</span>
-                              <span className="font-bold text-stone-800 text-xs">
-                                {bk.roomQuantity}x {bk.roomTypeName} ({bk.nights} Đêm nghỉ dưỡng)
-                              </span>
+                            <div className="col-span-2 pt-2 border-t border-stone-200/50 space-y-2">
+                              {/* Combo Package Title Header */}
+                              {(() => {
+                                const matchedCombo = INITIAL_COMBOS.find((c) => c.id === bk.comboId);
+                                return (
+                                  <div className="bg-amber-50/70 rounded-xl p-2.5 border border-amber-100 space-y-2 text-stone-700">
+                                    <div className="flex items-center space-x-1.5 text-amber-900 font-extrabold text-[11px] sm:text-xs">
+                                      <Gift className="w-4 h-4 text-amber-600 shrink-0" />
+                                      <span>Tên Gói: {matchedCombo ? matchedCombo.name : "Voucher Combo Xe Limousine + Phòng Khách Sạn"}</span>
+                                    </div>
+                                    
+                                    {/* Hotel Information */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] sm:text-xs pt-1 border-t border-amber-200/40">
+                                      <div className="flex items-start space-x-1.5">
+                                        <Hotel className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                        <span>
+                                          <b>Nghỉ dưỡng tại:</b> <span className="text-stone-900 font-bold">{bk.accommodationName || "Khách sạn / Resort tiêu chuẩn"}</span>
+                                        </span>
+                                      </div>
+                                      <div className="flex items-start space-x-1.5">
+                                        <Info className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                        <span>
+                                          <b>Chi tiết phòng:</b> <span className="text-stone-950 font-semibold">{bk.roomQuantity}x {bk.roomTypeName} ({bk.nights} Đêm)</span>
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Transport details */}
+                                    <div className="pt-2 border-t border-amber-200/40 space-y-1">
+                                      <div className="flex items-start space-x-1.5">
+                                        <Car className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" />
+                                        <span>
+                                          <b>Di chuyển:</b> Xe Limousine VIP khứ hồi (Hà Nội <span className="px-1 text-stone-400 font-light">⇄</span> Mộc Châu)
+                                        </span>
+                                      </div>
+                                      {bk.seatNumbers && bk.seatNumbers.length > 0 && (
+                                        <div className="pl-5 text-[10px] text-stone-500 font-sans flex flex-wrap gap-1">
+                                          <span className="font-bold">Hành trình ghế:</span>
+                                          {bk.seatNumbers.map((seat, sIdx) => (
+                                            <span key={sIdx} className="bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded font-medium border border-emerald-100">
+                                              {seat}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Discounts and Promo codes details */}
+                                    {(bk.couponCode || bk.discountAmount || bk.pointsDeducted) && (
+                                      <div className="pt-2 border-t border-amber-200/40 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-500">
+                                        <div className="flex items-center space-x-1">
+                                          <Tag className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                          <span>
+                                            <b>Mã ưu đãi:</b> <span className="font-mono text-indigo-700 bg-indigo-50 px-1 rounded font-bold">{bk.couponCode || "Tích lũy điểm"}</span>
+                                          </span>
+                                        </div>
+                                        {bk.discountAmount && bk.discountAmount > 0 && (
+                                          <span>
+                                            <b>Đã giảm giá:</b> <span className="text-emerald-700 font-bold">-{bk.discountAmount.toLocaleString()}đ</span>
+                                          </span>
+                                        )}
+                                        {bk.pointsDeducted && bk.pointsDeducted > 0 && (
+                                          <span>
+                                            <b>Khấu trừ ví:</b> <span className="text-amber-700 font-bold">-{bk.pointsDeducted} điểm</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Guest Notes */}
+                                    {bk.notes && (
+                                      <div className="pt-2 border-t border-amber-200/40 flex items-start space-x-1.5 text-[10px] text-stone-500">
+                                        <FileText className="w-3.5 h-3.5 text-stone-500 shrink-0 mt-0.5" />
+                                        <span>
+                                          <b>Ghi chú đặc biệt:</b> <span className="italic font-sans text-stone-600">"{bk.notes}"</span>
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>

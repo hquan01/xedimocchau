@@ -23,11 +23,17 @@ import {
   Compass,
   Star,
   Trash2,
+  Hotel,
+  Car,
+  Tag,
+  FileText,
+  Info,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth } from "../firebase";
 import { updatePassword, updateProfile, updateEmail } from "firebase/auth";
 import { saveUserToFirebase } from "../lib/firebaseUtils";
+import { INITIAL_COMBOS } from "../data/combos";
 
 interface CustomerDashboardProps {
   currentUser: User;
@@ -659,13 +665,15 @@ export default function CustomerDashboard({
                       >
                         <div
                           className={`px-4 py-2 text-white font-bold text-[10px] sm:text-xs flex justify-between items-center ${
-                            isLimo ? "bg-[#1b4332]" : "bg-amber-600"
+                            bk.type === "limousine" ? "bg-gradient-to-r from-[#1b4332] to-emerald-800" :
+                            bk.type === "shared_car" ? "bg-gradient-to-r from-sky-600 to-sky-700" :
+                            "bg-gradient-to-r from-amber-600 to-amber-700"
                           }`}
                         >
                           <span>
-                            {isLimo
-                              ? "VÉ XE LIMOUSINE VIP"
-                              : "VOUCHER COMBO XE + PHÒNG"}
+                            {bk.type === "limousine" ? "VÉ XE LIMOUSINE VIP" :
+                             bk.type === "shared_car" ? "VÉ XE GHÉP 7 CHỖ" :
+                             "VOUCHER COMBO XE + PHÒNG"}
                           </span>
                           <span className="font-mono">
                             Mã GD: #
@@ -675,7 +683,7 @@ export default function CustomerDashboard({
                         <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                           <div className="md:col-span-3 space-y-2 text-xs">
                             <div className="flex items-center space-x-2 font-black text-stone-850">
-                              <Calendar className="w-4 h-4 text-emerald-600" />
+                              <Calendar className="w-4 h-4 text-emerald-600 animate-pulse" />
                               <span>
                                 {bk.travelDate}{" "}
                                 {bk.departureTime && `lúc ${bk.departureTime}`}
@@ -689,21 +697,97 @@ export default function CustomerDashboard({
                               <p>
                                 <b>Điểm trả:</b> {bk.dropoffPoint}
                               </p>
-                              {isLimo ? (
+                              
+                              {bk.type === "limousine" && (
                                 <p>
                                   <b>Vị trí ghế VIP đã chọn:</b>{" "}
                                   <span className="font-extrabold text-emerald-700 font-mono text-sm">
                                     {bk.seatNumbers?.join(", ")}
                                   </span>
                                 </p>
-                              ) : (
+                              )}
+                              
+                              {bk.type === "shared_car" && (
                                 <p>
-                                  <b>Địa điểm lưu trú:</b>{" "}
-                                  <span className="font-bold text-stone-800">
-                                    {bk.accommodationName} ({bk.roomQuantity}x{" "}
-                                    {bk.roomTypeName})
+                                  <b>Số ghế đặt xe ghép:</b>{" "}
+                                  <span className="font-extrabold text-sky-700 text-sm">
+                                    {bk.seatCount} ghế
                                   </span>
                                 </p>
+                              )}
+
+                              {bk.type === "combo" && (
+                                <div className="mt-2.5 bg-amber-50/50 rounded-xl p-3 border border-amber-100/60 space-y-2 text-stone-700">
+                                  {(() => {
+                                    const matchedCombo = INITIAL_COMBOS.find((c) => c.id === bk.comboId);
+                                    return (
+                                      <>
+                                        <div className="flex items-center space-x-1.5 text-amber-900 font-extrabold text-[11px] sm:text-xs">
+                                          <Gift className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                          <span>Gói Combo: {matchedCombo ? matchedCombo.name : "Voucher Combo Xe Limousine + Phòng Khách Sạn"}</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] sm:text-[11px] pt-1.5 border-t border-amber-200/30">
+                                          <div className="flex items-start space-x-1.5">
+                                            <Hotel className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                            <span>
+                                              <b>Resort/Khách sạn:</b> <span className="text-stone-900 font-bold">{bk.accommodationName || "Mường Thanh Luxury / Phoenix Resort"}</span>
+                                            </span>
+                                          </div>
+                                          <div className="flex items-start space-x-1.5">
+                                            <Info className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                            <span>
+                                              <b>Phòng lưu trú:</b> <span className="text-stone-950 font-semibold">{bk.roomQuantity}x {bk.roomTypeName} ({bk.nights} Đêm)</span>
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="pt-1.5 border-t border-amber-200/30 space-y-1 text-[10px] sm:text-[11px]">
+                                          <div className="flex items-start space-x-1.5">
+                                            <Car className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" />
+                                            <span>
+                                              <b>Xe đưa đón khứ hồi:</b> Limousine VIP thương gia Hà Nội <span className="text-stone-400 font-light">⇄</span> Mộc Châu
+                                            </span>
+                                          </div>
+                                          {bk.seatNumbers && bk.seatNumbers.length > 0 && (
+                                            <div className="pl-5 flex flex-wrap gap-1">
+                                              <span className="font-bold text-stone-500">Mã ghế:</span>
+                                              {bk.seatNumbers.map((seat, sIdx) => (
+                                                <span key={sIdx} className="bg-emerald-50 text-emerald-800 px-1 py-0.2 rounded font-medium text-[9px] border border-emerald-100">
+                                                  {seat}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {(bk.couponCode || bk.discountAmount || bk.pointsDeducted) && (
+                                          <div className="pt-1.5 border-t border-amber-200/30 flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-stone-500">
+                                            <span className="flex items-center space-x-1">
+                                              <Tag className="w-3.5 h-3.5 text-indigo-500" />
+                                              <span><b>Mã:</b> <span className="font-mono text-indigo-700 bg-indigo-50 px-1 rounded font-bold">{bk.couponCode}</span></span>
+                                            </span>
+                                            {bk.discountAmount && bk.discountAmount > 0 && (
+                                              <span><b>Khuyến mại:</b> <span className="text-emerald-700 font-bold font-sans">-{bk.discountAmount.toLocaleString()}đ</span></span>
+                                            )}
+                                            {bk.pointsDeducted && bk.pointsDeducted > 0 && (
+                                              <span><b>Điểm ví:</b> <span className="text-amber-700 font-bold">-{bk.pointsDeducted} P</span></span>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {bk.notes && (
+                                          <div className="pt-1.5 border-t border-amber-200/30 flex items-start space-x-1.5 text-[9px] text-stone-500">
+                                            <FileText className="w-3.5 h-3.5 text-stone-500 shrink-0 mt-0.5" />
+                                            <span>
+                                              <b>Ghi chú:</b> <span className="italic font-sans text-stone-600">"{bk.notes}"</span>
+                                            </span>
+                                          </div>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+                                </div>
                               )}
                             </div>
                           </div>
