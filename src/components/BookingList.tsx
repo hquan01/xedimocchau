@@ -6,6 +6,7 @@ import { INITIAL_COMBOS } from "../data/combos";
 
 interface BookingListProps {
   bookings: Booking[];
+  allBookings?: Booking[];
   isOpen: boolean;
   onClose: () => void;
   onCancelBooking: (id: string) => void;
@@ -67,7 +68,7 @@ const CENTRAL_ONLINE_RESERVATIONS: Booking[] = [
   }
 ];
 
-export default function BookingList({ bookings, isOpen, onClose, onCancelBooking, onDeleteBooking }: BookingListProps) {
+export default function BookingList({ bookings, allBookings, isOpen, onClose, onCancelBooking, onDeleteBooking }: BookingListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "search">("all");
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
@@ -90,9 +91,15 @@ export default function BookingList({ bookings, isOpen, onClose, onCancelBooking
     );
   });
 
+  // Combine Firestore database bookings and CENTRAL_ONLINE_RESERVATIONS mock fallbacks safely without duplicates
+  const uniqueCloudBookings = [
+    ...(allBookings || []),
+    ...CENTRAL_ONLINE_RESERVATIONS.filter(mock => !(allBookings || []).some(b => b.id === mock.id))
+  ];
+
   // 2. Matched online database (only when searching)
   const onlineMatched = cleanQuery
-    ? CENTRAL_ONLINE_RESERVATIONS.filter((bk) => {
+    ? uniqueCloudBookings.filter((bk) => {
         // Exclude duplicate key rendering
         const existsInLocal = bookings.some((l) => (l.id || "").toLowerCase() === (bk.id || "").toLowerCase());
         if (existsInLocal) return false;

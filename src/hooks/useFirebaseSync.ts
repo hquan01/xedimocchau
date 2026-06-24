@@ -14,6 +14,7 @@ export function useFirebaseSync() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [blockedSeats, setBlockedSeats] = useState<BlockedSeat[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -96,14 +97,15 @@ export function useFirebaseSync() {
       // Bookings: Public read access now allowed by rules, operator gets all, customers can filter frontend
       unsubBookings = onSnapshot(collection(db, "bookings"), (snap) => {
         console.log("Bookings snapshot received", snap.size);
-        const allBookings = snap.docs.map(d => d.data() as Booking);
+        const fetchedBookings = snap.docs.map(d => d.data() as Booking);
+        setAllBookings(fetchedBookings);
         const deviceId = getDeviceId();
         
         if (currentUser?.role === 'operator') {
-          setBookings(allBookings);
+          setBookings(fetchedBookings);
         } else {
           // Show only bookings from this device
-          setBookings(allBookings.filter(b => (b as any).deviceId === deviceId));
+          setBookings(fetchedBookings.filter(b => (b as any).deviceId === deviceId));
         }
       }, (error) => handleFirestoreError(error, OperationType.LIST, "bookings"));
 
@@ -286,6 +288,7 @@ export function useFirebaseSync() {
     authReady,
     bookings,
     setBookings,
+    allBookings,
     blockedSeats,
     setBlockedSeats,
     users,

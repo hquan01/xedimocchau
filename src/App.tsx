@@ -45,6 +45,7 @@ export default function App() {
     authReady,
     users,
     bookings,
+    allBookings,
     blockedSeats,
     combos,
     setCombos,
@@ -580,6 +581,7 @@ export default function App() {
       <Suspense fallback={null}>
         <BookingList
           bookings={bookings}
+          allBookings={allBookings}
           isOpen={isBookingListOpen}
           onClose={() => setIsBookingListOpen(false)}
           onCancelBooking={handleCancelBooking}

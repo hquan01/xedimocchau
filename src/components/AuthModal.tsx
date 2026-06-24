@@ -401,6 +401,29 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users = [] 
             </div>
           )}
 
+          {authMode === "login" && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex justify-between items-center">
+              <div>
+                <p className="font-extrabold flex items-center gap-1 text-amber-800">
+                  🔑 Tài khoản Quản lý nhà xe:
+                </p>
+                <p className="font-mono mt-0.5 text-stone-600">
+                  SĐT: <span className="font-bold text-amber-950">0971050324</span> | Pass: <span className="font-bold text-amber-950">Duyanh18@</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("0971050324");
+                  setPassword("Duyanh18@");
+                }}
+                className="bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-colors cursor-pointer uppercase shrink-0"
+              >
+                Nhập nhanh
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleEmailAuth} className="space-y-4" autoComplete="off">
             {authMode === "register" && (
               <>
