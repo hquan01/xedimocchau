@@ -2,7 +2,7 @@ import React from "react";
 import { Compass, CalendarDays, Users, Search, Sparkles, MapPin, Ticket } from "lucide-react";
 import { motion } from "motion/react";
 
-const heroImg = "/src/assets/images/moc_chau_hero_1779246188232.png";
+const heroImg = "/src/assets/images/national_day_hero_1787038740264.jpg";
 
 interface HeroProps {
   activeTab: string;
@@ -173,10 +173,11 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="inline-flex items-center space-x-2 bg-emerald-500/15 border border-emerald-500/30 px-3.5 py-1.5 rounded-full text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-6 backdrop-blur-sm"
+          className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-600/30 via-amber-500/20 to-emerald-600/30 border border-amber-400/40 px-4 py-1.5 rounded-full text-amber-300 text-xs font-bold uppercase tracking-wider mb-6 backdrop-blur-md shadow-lg shadow-red-950/20"
         >
-          <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-          <span>Mộc Châu Khởi Hành Hàng Ngày - Giá Tốt Nhất</span>
+          <span className="text-sm">🇻🇳</span>
+          <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+          <span>Chào Mừng Đại Lễ Quốc Khánh 2/9 • Mở Bán Vé Sớm & Combo Ưu Đãi</span>
         </motion.div>
 
         {/* Catchy Slogan */}
@@ -196,7 +197,7 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mt-4 text-sm sm:text-base md:text-lg text-stone-200 max-w-3xl font-sans"
         >
-          Đơn vị vận tải & lữ hành số 1 Tây Bắc. Cam kết giữ đúng số ghế 100%, không bắt khách dọc đường, đưa đón tận nhà cả hai đầu. Đặt Combo Xe & Phòng nghỉ sang trọng (Phoenix, Mường Thanh) ngay hôm nay để tiết kiệm đến 20%!
+          Kỳ nghỉ Lễ 2/9 vi vu trọn vẹn tại thảo nguyên Mộc Châu xanh ngát! Nhà xe Duy Anh cam kết giữ đúng 100% số ghế đã đặt, không phụ thu vô lý, đưa đón tận nơi. Đặt vé Limousine & Combo Xe + Khách sạn sớm để nhận giá tốt nhất!
         </motion.p>
 
         {/* Search Engine Booking Bar */}
