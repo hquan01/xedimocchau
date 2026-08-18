@@ -224,7 +224,11 @@ export function useFirebaseSync() {
         
         const filtered = currentUser?.role === 'operator' 
           ? allNotifs 
-          : allNotifs.filter(n => n.deviceId === deviceId || n.deviceId === "all");
+          : allNotifs.filter(n => 
+              n.deviceId === deviceId || 
+              n.deviceId === "all" || 
+              (currentUser?.phone && (n.targetPhone === currentUser.phone || n.metadata?.customerPhone === currentUser.phone))
+            );
 
         setNotifications(filtered.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
       }, (error) => handleFirestoreError(error, OperationType.LIST, "notifications"));

@@ -939,12 +939,30 @@ export default function OperatorPanel({
                         <span className="text-[10px] text-stone-500 mt-0.5 block">Đơn ngày: {bk.bookingDate}</span>
                       </td>
                       <td className="py-4 px-6">
-                        <div className="space-y-0.5">
+                        <div className="space-y-1">
                           <p className="font-extrabold text-[#111]">{bk.passengerName}</p>
                           <p className="font-mono text-[10px] text-stone-500 flex items-center gap-0.5">
                             <Phone className="w-3 h-3 text-stone-400" />
                             {bk.passengerPhone}
                           </p>
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <a 
+                              href={`sms:${bk.passengerPhone}?body=${encodeURIComponent(`[Nha xe DUY ANH] Xac nhan thanh cong ve xe #${(bk.id||'').replace('bk_','').toUpperCase()} cho quy khach ${bk.passengerName}. Chuyen ${bk.travelDate} luc ${bk.departureTime||''} (${(bk.seatNumbers||[]).join(', ')}). Hotline: 0971050324`)}`}
+                              className="text-[9px] bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-stone-200 transition-colors"
+                              title="Gửi SMS xác nhận đến điện thoại khách"
+                            >
+                              SMS
+                            </a>
+                            <a 
+                              href={`https://zalo.me/${bk.passengerPhone.replace(/^0/, '84')}`}
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded border border-blue-200 transition-colors"
+                              title="Nhắn tin Zalo cho khách"
+                            >
+                              Zalo
+                            </a>
+                          </div>
                         </div>
                       </td>
                       <td className="py-4 px-6">

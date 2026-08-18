@@ -180,12 +180,21 @@ export interface AppNotification {
   title: string;
   message: string;
   timestamp: string; // ISO string
-  type: 'booking_new' | 'system';
+  type: 'booking_new' | 'booking_confirmed' | 'system' | 'admin_manual';
   isRead: boolean;
   deviceId?: string;
+  targetPhone?: string;
   metadata?: {
     bookingId?: string;
     customerName?: string;
+    customerPhone?: string;
+    seats?: string[];
+    travelDate?: string;
+    departureTime?: string;
+    route?: string;
+    totalPrice?: number;
+    pickupPoint?: string;
+    dropoffPoint?: string;
   };
 }
 

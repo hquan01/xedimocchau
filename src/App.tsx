@@ -75,6 +75,51 @@ export default function App() {
   // Quick search synchronization states
   const [limousineSearch, setLimousineSearch] = useState<{ from: string; to: string; date: string; time: string } | null>(null);
   const [comboSearch, setComboSearch] = useState<{ hotelId: string; date: string; from?: string; to?: string; time?: string } | null>(null);
+  const [confirmedPopupNotif, setConfirmedPopupNotif] = useState<AppNotification | null>(null);
+  const notifiedIdsRef = React.useRef<Set<string>>(new Set());
+
+  // Web Audio chime helper for notifications
+  const playNotificationChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+      osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.8);
+    } catch {
+      // Ignore audio synthesis errors on autoplay policy
+    }
+  };
+
+  // Listen for incoming notifications in real-time
+  React.useEffect(() => {
+    if (!notifications || notifications.length === 0) return;
+    
+    // Find unread confirmed notifications that haven't been popped up yet in this session
+    const latestConfirmed = notifications.find(
+      n => n.type === 'booking_confirmed' && !n.isRead && !notifiedIdsRef.current.has(n.id)
+    );
+
+    if (latestConfirmed) {
+      notifiedIdsRef.current.add(latestConfirmed.id);
+      playNotificationChime();
+      sendSystemNotification(latestConfirmed.title, latestConfirmed.message);
+      // If customer role or non-operator, pop up immediate visual congratulations
+      if (currentUser?.role !== 'operator') {
+        setConfirmedPopupNotif(latestConfirmed);
+      }
+    }
+  }, [notifications, currentUser]);
 
   // Set App Badge when notifications change
   React.useEffect(() => {
@@ -450,10 +495,48 @@ export default function App() {
           {activeTab === "operator" && currentUser?.role === "operator" && (
             <OperatorPanel
               users={users}
-              bookings={bookings}
+              bookings={allBookings.length > 0 ? allBookings : bookings}
               onUpdateBookingStatus={async (bookingId, status) => {
-                const bk = bookings.find(b => b.id === bookingId);
-                if (bk) await updateBookingStatusInFirebase(bookingId, { ...bk, status });
+                const targetList = allBookings.length > 0 ? allBookings : bookings;
+                const bk = targetList.find(b => b.id === bookingId) || bookings.find(b => b.id === bookingId);
+                if (bk) {
+                  const updatedBk = { ...bk, status };
+                  await updateBookingStatusInFirebase(bookingId, updatedBk);
+
+                  // Send confirmation notification to customer when status becomes success or completed
+                  if (status === "success" || status === "completed") {
+                    const { saveNotificationToFirebase } = await import("./lib/firebaseUtils");
+                    const seatInfo = (bk.seatNumbers && bk.seatNumbers.length > 0) 
+                      ? `Ghế: ${bk.seatNumbers.join(', ')}` 
+                      : (bk.seatCount ? `${bk.seatCount} chỗ` : '');
+                    const routeInfo = bk.routeSelection || bk.accommodationName || (bk.type === 'private_charter' ? 'Thuê xe riêng' : 'Vé xe');
+                    
+                    const confirmNotif: AppNotification = {
+                      id: `notif_confirmed_${bk.id}_${Date.now()}`,
+                      title: "🎉 ĐẶT VÉ THÀNH CÔNG!",
+                      message: `Vé #${(bk.id || "").replace("bk_", "").toUpperCase()} (${routeInfo}) của Quý khách ${bk.passengerName} (${bk.passengerPhone}) đã được Nhà xe DUY ANH xác nhận thành công! Chuyến đi: ${bk.travelDate} lúc ${bk.departureTime || ''}. ${seatInfo ? `[${seatInfo}]` : ''}`,
+                      timestamp: new Date().toISOString(),
+                      type: "booking_confirmed",
+                      isRead: false,
+                      deviceId: (bk as any).deviceId || "all",
+                      targetPhone: bk.passengerPhone,
+                      metadata: {
+                        bookingId: bk.id,
+                        customerName: bk.passengerName,
+                        customerPhone: bk.passengerPhone,
+                        seats: bk.seatNumbers,
+                        travelDate: bk.travelDate,
+                        departureTime: bk.departureTime,
+                        route: routeInfo,
+                        totalPrice: bk.totalPrice,
+                        pickupPoint: bk.pickupPoint,
+                        dropoffPoint: bk.dropoffPoint
+                      }
+                    };
+                    
+                    await saveNotificationToFirebase(confirmNotif);
+                  }
+                }
               }}
               onDeleteBooking={async (bookingId) => {
                  // Firebase delete
@@ -689,6 +772,79 @@ export default function App() {
                 >
                   Nhắn Tin Zalo Đặt Xe
                 </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Real-time Customer Booking Confirmation Popup */}
+      {confirmedPopupNotif && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[110] animate-fade-in text-left">
+          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-emerald-100 flex flex-col animate-scale-up">
+            <div className="bg-[#1b4332] text-white p-6 relative">
+              <button 
+                onClick={() => {
+                  markNotificationAsRead(confirmedPopupNotif.id);
+                  setConfirmedPopupNotif(null);
+                }}
+                className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+              <span className="text-[10px] bg-emerald-400 text-stone-950 font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                🎉 XÁC NHẬN THÀNH CÔNG
+              </span>
+              <h3 className="text-lg font-black tracking-tight mt-2 text-white">
+                {confirmedPopupNotif.title}
+              </h3>
+              <p className="text-emerald-100 text-xs mt-1 font-sans">
+                Nhà xe DUY ANH vừa phê duyệt vé đặt của Quý khách!
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4 text-xs space-y-2">
+                <p className="text-stone-800 font-bold leading-relaxed">
+                  {confirmedPopupNotif.message}
+                </p>
+                {confirmedPopupNotif.metadata && (
+                  <div className="pt-2 border-t border-emerald-200/50 grid grid-cols-2 gap-2 text-[11px] text-stone-600">
+                    {confirmedPopupNotif.metadata.travelDate && (
+                      <div>
+                        <span className="text-stone-400 block text-[9px] uppercase font-bold">Ngày & Giờ đi</span>
+                        <span className="font-bold text-stone-800">{confirmedPopupNotif.metadata.travelDate} ({confirmedPopupNotif.metadata.departureTime || '-'})</span>
+                      </div>
+                    )}
+                    {confirmedPopupNotif.metadata.seats && confirmedPopupNotif.metadata.seats.length > 0 && (
+                      <div>
+                        <span className="text-stone-400 block text-[9px] uppercase font-bold">Ghế đã đặt</span>
+                        <span className="font-bold text-emerald-800">{confirmedPopupNotif.metadata.seats.join(', ')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    markNotificationAsRead(confirmedPopupNotif.id);
+                    setConfirmedPopupNotif(null);
+                    setIsBookingListOpen(true);
+                  }}
+                  className="flex-1 bg-[#1b4332] text-white py-3 rounded-xl text-xs font-black text-center uppercase tracking-wider hover:bg-emerald-800 transition-colors shadow-md shadow-emerald-900/10 cursor-pointer"
+                >
+                  Xem Vé Điện Tử
+                </button>
+                <button
+                  onClick={() => {
+                    markNotificationAsRead(confirmedPopupNotif.id);
+                    setConfirmedPopupNotif(null);
+                  }}
+                  className="px-4 bg-stone-100 text-stone-700 py-3 rounded-xl text-xs font-bold hover:bg-stone-200 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
               </div>
             </div>
           </div>

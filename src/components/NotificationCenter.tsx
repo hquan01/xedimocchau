@@ -153,13 +153,29 @@ export default function NotificationCenter({
                         {!n.isRead && <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-600" />}
                         <div className="flex gap-3">
                           <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${
-                            n.type === 'booking_new' ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-600'
+                            n.type === 'booking_confirmed' 
+                              ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-700/20' 
+                              : n.type === 'booking_new' 
+                              ? 'bg-emerald-100 text-emerald-700' 
+                              : 'bg-stone-100 text-stone-600'
                           }`}>
-                            {n.type === 'booking_new' ? <Calendar className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
+                            {n.type === 'booking_confirmed' ? (
+                              <Check className="w-5 h-5 stroke-[2.5]" />
+                            ) : n.type === 'booking_new' ? (
+                              <Calendar className="w-5 h-5" />
+                            ) : (
+                              <Bell className="w-5 h-5" />
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-start">
-                              <h4 className={`text-xs uppercase tracking-tight truncate pr-2 ${!n.isRead ? 'font-black text-stone-900' : 'font-bold text-stone-500'}`}>
+                              <h4 className={`text-xs uppercase tracking-tight truncate pr-2 ${
+                                n.type === 'booking_confirmed' 
+                                  ? 'font-black text-emerald-800' 
+                                  : !n.isRead 
+                                  ? 'font-black text-stone-900' 
+                                  : 'font-bold text-stone-500'
+                              }`}>
                                 {n.title}
                               </h4>
                               <div className="flex items-center gap-2 shrink-0">
@@ -176,19 +192,33 @@ export default function NotificationCenter({
                                 </button>
                               </div>
                             </div>
-                            <p className="text-xs text-stone-600 mt-1 line-clamp-2 leading-relaxed">
+                            <p className="text-xs text-stone-600 mt-1 leading-relaxed">
                               {n.message}
                             </p>
-                            {n.metadata?.customerName && (
-                              <div className="flex items-center gap-3 mt-2">
-                                <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold uppercase">
-                                  <User className="w-3 h-3" />
-                                  {n.metadata.customerName}
-                                </div>
-                                <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-black uppercase">
-                                  <ArrowRight className="w-3 h-3" />
-                                  Mới đặt
-                                </div>
+                            {n.metadata && (
+                              <div className="flex flex-wrap items-center gap-2 mt-2 pt-1 border-t border-stone-100">
+                                {n.metadata.customerName && (
+                                  <div className="flex items-center gap-1 text-[10px] text-stone-600 font-bold">
+                                    <User className="w-3 h-3 text-stone-400" />
+                                    {n.metadata.customerName}
+                                  </div>
+                                )}
+                                {n.metadata.travelDate && (
+                                  <div className="flex items-center gap-1 text-[10px] text-stone-600 font-mono">
+                                    <Calendar className="w-3 h-3 text-stone-400" />
+                                    {n.metadata.travelDate} {n.metadata.departureTime ? `(${n.metadata.departureTime})` : ''}
+                                  </div>
+                                )}
+                                {n.metadata.seats && n.metadata.seats.length > 0 && (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                                    Ghế: {n.metadata.seats.join(', ')}
+                                  </span>
+                                )}
+                                {n.type === 'booking_confirmed' && (
+                                  <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded ml-auto flex items-center gap-0.5">
+                                    <Check className="w-2.5 h-2.5" /> ĐÃ XÁC NHẬN
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
