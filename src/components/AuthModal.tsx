@@ -56,7 +56,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users = [] 
     const mockUser: User = isDefaultAdmin ? {
       id: "mock-operator-session-id",
       email: "nhaxe@mocchau.vn",
-      name: "Duy Anh (Quản lý Nhà Xe)",
+      name: "Quản lý Limousine Mộc Châu",
       phone: "0971050324",
       role: "operator",
       points: 9999,
@@ -101,7 +101,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users = [] 
         userData = {
           id: firebaseUser.uid,
           email: firebaseUser.email || "",
-          name: customName || (firebaseUser.email === "nhaxe@mocchau.vn" ? "Duy Anh (Quản lý Nhà Xe)" : (firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Khách hàng")),
+          name: customName || (firebaseUser.email === "nhaxe@mocchau.vn" ? "Quản lý Limousine Mộc Châu" : (firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Khách hàng")),
           phone: customPhone || (firebaseUser.email === "nhaxe@mocchau.vn" ? "0971050324" : (firebaseUser.phoneNumber || "")),
           role: isOperator ? "operator" : "customer",
           points: addPoints ? 10 : 0, 
@@ -206,7 +206,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users = [] 
           const userData: User = {
             id: "mock-operator-session-id",
             email: "nhaxe@mocchau.vn",
-            name: "Duy Anh (Quản lý Nhà Xe)",
+            name: "Quản lý Limousine Mộc Châu",
             phone: "0971050324",
             role: "operator",
             points: 9999,
@@ -217,7 +217,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users = [] 
              setDoc(doc(db, "users", userData.id), userData).catch(console.warn);
           });
 
-          setSuccessMsg("Chào mừng Duy Anh đã đăng nhập thành công quyền Quản Trị Viên!");
+          setSuccessMsg("Chào mừng Quản trị viên Limousine Mộc Châu đã đăng nhập thành công!");
           setTimeout(() => {
             onLoginSuccess(userData);
             onClose();

@@ -197,7 +197,7 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mt-4 text-sm sm:text-base md:text-lg text-stone-200 max-w-3xl font-sans"
         >
-          Kỳ nghỉ Lễ 2/9 vi vu trọn vẹn tại thảo nguyên Mộc Châu xanh ngát! Nhà xe Duy Anh cam kết giữ đúng 100% số ghế đã đặt, không phụ thu vô lý, đưa đón tận nơi. Đặt vé Limousine & Combo Xe + Khách sạn sớm để nhận giá tốt nhất!
+          Kỳ nghỉ Lễ 2/9 vi vu trọn vẹn tại thảo nguyên Mộc Châu xanh ngát! Limousine Mộc Châu cam kết giữ đúng 100% số ghế đã đặt, không phụ thu vô lý, đưa đón tận nơi. Đặt vé Limousine & Combo Xe + Khách sạn sớm để nhận giá tốt nhất!
         </motion.p>
 
         {/* Search Engine Booking Bar */}

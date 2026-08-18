@@ -43,7 +43,7 @@ export function useFirebaseSync() {
               setCurrentUser({
                 id: user.uid,
                 email: user.email || "nhaxe@mocchau.vn",
-                name: "Duy Anh (Quản lý Nhà Xe)",
+                name: "Quản lý Limousine Mộc Châu",
                 phone: "0971050324",
                 role: "operator",
                 points: 9999
@@ -58,7 +58,7 @@ export function useFirebaseSync() {
             setCurrentUser({
               id: user.uid,
               email: user.email || "nhaxe@mocchau.vn",
-              name: "Duy Anh (Quản lý Nhà Xe)",
+              name: "Quản lý Limousine Mộc Châu",
               phone: "0971050324",
               role: "operator",
               points: 9999

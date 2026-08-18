@@ -514,7 +514,7 @@ export default function App() {
                     const confirmNotif: AppNotification = {
                       id: `notif_confirmed_${bk.id}_${Date.now()}`,
                       title: "🎉 ĐẶT VÉ THÀNH CÔNG!",
-                      message: `Vé #${(bk.id || "").replace("bk_", "").toUpperCase()} (${routeInfo}) của Quý khách ${bk.passengerName} (${bk.passengerPhone}) đã được Nhà xe DUY ANH xác nhận thành công! Chuyến đi: ${bk.travelDate} lúc ${bk.departureTime || ''}. ${seatInfo ? `[${seatInfo}]` : ''}`,
+                      message: `Vé #${(bk.id || "").replace("bk_", "").toUpperCase()} (${routeInfo}) của Quý khách ${bk.passengerName} (${bk.passengerPhone}) đã được Limousine Mộc Châu xác nhận thành công! Chuyến đi: ${bk.travelDate} lúc ${bk.departureTime || ''}. ${seatInfo ? `[${seatInfo}]` : ''}`,
                       timestamp: new Date().toISOString(),
                       type: "booking_confirmed",
                       isRead: false,
@@ -798,7 +798,7 @@ export default function App() {
                 {confirmedPopupNotif.title}
               </h3>
               <p className="text-emerald-100 text-xs mt-1 font-sans">
-                Nhà xe DUY ANH vừa phê duyệt vé đặt của Quý khách!
+                Limousine Mộc Châu vừa phê duyệt vé đặt của Quý khách!
               </p>
             </div>
 

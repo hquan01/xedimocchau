@@ -537,7 +537,7 @@ export default function OperatorPanel({
                 <span className="text-[10px] sm:text-xs bg-emerald-600/80 text-emerald-100 font-bold px-2 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                   Trạm Điều Hành
                 </span>
-                <span className="text-white/60 text-[10px] sm:text-xs truncate">• Nhà xe Duy Anh Limousine</span>
+                <span className="text-white/60 text-[10px] sm:text-xs truncate">• Limousine Mộc Châu</span>
               </div>
               <h2 className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight mt-0.5 sm:mt-1 text-stone-100 truncate">Hệ Thống Phân Hệ Quản Trị Chuyên Nghiệp</h2>
             </div>
@@ -1031,7 +1031,7 @@ export default function OperatorPanel({
                             </p>
                             <div className="flex items-center gap-1.5 pt-0.5">
                               <a 
-                                href={`sms:${bk.passengerPhone}?body=${encodeURIComponent(`[Nha xe DUY ANH] Xac nhan thanh cong ve xe #${(bk.id||'').replace('bk_','').toUpperCase()} cho quy khach ${bk.passengerName}. Chuyen ${bk.travelDate} luc ${bk.departureTime||''} (${(bk.seatNumbers||[]).join(', ')}). Hotline: 0971050324`)}`}
+                                href={`sms:${bk.passengerPhone}?body=${encodeURIComponent(`[Limousine Moc Chau] Xac nhan thanh cong ve xe #${(bk.id||'').replace('bk_','').toUpperCase()} cho quy khach ${bk.passengerName}. Chuyen ${bk.travelDate} luc ${bk.departureTime||''} (${(bk.seatNumbers||[]).join(', ')}). Hotline: 0971050324`)}`}
                                 className="text-[9px] bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-stone-200 transition-colors"
                                 title="Gửi SMS xác nhận đến điện thoại khách"
                               >
