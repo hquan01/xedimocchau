@@ -403,11 +403,39 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
 
                       {/* Right bar price, barcode and status actions */}
                       <div className="md:col-span-4 border-l-0 md:border-l border-dashed border-stone-200 pl-0 md:pl-4 flex flex-col justify-between items-center text-center space-y-3">
-                        <div className="space-y-1">
+                        <div className="space-y-1.5 w-full">
                           <span className="text-[9px] uppercase font-bold text-stone-400">Tổng thanh toán</span>
                           <span className="block font-mono text-base sm:text-lg font-extrabold text-[#1b4332]">
                             {bk.totalPrice.toLocaleString()}đ
                           </span>
+
+                          {/* Deposit and remaining payment info */}
+                          {bk.depositAmount && bk.depositAmount > 0 ? (
+                            <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-lg p-1.5 text-[10px] space-y-0.5 font-mono">
+                              <div className="text-emerald-800 font-bold flex justify-between px-1">
+                                <span className="font-sans">Đã cọc:</span>
+                                <span>{bk.depositAmount.toLocaleString()}đ</span>
+                              </div>
+                              {Math.max(0, bk.totalPrice - bk.depositAmount) > 0 ? (
+                                <div className="text-red-600 font-black flex justify-between px-1 border-t border-emerald-200/60 pt-0.5">
+                                  <span className="font-sans">Còn thu tại xe:</span>
+                                  <span>{Math.max(0, bk.totalPrice - bk.depositAmount).toLocaleString()}đ</span>
+                                </div>
+                              ) : (
+                                <div className="text-emerald-700 font-bold text-[9px] px-1 border-t border-emerald-200/60 pt-0.5">
+                                  ✓ Đã thanh toán đủ 100%
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
+
+                          {/* Operator note for customer */}
+                          {bk.operatorNotes && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-1.5 text-[10px] text-left text-amber-900">
+                              <span className="font-bold text-amber-800 block text-[9px] uppercase">📌 Ghi chú nhà xe:</span>
+                              <span className="font-medium">{bk.operatorNotes}</span>
+                            </div>
+                          )}
                           
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${
                             bk.status === "success"

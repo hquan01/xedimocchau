@@ -71,6 +71,8 @@ export interface Booking {
   pickupPoint: string;
   dropoffPoint: string;
   totalPrice: number;
+  depositAmount?: number; // Tiền khách đã cọc (VNĐ)
+  operatorNotes?: string; // Ghi chú điều hành / thu tiền của nhà xe
   status: 'pending' | 'success' | 'completed' | 'cancelled';
   notes?: string;
   couponCode?: string;

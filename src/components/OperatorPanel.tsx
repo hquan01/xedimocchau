@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification } from "../types";
-import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star } from "lucide-react";
+import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator } from "lucide-react";
 import { motion } from "motion/react";
 import { getOfficialSchedulesForRoute } from "./LimousineBooking";
 import { getSharedCarSchedules } from "./SharedCarBooking";
@@ -133,6 +133,50 @@ export default function OperatorPanel({
   const [seatNotes, setSeatNotes] = useState("");
   const [isUpdatingSeat, setIsUpdatingSeat] = useState(false);
 
+  // Deposit & Operator Notes Editing States
+  const [editingDepositBooking, setEditingDepositBooking] = useState<Booking | null>(null);
+  const [editDepositAmount, setEditDepositAmount] = useState<number>(0);
+  const [editOperatorNotes, setEditOperatorNotes] = useState<string>("");
+  const [isSavingDepositNotes, setIsSavingDepositNotes] = useState(false);
+
+  const handleOpenDepositModal = (bk: Booking) => {
+    setEditingDepositBooking(bk);
+    setEditDepositAmount(bk.depositAmount || 0);
+    setEditOperatorNotes(bk.operatorNotes || "");
+  };
+
+  const handleSaveDepositAndNotes = async () => {
+    if (!editingDepositBooking) return;
+    setIsSavingDepositNotes(true);
+    try {
+      const updates: Partial<Booking> = {
+        depositAmount: Math.max(0, Number(editDepositAmount) || 0),
+        operatorNotes: editOperatorNotes.trim(),
+      };
+
+      // Update Firestore database
+      const { db } = await import("../firebase");
+      const { doc, setDoc } = await import("firebase/firestore");
+      await setDoc(doc(db, "bookings", editingDepositBooking.id), updates, { merge: true });
+
+      // Update localStorage fallback
+      const { getLocalList, setLocalList } = await import("../lib/firebaseUtils");
+      const current = getLocalList<Booking>("bookings", []);
+      const idx = current.findIndex(b => b.id === editingDepositBooking.id);
+      if (idx > -1) {
+        current[idx] = { ...current[idx], ...updates };
+        setLocalList("bookings", current);
+      }
+
+      setEditingDepositBooking(null);
+    } catch (err) {
+      console.error("Error saving deposit and notes:", err);
+      alert("Đã xảy ra lỗi khi lưu thông tin cọc & ghi chú!");
+    } finally {
+      setIsSavingDepositNotes(false);
+    }
+  };
+
   // Dynamic feedback update on hour change mapping safety
   useEffect(() => {
     const hours = lockService === "limousine"
@@ -199,7 +243,7 @@ export default function OperatorPanel({
     }
     
     let csvContent = "\uFEFF"; // UTF-8 BOM so Vietnamese displays perfectly in Excel!
-    csvContent += "Mã Vé,Họ Tên Khách,Số Điện Thoại,Loại Hình,Hành Trình,Chi Tiết Ghế/Phòng,Ngày Khởi Hành,Giờ Chạy,Đón Khách,Trả Khách,Tổng Tiền,Trạng Thái\n";
+    csvContent += "Mã Vé,Họ Tên Khách,Số Điện Thoại,Loại Hình,Hành Trình,Chi Tiết Ghế/Phòng,Ngày Khởi Hành,Giờ Chạy,Đón Khách,Trả Khách,Tổng Tiền (VNĐ),Đã Cọc (VNĐ),Còn Phải Thu (VNĐ),Ghi Chú Nhà Xe,Ghi Chú Khách,Trạng Thái\n";
     
     activeBookings.forEach(b => {
       const seatOrRooms = (b.type === "limousine" || b.type === "shared_car")
@@ -210,7 +254,12 @@ export default function OperatorPanel({
       const route = (b.type === "limousine" || b.type === "shared_car") ? b.routeSelection : b.type === "private_charter" ? `${b.pickupPoint} - ${b.dropoffPoint}` : `${b.accommodationName}`;
       const serviceType = b.type === "limousine" ? "Xe Limousine VIP" : b.type === "shared_car" ? "Xe Ghép 7 Chỗ" : b.type === "private_charter" ? "Thuê Xe Riêng" : "Combo Du Lịch";
       
-      csvContent += `"${(b.id || "").toUpperCase()}","${b.passengerName}","${b.passengerPhone}","${serviceType}","${route}","${seatOrRooms}","${b.travelDate}","${b.departureTime || '-'}","${b.pickupPoint}","${b.dropoffPoint}","${b.totalPrice}","${b.status === 'success' ? 'Đã duyệt (OK)' : b.status === 'completed' ? 'Đã hoàn thành' : 'Chờ xử lý'}"\n`;
+      const deposit = b.depositAmount || 0;
+      const remaining = Math.max(0, b.totalPrice - deposit);
+      const opNotes = (b.operatorNotes || "").replace(/"/g, '""');
+      const custNotes = (b.notes || "").replace(/"/g, '""');
+
+      csvContent += `"${(b.id || "").toUpperCase()}","${b.passengerName}","${b.passengerPhone}","${serviceType}","${route}","${seatOrRooms}","${b.travelDate}","${b.departureTime || '-'}","${b.pickupPoint}","${b.dropoffPoint}","${b.totalPrice}","${deposit}","${remaining}","${opNotes}","${custNotes}","${b.status === 'success' ? 'Đã duyệt (OK)' : b.status === 'completed' ? 'Đã hoàn thành' : 'Chờ xử lý'}"\n`;
     });
     
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -830,6 +879,37 @@ export default function OperatorPanel({
             </div>
           </div>
 
+          {/* Financial & Deposit Quick Summary Strip */}
+          {(() => {
+            const filteredActive = filteredBookings.filter(b => b.status !== 'cancelled');
+            const sumTotalMoney = filteredActive.reduce((acc, b) => acc + (b.totalPrice || 0), 0);
+            const sumDepositMoney = filteredActive.reduce((acc, b) => acc + (b.depositAmount || 0), 0);
+            const sumRemainingMoney = Math.max(0, sumTotalMoney - sumDepositMoney);
+
+            return (
+              <div className="bg-stone-50 border-b border-stone-200/80 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-stone-700">
+                  <Calculator className="w-4 h-4 text-emerald-700" />
+                  <span className="font-bold">Tổng kết danh sách đang lọc ({filteredActive.length} đơn hiệu lực):</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                  <div className="flex items-center gap-1.5 font-mono bg-white px-2.5 py-1 rounded-lg border border-stone-200 shadow-2xs">
+                    <span className="text-stone-500 font-sans text-[11px]">Tổng giá vé:</span>
+                    <span className="font-black text-stone-900">{sumTotalMoney.toLocaleString()}đ</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 font-mono bg-emerald-50/80 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
+                    <span className="text-emerald-800 font-sans text-[11px] font-bold">Đã thu cọc:</span>
+                    <span className="font-black text-emerald-900">{sumDepositMoney.toLocaleString()}đ</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 font-mono bg-red-50/80 px-2.5 py-1 rounded-lg border border-red-200 shadow-2xs">
+                    <span className="text-red-700 font-sans text-[11px] font-bold">Còn phải thu:</span>
+                    <span className="font-black text-red-700">{sumRemainingMoney.toLocaleString()}đ</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Bulk actions banner if any is selected */}
           {selectedBookingIds.length > 0 && (
             <div className="p-4 bg-amber-50 border-b border-amber-100 flex flex-col sm:flex-row justify-between items-center gap-3 animate-fadeIn" id="bulk_actions_bar">
@@ -884,7 +964,7 @@ export default function OperatorPanel({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[950px]">
                 <thead>
                   <tr className="bg-stone-50/50 text-left border-b border-stone-100 text-[11px] text-stone-500 font-extrabold uppercase tracking-wider">
                     <th className="py-4 px-4 text-center w-12">
@@ -911,250 +991,506 @@ export default function OperatorPanel({
                     </th>
                     <th className="py-4 px-4">Mã giao dịch / Ngày</th>
                     <th className="py-4 px-6">Hành khách</th>
-                    <th className="py-4 px-6">Chi tiết hành trình / Dịch vụ</th>
-                    <th className="py-4 px-6 text-right">Tổng thành tiền</th>
+                    <th className="py-4 px-6">Chi tiết hành trình & Ghi chú</th>
+                    <th className="py-4 px-6 text-right">Tổng tiền & Cọc / Thu hộ</th>
                     <th className="py-4 px-6">Trạng thái</th>
                     <th className="py-4 px-6 text-center">Thao tác duyệt giữ chỗ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 text-xs text-stone-700">
-                  {filteredBookings.map((bk, idx) => (
-                    <tr key={bk.id ? `bk-row-${bk.id}-${idx}` : `bk-row-idx-${idx}`} className={`hover:bg-stone-50/20 transition-colors ${selectedBookingIds.includes(bk.id) ? "bg-emerald-50/5" : ""}`}>
-                      <td className="py-4 px-4 text-center w-12">
-                        <input
-                          type="checkbox"
-                          checked={selectedBookingIds.includes(bk.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedBookingIds(prev => [...prev, bk.id]);
-                            } else {
-                              setSelectedBookingIds(prev => prev.filter(id => id !== bk.id));
-                            }
-                          }}
-                          className="w-4 h-4 text-emerald-600 border-stone-300 rounded focus:ring-emerald-500 cursor-pointer"
-                        />
-                      </td>
-                      <td className="py-4 px-4 font-mono">
-                        <span className="font-extrabold text-[#1b4332] block">#{(bk.id || "").replace("bk_", "").toUpperCase()}</span>
-                        <span className="text-[10px] text-stone-500 mt-0.5 block">Đơn ngày: {bk.bookingDate}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="space-y-1">
-                          <p className="font-extrabold text-[#111]">{bk.passengerName}</p>
-                          <p className="font-mono text-[10px] text-stone-500 flex items-center gap-0.5">
-                            <Phone className="w-3 h-3 text-stone-400" />
-                            {bk.passengerPhone}
-                          </p>
-                          <div className="flex items-center gap-1.5 pt-0.5">
-                            <a 
-                              href={`sms:${bk.passengerPhone}?body=${encodeURIComponent(`[Nha xe DUY ANH] Xac nhan thanh cong ve xe #${(bk.id||'').replace('bk_','').toUpperCase()} cho quy khach ${bk.passengerName}. Chuyen ${bk.travelDate} luc ${bk.departureTime||''} (${(bk.seatNumbers||[]).join(', ')}). Hotline: 0971050324`)}`}
-                              className="text-[9px] bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-stone-200 transition-colors"
-                              title="Gửi SMS xác nhận đến điện thoại khách"
+                  {filteredBookings.map((bk, idx) => {
+                    const deposit = bk.depositAmount || 0;
+                    const remaining = Math.max(0, bk.totalPrice - deposit);
+
+                    return (
+                      <tr key={bk.id ? `bk-row-${bk.id}-${idx}` : `bk-row-idx-${idx}`} className={`hover:bg-stone-50/20 transition-colors ${selectedBookingIds.includes(bk.id) ? "bg-emerald-50/5" : ""}`}>
+                        <td className="py-4 px-4 text-center w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedBookingIds.includes(bk.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBookingIds(prev => [...prev, bk.id]);
+                              } else {
+                                setSelectedBookingIds(prev => prev.filter(id => id !== bk.id));
+                              }
+                            }}
+                            className="w-4 h-4 text-emerald-600 border-stone-300 rounded focus:ring-emerald-500 cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-4 px-4 font-mono">
+                          <span className="font-extrabold text-[#1b4332] block">#{(bk.id || "").replace("bk_", "").toUpperCase()}</span>
+                          <span className="text-[10px] text-stone-500 mt-0.5 block">Đơn ngày: {bk.bookingDate}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="space-y-1">
+                            <p className="font-extrabold text-[#111]">{bk.passengerName}</p>
+                            <p className="font-mono text-[10px] text-stone-500 flex items-center gap-0.5">
+                              <Phone className="w-3 h-3 text-stone-400" />
+                              {bk.passengerPhone}
+                            </p>
+                            <div className="flex items-center gap-1.5 pt-0.5">
+                              <a 
+                                href={`sms:${bk.passengerPhone}?body=${encodeURIComponent(`[Nha xe DUY ANH] Xac nhan thanh cong ve xe #${(bk.id||'').replace('bk_','').toUpperCase()} cho quy khach ${bk.passengerName}. Chuyen ${bk.travelDate} luc ${bk.departureTime||''} (${(bk.seatNumbers||[]).join(', ')}). Hotline: 0971050324`)}`}
+                                className="text-[9px] bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-stone-200 transition-colors"
+                                title="Gửi SMS xác nhận đến điện thoại khách"
+                              >
+                                SMS
+                              </a>
+                              <a 
+                                href={`https://zalo.me/${bk.passengerPhone.replace(/^0/, '84')}`}
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded border border-blue-200 transition-colors"
+                                title="Nhắn tin Zalo cho khách"
+                              >
+                                Zalo
+                              </a>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          {bk.type === "limousine" && (
+                            <div className="space-y-1">
+                              <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 text-[9px] bg-emerald-100 text-emerald-800 font-bold rounded-md">
+                                  XE LIMOUSINE
+                                </span>
+                                <span>Tuyến: {bk.routeSelection}</span>
+                              </p>
+                              <p className="text-stone-500 font-sans tracking-wide">
+                                Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime}</strong>
+                              </p>
+                              <p className="text-[10px] text-emerald-700 font-bold">
+                                Ghế đặt: {bk.seatNumbers?.join(", ")}
+                              </p>
+                            </div>
+                          )}
+                          {bk.type === "shared_car" && (
+                            <div className="space-y-1">
+                              <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 text-[9px] bg-teal-100 text-teal-800 font-bold rounded-md">
+                                  XE GHÉP 7 CHỖ
+                                </span>
+                                <span>Tuyến: {bk.routeSelection}</span>
+                              </p>
+                              <p className="text-stone-500 font-sans tracking-wide">
+                                Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime}</strong>
+                              </p>
+                              <p className="text-[10px] text-teal-700 font-bold">
+                                Ghế đặt: {bk.seatNumbers?.join(", ")}
+                              </p>
+                            </div>
+                          )}
+                          {bk.type === "private_charter" && (
+                            <div className="space-y-1">
+                              <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 text-[9px] bg-indigo-100 text-indigo-800 font-bold rounded-md">
+                                  THUÊ XE RIÊNG
+                                </span>
+                                <span>Tuyến: {bk.routeSelection || "Theo yêu cầu"}</span>
+                              </p>
+                              <p className="text-stone-500 font-sans tracking-wide">
+                                Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime || '-'}</strong>
+                              </p>
+                              <p className="text-[10px] text-indigo-700 font-bold">
+                                Sức chứa: {bk.seatCount || "7"} chỗ
+                              </p>
+                            </div>
+                          )}
+                          {bk.type === "combo" && (
+                            <div className="space-y-1">
+                              <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 font-bold rounded-md">
+                                  COMBO
+                                </span>
+                                <span>{bk.accommodationName}</span>
+                              </p>
+                              <p className="text-stone-500 font-sans">
+                                Loại phòng: {bk.roomTypeName} ({bk.roomQuantity} phòng x {bk.nights} đêm)
+                              </p>
+                              <p className="text-[10px] text-amber-700 font-bold">
+                                Ngày đi xe khứ hồi: {bk.travelDate}
+                              </p>
+                            </div>
+                          )}
+                          <span className="text-[9px] text-stone-400 block mt-1.5">Đón: {bk.pickupPoint} ➜ Trả: {bk.dropoffPoint}</span>
+
+                          {/* Ghi chú điều hành / Nhà xe */}
+                          {bk.operatorNotes && (
+                            <div className="mt-1.5 p-1.5 bg-amber-50/90 border border-amber-200 rounded-lg text-[10px] text-amber-950 font-medium flex items-start gap-1">
+                              <span className="font-black text-amber-800 shrink-0">📌 Nhà xe:</span>
+                              <span>{bk.operatorNotes}</span>
+                            </div>
+                          )}
+
+                          {/* Ghi chú khách gửi */}
+                          {bk.notes && (
+                            <div className="mt-1 p-1 bg-stone-50 border border-stone-200 rounded text-[10px] text-stone-600">
+                              <span className="font-bold text-stone-700">💬 Khách dặn:</span> {bk.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 text-right font-mono">
+                          <div className="space-y-1">
+                            <div className="font-black text-xs text-stone-900">
+                              {bk.totalPrice.toLocaleString()}đ
+                            </div>
+                            
+                            {/* Tiền đã cọc */}
+                            <div>
+                              {deposit > 0 ? (
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                  Đã cọc: {deposit.toLocaleString()}đ
+                                </span>
+                              ) : (
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 text-[10px]">
+                                  Chưa cọc: 0đ
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Còn phải thu */}
+                            {remaining <= 0 ? (
+                              <span className="block text-[10px] font-extrabold text-emerald-700">
+                                ✓ Đã thu đủ
+                              </span>
+                            ) : (
+                              <span className="block text-[11px] font-black text-red-600">
+                                Còn thu: {remaining.toLocaleString()}đ
+                              </span>
+                            )}
+
+                            {/* Nút bấm mở pop-up sửa nhanh cọc & ghi chú */}
+                            <button
+                              onClick={() => handleOpenDepositModal(bk)}
+                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-bold transition-colors cursor-pointer"
+                              title="Cập nhật tiền cọc, số tiền phải thu và ghi chú điều hành"
                             >
-                              SMS
-                            </a>
-                            <a 
-                              href={`https://zalo.me/${bk.passengerPhone.replace(/^0/, '84')}`}
-                              target="_blank" 
-                              rel="noreferrer"
-                              className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded border border-blue-200 transition-colors"
-                              title="Nhắn tin Zalo cho khách"
-                            >
-                              Zalo
-                            </a>
+                              <Edit3 className="w-2.5 h-2.5" />
+                              <span>Sửa cọc / Ghi chú</span>
+                            </button>
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        {bk.type === "limousine" && (
-                          <div className="space-y-1">
-                            <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.5 text-[9px] bg-emerald-100 text-emerald-800 font-bold rounded-md">
-                                XE LIMOUSINE
-                              </span>
-                              <span>Tuyến: {bk.routeSelection}</span>
-                            </p>
-                            <p className="text-stone-500 font-sans tracking-wide">
-                              Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime}</strong>
-                            </p>
-                            <p className="text-[10px] text-emerald-700 font-bold">
-                              Ghế đặt: {bk.seatNumbers?.join(", ")}
-                            </p>
-                          </div>
-                        )}
-                        {bk.type === "shared_car" && (
-                          <div className="space-y-1">
-                            <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.5 text-[9px] bg-teal-100 text-teal-800 font-bold rounded-md">
-                                XE GHÉP 7 CHỖ
-                              </span>
-                              <span>Tuyến: {bk.routeSelection}</span>
-                            </p>
-                            <p className="text-stone-500 font-sans tracking-wide">
-                              Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime}</strong>
-                            </p>
-                            <p className="text-[10px] text-teal-700 font-bold">
-                              Ghế đặt: {bk.seatNumbers?.join(", ")}
-                            </p>
-                          </div>
-                        )}
-                        {bk.type === "private_charter" && (
-                          <div className="space-y-1">
-                            <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.5 text-[9px] bg-indigo-100 text-indigo-800 font-bold rounded-md">
-                                THUÊ XE RIÊNG
-                              </span>
-                              <span>Tuyến: {bk.routeSelection || "Theo yêu cầu"}</span>
-                            </p>
-                            <p className="text-stone-500 font-sans tracking-wide">
-                              Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime || '-'}</strong>
-                            </p>
-                            <p className="text-[10px] text-indigo-700 font-bold">
-                              Sức chứa: {bk.seatCount || "7"} chỗ
-                            </p>
-                          </div>
-                        )}
-                        {bk.type === "combo" && (
-                          <div className="space-y-1">
-                            <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 font-bold rounded-md">
-                                COMBO
-                              </span>
-                              <span>{bk.accommodationName}</span>
-                            </p>
-                            <p className="text-stone-500 font-sans">
-                              Loại phòng: {bk.roomTypeName} ({bk.roomQuantity} phòng x {bk.nights} đêm)
-                            </p>
-                            <p className="text-[10px] text-amber-700 font-bold">
-                              Ngày đi xe khứ hồi: {bk.travelDate}
-                            </p>
-                          </div>
-                        )}
-                        <span className="text-[9px] text-stone-400 block mt-1.5">Đón: {bk.pickupPoint} ➜ Trả: {bk.dropoffPoint}</span>
-                      </td>
-                      <td className="py-4 px-6 text-right font-black text-xs text-stone-900 font-mono">
-                        {bk.totalPrice.toLocaleString()}đ
-                      </td>
-                      <td className="py-4 px-6">
-                        {bk.status === "pending" && (
-                          <span className="px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px]">
-                            Đang Chờ
-                          </span>
-                        )}
-                        {bk.status === "success" && (
-                          <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
-                            Đã Đi / OK
-                          </span>
-                        )}
-                        {bk.status === "completed" && (
-                          <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-bold text-[10px]">
-                            Đã Đi / Xong
-                          </span>
-                        )}
-                        {bk.status === "cancelled" && (
-                          <span className="px-2 py-1 bg-stone-100 text-stone-500 border border-stone-200 rounded-full font-bold text-[10px]">
-                            Đã Hủy
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center justify-center gap-1.5">
+                        </td>
+                        <td className="py-4 px-6">
                           {bk.status === "pending" && (
-                            <>
-                              <button
-                                onClick={() => handleUpdateStatus(bk.id, "success")}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                title="Xác nhận thanh toán thành công & tích điểm cho khách"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                Duyệt Đơn
-                              </button>
-                              <button
-                                onClick={() => handleUpdateStatus(bk.id, "cancelled")}
-                                className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                title="Hủy chuyến giữ chỗ này"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                                Hủy Đơn
-                              </button>
-                            </>
+                            <span className="px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px]">
+                              Đang Chờ
+                            </span>
                           )}
                           {bk.status === "success" && (
-                            <>
-                              <button
-                                onClick={() => handleUpdateStatus(bk.id, "completed")}
-                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold cursor-pointer transition-colors"
-                                title="Đánh dấu chuyến đi đã hoàn thành"
-                              >
-                                Hoàn thành
-                              </button>
-                              <button
-                                onClick={() => handleUpdateStatus(bk.id, "cancelled")}
-                                className="px-2 py-1 border border-stone-200 text-stone-400 rounded-md hover:text-red-500 hover:border-red-200 text-[10px] cursor-pointer"
-                                title="Hủy chuyến"
-                              >
-                                Hủy đơn
-                              </button>
-                            </>
+                            <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
+                              Đã Đi / OK
+                            </span>
                           )}
                           {bk.status === "completed" && (
-                            <button
-                              onClick={() => handleUpdateStatus(bk.id, "success")}
-                              className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
-                              title="Khôi phục trạng thái Đã Duyệt"
-                            >
-                              Khôi phục 'Duyệt'
-                            </button>
+                            <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-bold text-[10px]">
+                              Đã Đi / Xong
+                            </span>
                           )}
                           {bk.status === "cancelled" && (
-                            <button
-                              onClick={() => handleUpdateStatus(bk.id, "pending")}
-                              className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
-                            >
-                              Khôi phục 'Chờ'
-                            </button>
+                            <span className="px-2 py-1 bg-stone-100 text-stone-500 border border-stone-200 rounded-full font-bold text-[10px]">
+                              Đã Hủy
+                            </span>
                           )}
-                          
-                          {/* Permanent Storage Deletion Button */}
-                          {deleteConfirmId === bk.id ? (
-                            <div className="flex items-center bg-red-100 border border-red-300 p-0.5 rounded-lg animate-fadeIn ml-1 text-[10px]">
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {bk.status === "pending" && (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateStatus(bk.id, "success")}
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Xác nhận thanh toán thành công & tích điểm cho khách"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  Duyệt Đơn
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateStatus(bk.id, "cancelled")}
+                                  className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Hủy chuyến giữ chỗ này"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  Hủy Đơn
+                                </button>
+                              </>
+                            )}
+                            {bk.status === "success" && (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateStatus(bk.id, "completed")}
+                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold cursor-pointer transition-colors"
+                                  title="Đánh dấu chuyến đi đã hoàn thành"
+                                >
+                                  Hoàn thành
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateStatus(bk.id, "cancelled")}
+                                  className="px-2 py-1 border border-stone-200 text-stone-400 rounded-md hover:text-red-500 hover:border-red-200 text-[10px] cursor-pointer"
+                                  title="Hủy chuyến"
+                                >
+                                  Hủy đơn
+                                </button>
+                              </>
+                            )}
+                            {bk.status === "completed" && (
+                              <button
+                                onClick={() => handleUpdateStatus(bk.id, "success")}
+                                className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
+                                title="Khôi phục trạng thái Đã Duyệt"
+                              >
+                                Khôi phục 'Duyệt'
+                              </button>
+                            )}
+                            {bk.status === "cancelled" && (
+                              <button
+                                onClick={() => handleUpdateStatus(bk.id, "pending")}
+                                className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
+                              >
+                                Khôi phục 'Chờ'
+                              </button>
+                            )}
+                            
+                            {/* Permanent Storage Deletion Button */}
+                            {deleteConfirmId === bk.id ? (
+                              <div className="flex items-center bg-red-100 border border-red-300 p-0.5 rounded-lg animate-fadeIn ml-1 text-[10px]">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteBooking(bk.id)}
+                                  className="px-1.5 py-1 bg-red-700 hover:bg-red-800 text-white font-extrabold rounded-md shadow-xs transition-colors cursor-pointer text-[9px]"
+                                >
+                                  Xóa thật
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteConfirmId(null)}
+                                  className="ml-1 text-[9px] font-bold text-stone-600 hover:text-stone-900 px-0.5 hover:underline cursor-pointer"
+                                >
+                                  Hủy
+                                </button>
+                              </div>
+                            ) : (
                               <button
                                 type="button"
-                                onClick={() => handleDeleteBooking(bk.id)}
-                                className="px-1.5 py-1 bg-red-700 hover:bg-red-800 text-white font-extrabold rounded-md shadow-xs transition-colors cursor-pointer text-[9px]"
+                                onClick={() => {
+                                  setDeleteConfirmId(bk.id);
+                                  setTimeout(() => {
+                                    setDeleteConfirmId(prev => prev === bk.id ? null : prev);
+                                  }, 4000);
+                                }}
+                                className="p-1 px-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 ml-1"
+                                title="Xóa vĩnh viễn vé này"
                               >
-                                Xóa thật
+                                <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                <span className="text-[10px] font-bold">Xóa vé</span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => setDeleteConfirmId(null)}
-                                className="ml-1 text-[9px] font-bold text-stone-600 hover:text-stone-900 px-0.5 hover:underline cursor-pointer"
-                              >
-                                Hủy
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDeleteConfirmId(bk.id);
-                                setTimeout(() => {
-                                  setDeleteConfirmId(prev => prev === bk.id ? null : prev);
-                                }, 4000);
-                              }}
-                              className="p-1 px-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 ml-1"
-                              title="Xóa vĩnh viễn vé này"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                              <span className="text-[10px] font-bold">Xóa vé</span>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Quick Deposit & Operator Notes Modal */}
+          {editingDepositBooking && (
+            <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[120] animate-fade-in text-left">
+              <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-stone-200 flex flex-col animate-scale-up">
+                <div className="bg-[#1b4332] text-white p-5 relative">
+                  <button 
+                    onClick={() => setEditingDepositBooking(null)}
+                    className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer transition-colors"
+                  >
+                    ✕
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Banknote className="w-5 h-5 text-emerald-400" />
+                    <span className="text-[10px] bg-emerald-400 text-stone-950 font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      QUẢN LÝ TIỀN CỌC & GHI CHÚ
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black tracking-tight mt-2 text-white">
+                    Vé #{editingDepositBooking.id.replace("bk_", "").toUpperCase()} - {editingDepositBooking.passengerName}
+                  </h3>
+                  <p className="text-emerald-100 text-xs mt-0.5">
+                    SĐT: <strong className="text-white">{editingDepositBooking.passengerPhone}</strong> | Tuyến: {editingDepositBooking.routeSelection || editingDepositBooking.accommodationName || "Xe riêng"} ({editingDepositBooking.travelDate} lúc {editingDepositBooking.departureTime || '-'})
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                  {/* Financial calculation box */}
+                  <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-3">
+                    <div className="flex justify-between items-center text-xs pb-2 border-b border-stone-200">
+                      <span className="text-stone-500 font-bold uppercase tracking-wider text-[10px]">Tổng tiền vé:</span>
+                      <span className="font-black text-sm text-stone-900 font-mono">
+                        {editingDepositBooking.totalPrice.toLocaleString()}đ
+                      </span>
+                    </div>
+
+                    {/* Deposit amount input */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-extrabold text-stone-700 flex items-center justify-between">
+                        <span>💰 Khách đã đặt cọc (VNĐ):</span>
+                        <span className="text-[10px] font-bold text-emerald-700 font-mono">
+                          {Number(editDepositAmount || 0).toLocaleString()}đ
+                        </span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={0}
+                          step={10000}
+                          max={editingDepositBooking.totalPrice}
+                          value={editDepositAmount}
+                          onChange={(e) => setEditDepositAmount(Number(e.target.value) || 0)}
+                          placeholder="Nhập số tiền khách đã cọc..."
+                          className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl font-mono text-sm font-extrabold text-stone-800 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-400">
+                          VNĐ
+                        </span>
+                      </div>
+
+                      {/* Quick preset buttons */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditDepositAmount(0)}
+                          className="px-2 py-1 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                        >
+                          Chưa cọc (0đ)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditDepositAmount(200000)}
+                          className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                        >
+                          200.000đ
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditDepositAmount(300000)}
+                          className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                        >
+                          300.000đ
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditDepositAmount(Math.round(editingDepositBooking.totalPrice * 0.5))}
+                          className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                        >
+                          50% ({Math.round(editingDepositBooking.totalPrice * 0.5).toLocaleString()}đ)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditDepositAmount(editingDepositBooking.totalPrice)}
+                          className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-900 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                        >
+                          Thu đủ 100% ({editingDepositBooking.totalPrice.toLocaleString()}đ)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Remaining Calculation Preview */}
+                    <div className="pt-2 border-t border-stone-200 flex justify-between items-center">
+                      <div>
+                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+                          Số tiền còn phải thu:
+                        </span>
+                        <span className="text-[10px] text-stone-400">
+                          (Tài xế/Phụ xe thu khi khách lên xe)
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        {Math.max(0, editingDepositBooking.totalPrice - (Number(editDepositAmount) || 0)) <= 0 ? (
+                          <span className="inline-block px-2 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-xs rounded-lg">
+                            ✓ ĐÃ THU ĐỦ 100%
+                          </span>
+                        ) : (
+                          <span className="font-black text-base text-red-600 font-mono">
+                            {Math.max(0, editingDepositBooking.totalPrice - (Number(editDepositAmount) || 0)).toLocaleString()}đ
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Operator Notes Field */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-extrabold text-stone-700 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5 text-stone-500" />
+                        Ghi chú nội bộ nhà xe / Điều hành:
+                      </span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editOperatorNotes}
+                      onChange={(e) => setEditOperatorNotes(e.target.value)}
+                      placeholder="VD: Đã nhận cọc 200k qua VCB. Tài xế thu nốt 700k tại điểm đón BigC Thăng Long..."
+                      className="w-full p-3 bg-white border border-stone-300 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                    />
+
+                    {/* Quick template snippets */}
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {[
+                        "Thu tiền tại xe",
+                        "Đã cọc qua VCB",
+                        "Đã cọc qua Momo",
+                        "Khách dặn gọi trước 30p",
+                        "Đã gửi vé qua Zalo"
+                      ].map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            setEditOperatorNotes(prev => prev ? `${prev}, ${tag}` : tag);
+                          }}
+                          className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-md text-[10px] font-medium transition-colors cursor-pointer"
+                        >
+                          + {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Customer original notes (if any) */}
+                  {editingDepositBooking.notes && (
+                    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs">
+                      <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+                        Ghi chú của khách khi đặt vé trực tuyến:
+                      </span>
+                      <p className="text-stone-700 italic mt-0.5 font-sans">
+                        "{editingDepositBooking.notes}"
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      disabled={isSavingDepositNotes}
+                      onClick={handleSaveDepositAndNotes}
+                      className="flex-1 bg-[#1b4332] hover:bg-emerald-800 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-md shadow-emerald-900/10 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      {isSavingDepositNotes ? "Đang lưu..." : "Lưu Thông Tin Cọc & Ghi Chú"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingDepositBooking(null)}
+                      className="px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 py-3 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
