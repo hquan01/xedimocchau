@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification } from "../types";
-import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator } from "lucide-react";
+import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator, CalendarDays, ArrowUpDown, Layers, Bus, TrendingUp } from "lucide-react";
 import { motion } from "motion/react";
 import { getOfficialSchedulesForRoute } from "./LimousineBooking";
 import { getSharedCarSchedules } from "./SharedCarBooking";
@@ -13,6 +13,73 @@ import DestinationManagement from "./operator/DestinationManagement";
 import ArticleManagement from "./operator/ArticleManagement";
 import ScheduleManagement from "./operator/ScheduleManagement";
 import ReviewManagement from "./operator/ReviewManagement";
+
+// Helper functions for Date Formatting (ngày/tháng/năm: DD/MM/YYYY) and ISO conversion for accurate sorting
+export const normalizeToISODate = (dateStr?: string): string => {
+  if (!dateStr) return "9999-99-99";
+  const trimmed = String(dateStr).trim();
+  // YYYY-MM-DD or YYYY-M-D
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(trimmed)) {
+    const parts = trimmed.split("T")[0].split(/[-/]/);
+    const y = parts[0];
+    const m = parts[1].padStart(2, "0");
+    const d = parts[2].padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  // DD/MM/YYYY or D/M/YYYY
+  if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}/.test(trimmed)) {
+    const parts = trimmed.split(/[-/]/);
+    const d = parts[0].padStart(2, "0");
+    const m = parts[1].padStart(2, "0");
+    const y = parts[2];
+    return `${y}-${m}-${d}`;
+  }
+  return trimmed;
+};
+
+export const formatDisplayDate = (dateStr?: string): string => {
+  if (!dateStr) return "-";
+  const iso = normalizeToISODate(dateStr);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
+  }
+  return dateStr;
+};
+
+export const getDayOfWeekVN = (dateStr?: string): string => {
+  if (!dateStr) return "";
+  const iso = normalizeToISODate(dateStr);
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return "";
+  const dayNames = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+  return dayNames[d.getDay()];
+};
+
+export interface TripGroupData {
+  tripKey: string;
+  departureTime: string;
+  routeSelection: string;
+  serviceType: string;
+  bookings: Booking[];
+  totalSeats: number;
+  allSeatNumbers: string[];
+  totalRevenue: number;
+  totalDeposit: number;
+  totalRemaining: number;
+}
+
+export interface DateGroupData {
+  dateISO: string;
+  dateDisplay: string;
+  dayOfWeek: string;
+  bookingsCount: number;
+  totalSeatsCount: number;
+  totalRevenue: number;
+  totalDeposit: number;
+  totalRemaining: number;
+  trips: TripGroupData[];
+}
 
 interface OperatorPanelProps {
   users: UserType[];
@@ -107,6 +174,8 @@ export default function OperatorPanel({
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "success" | "completed" | "cancelled">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "limousine" | "shared_car" | "private_charter" | "combo">("all");
   const [dateFilter, setDateFilter] = useState("");
+  const [viewMode, setViewMode] = useState<"grouped" | "table">("grouped");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Seat Locking custom states
   const [lockService, setLockService] = useState<"limousine" | "shared_car">("limousine");
@@ -191,6 +260,7 @@ export default function OperatorPanel({
   const today = new Date().toISOString().substring(0, 10);
   
   const todayBookings = bookings.filter(b => b.travelDate === today && b.status !== "cancelled");
+  const confirmedTodayCount = todayBookings.length;
   const todayLimousine = todayBookings.filter(b => b.type === "limousine" || b.type === "shared_car");
   const todayCombos = todayBookings.filter(b => b.type === "combo");
 
@@ -229,14 +299,105 @@ export default function OperatorPanel({
 
     const matchesStatus = statusFilter === "all" || bk.status === statusFilter;
     const matchesType = typeFilter === "all" || bk.type === typeFilter;
-    const matchesDate = !dateFilter || bk.travelDate === dateFilter;
+    const matchesDate = !dateFilter || normalizeToISODate(bk.travelDate) === dateFilter;
 
     return matchesSearch && matchesStatus && matchesType && matchesDate;
   });
 
+  // 1. Sort bookings strictly by Travel Date (Ngày khởi hành) then by Trip (Giờ chạy + Tuyến đường)
+  const sortedBookings = [...filteredBookings].sort((a, b) => {
+    const dateA = normalizeToISODate(a.travelDate);
+    const dateB = normalizeToISODate(b.travelDate);
+    
+    if (dateA !== dateB) {
+      return sortOrder === "asc" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+    }
+    
+    // Same date -> Sort by departure time (06:00, 07:00, 13:00, 14:00, 16:00...)
+    const timeA = (a.departureTime || "00:00").padStart(5, "0");
+    const timeB = (b.departureTime || "00:00").padStart(5, "0");
+    if (timeA !== timeB) {
+      return timeA.localeCompare(timeB);
+    }
+    
+    // Same time -> Sort by route
+    const routeA = a.routeSelection || "";
+    const routeB = b.routeSelection || "";
+    if (routeA !== routeB) {
+      return routeA.localeCompare(routeB);
+    }
+
+    return (b.id || "").localeCompare(a.id || "");
+  });
+
+  // 2. Group into DateGroups -> TripGroups for crystal-clear visual hierarchy
+  const groupedByDateAndTrip: DateGroupData[] = [];
+
+  sortedBookings.forEach((bk) => {
+    const dateISO = normalizeToISODate(bk.travelDate);
+    let dateGroup = groupedByDateAndTrip.find((g) => g.dateISO === dateISO);
+
+    if (!dateGroup) {
+      dateGroup = {
+        dateISO,
+        dateDisplay: formatDisplayDate(bk.travelDate),
+        dayOfWeek: getDayOfWeekVN(bk.travelDate),
+        bookingsCount: 0,
+        totalSeatsCount: 0,
+        totalRevenue: 0,
+        totalDeposit: 0,
+        totalRemaining: 0,
+        trips: [],
+      };
+      groupedByDateAndTrip.push(dateGroup);
+    }
+
+    // Calculate Date Group aggregates
+    const seatsInBooking = bk.seatNumbers?.length || bk.seatCount || 1;
+    const deposit = bk.depositAmount || 0;
+    const remaining = Math.max(0, bk.totalPrice - deposit);
+
+    dateGroup.bookingsCount += 1;
+    dateGroup.totalSeatsCount += seatsInBooking;
+    dateGroup.totalRevenue += bk.totalPrice;
+    dateGroup.totalDeposit += deposit;
+    dateGroup.totalRemaining += remaining;
+
+    // Find or create trip in dateGroup
+    const tripTime = bk.departureTime || "Chưa định giờ";
+    const tripRoute = bk.routeSelection || (bk.type === "combo" ? bk.accommodationName : "Theo yêu cầu") || "Mộc Châu ➔ Hà Nội";
+    const tripKey = `${tripTime}___${tripRoute}___${bk.type}`;
+
+    let tripGroup = dateGroup.trips.find((t) => t.tripKey === tripKey);
+    if (!tripGroup) {
+      tripGroup = {
+        tripKey,
+        departureTime: tripTime,
+        routeSelection: tripRoute,
+        serviceType: bk.type,
+        bookings: [],
+        totalSeats: 0,
+        allSeatNumbers: [],
+        totalRevenue: 0,
+        totalDeposit: 0,
+        totalRemaining: 0,
+      };
+      dateGroup.trips.push(tripGroup);
+    }
+
+    tripGroup.bookings.push(bk);
+    tripGroup.totalSeats += seatsInBooking;
+    if (bk.seatNumbers && bk.seatNumbers.length > 0) {
+      tripGroup.allSeatNumbers.push(...bk.seatNumbers);
+    }
+    tripGroup.totalRevenue += bk.totalPrice;
+    tripGroup.totalDeposit += deposit;
+    tripGroup.totalRemaining += remaining;
+  });
+
   // Handle professional dispatch sheet export (UTF-8 Excel CSV Compatible)
   const handleExportCSV = () => {
-    const activeBookings = filteredBookings.filter(b => b.status === "success" || b.status === "completed" || b.status === "pending");
+    const activeBookings = sortedBookings.filter(b => b.status === "success" || b.status === "completed" || b.status === "pending");
     if (activeBookings.length === 0) {
       alert("Không có dữ liệu hành khách hoạt động trong bộ lọc hiện tại để xuất danh sách!");
       return;
@@ -259,14 +420,14 @@ export default function OperatorPanel({
       const opNotes = (b.operatorNotes || "").replace(/"/g, '""');
       const custNotes = (b.notes || "").replace(/"/g, '""');
 
-      csvContent += `"${(b.id || "").toUpperCase()}","${b.passengerName}","${b.passengerPhone}","${serviceType}","${route}","${seatOrRooms}","${b.travelDate}","${b.departureTime || '-'}","${b.pickupPoint}","${b.dropoffPoint}","${b.totalPrice}","${deposit}","${remaining}","${opNotes}","${custNotes}","${b.status === 'success' ? 'Đã duyệt (OK)' : b.status === 'completed' ? 'Đã hoàn thành' : 'Chờ xử lý'}"\n`;
+      csvContent += `"${(b.id || "").toUpperCase()}","${b.passengerName}","${b.passengerPhone}","${serviceType}","${route}","${seatOrRooms}","${formatDisplayDate(b.travelDate)}","${b.departureTime || '-'}","${b.pickupPoint}","${b.dropoffPoint}","${b.totalPrice}","${deposit}","${remaining}","${opNotes}","${custNotes}","${b.status === 'success' ? 'Đã duyệt (OK)' : b.status === 'completed' ? 'Đã hoàn thành' : 'Chờ xử lý'}"\n`;
     });
     
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Bieu-Khoi-Hanh-XeDimocchau_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute("download", `Bieu-Khoi-Hanh-LimousineMocChau_${new Date().toISOString().substring(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -790,17 +951,17 @@ export default function OperatorPanel({
 
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 flex items-center justify-between shadow-xs">
             <div className="space-y-1">
-              <span className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wide block">Sản phẩm Combo Xe + Khách Sạn</span>
-              <p className="text-stone-850 font-black text-lg">{comboCount} vé lưu trú</p>
-              <p className="text-[10px] text-stone-400">Tăng trưởng nhanh khu Bản Áng</p>
+              <span className="text-[10px] font-extrabold text-[#1b4332] uppercase tracking-wide block">Tỉ lệ lấp đầy ghế</span>
+              <p className="text-[11px] text-stone-500">Toàn bộ các chuyến hôm nay</p>
+              <div className="text-stone-900 font-extrabold text-lg mt-2">
+                {confirmedTodayCount > 0 ? Math.round((confirmedTodayCount / 38) * 100) : 0}% <span className="text-xs font-normal text-stone-500">ghế đặt</span>
+              </div>
             </div>
-            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-amber-700 font-bold text-xs">
-              MỚI ⭐
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-sm border border-emerald-100">
+              <TrendingUp className="w-6 h-6 text-emerald-600" />
             </div>
           </div>
         </div>
-      </div>
-    )}
 
       {panelTab === "bookings" && (
         /* TAB 1: BOOKING & TICKETS LIST MANAGER */
@@ -818,7 +979,7 @@ export default function OperatorPanel({
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
               <div className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-xl border border-stone-200">
                 <ListFilter className="w-3.5 h-3.5 text-stone-500" />
                 <span className="text-[11px] text-stone-500 font-bold">Lọc trạng thái:</span>
@@ -836,22 +997,22 @@ export default function OperatorPanel({
               </div>
 
               <div className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-xl border border-stone-200">
-                <span className="text-[11px] text-stone-500 font-bold">Nhóm dịch vụ:</span>
+                <span className="text-[11px] text-stone-500 font-bold">Dịch vụ:</span>
                 <select
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value as any)}
                   className="text-xs font-bold text-stone-700 bg-transparent focus:outline-none cursor-pointer"
                 >
-                  <option value="all">Tất cả đặt chỗ</option>
-                  <option value="limousine">Đặt xe Limousine</option>
-                  <option value="shared_car">Đặt xe Ghép 7 Chỗ</option>
+                  <option value="all">Tất cả</option>
+                  <option value="limousine">Xe Limousine VIP</option>
+                  <option value="shared_car">Xe Ghép 7 Chỗ</option>
                   <option value="private_charter">Thuê Xe Riêng</option>
                   <option value="combo">Combo phòng nghỉ</option>
                 </select>
               </div>
 
               <div className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-xl border border-stone-200">
-                <span className="text-[11px] text-stone-500 font-bold">Ngày xe chạy:</span>
+                <span className="text-[11px] text-stone-500 font-bold">Ngày đi:</span>
                 <input
                   type="date"
                   value={dateFilter}
@@ -869,19 +1030,57 @@ export default function OperatorPanel({
                 )}
               </div>
 
+              {/* View Mode (Phân nhóm Ngày & Chuyến vs Bảng liên tục) */}
+              <div className="flex items-center bg-stone-200/70 p-0.5 rounded-xl border border-stone-300">
+                <button
+                  onClick={() => setViewMode("grouped")}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    viewMode === "grouped"
+                      ? "bg-[#1b4332] text-white shadow-xs"
+                      : "text-stone-700 hover:text-stone-900"
+                  }`}
+                  title="Sắp xếp & phân tách rõ ràng theo từng Ngày và từng Chuyến xe"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Phân theo Ngày & Chuyến</span>
+                </button>
+                <button
+                  onClick={() => setViewMode("table")}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    viewMode === "table"
+                      ? "bg-[#1b4332] text-white shadow-xs"
+                      : "text-stone-700 hover:text-stone-900"
+                  }`}
+                  title="Xem dạng danh sách phẳng"
+                >
+                  <ListFilter className="w-3.5 h-3.5" />
+                  <span>Dạng bảng</span>
+                </button>
+              </div>
+
+              {/* Sort Order Toggle */}
+              <button
+                onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                className="px-3 py-1.5 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl text-xs font-bold text-stone-700 flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                title="Thay đổi thứ tự ngày xe chạy"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 text-[#1b4332]" />
+                <span>{sortOrder === "asc" ? "Ngày: Gần nhất trước ⬆" : "Ngày: Mới nhất trước ⬇"}</span>
+              </button>
+
               <button
                 onClick={handleExportCSV}
-                className="px-4 py-2 bg-[#1b4332] hover:bg-emerald-800 text-white rounded-xl text-xs font-bold tracking-wide shadow-xs transition-colors cursor-pointer flex items-center space-x-1"
+                className="px-3.5 py-1.5 bg-[#1b4332] hover:bg-emerald-800 text-white rounded-xl text-xs font-bold tracking-wide shadow-xs transition-colors cursor-pointer flex items-center space-x-1"
                 title="Tải bảng điều vận danh sách hành khách đi xe Excel"
               >
-                <span>📥 Xuất bảng điều vận (Excel)</span>
+                <span>📥 Xuất Excel</span>
               </button>
             </div>
           </div>
 
           {/* Financial & Deposit Quick Summary Strip */}
           {(() => {
-            const filteredActive = filteredBookings.filter(b => b.status !== 'cancelled');
+            const filteredActive = sortedBookings.filter(b => b.status !== 'cancelled');
             const sumTotalMoney = filteredActive.reduce((acc, b) => acc + (b.totalPrice || 0), 0);
             const sumDepositMoney = filteredActive.reduce((acc, b) => acc + (b.depositAmount || 0), 0);
             const sumRemainingMoney = Math.max(0, sumTotalMoney - sumDepositMoney);
@@ -890,7 +1089,7 @@ export default function OperatorPanel({
               <div className="bg-stone-50 border-b border-stone-200/80 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2 text-stone-700">
                   <Calculator className="w-4 h-4 text-emerald-700" />
-                  <span className="font-bold">Tổng kết danh sách đang lọc ({filteredActive.length} đơn hiệu lực):</span>
+                  <span className="font-bold">Tổng kết danh sách đang lọc ({filteredActive.length} đơn hiệu lực / {groupedByDateAndTrip.length} ngày khởi hành):</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                   <div className="flex items-center gap-1.5 font-mono bg-white px-2.5 py-1 rounded-lg border border-stone-200 shadow-2xs">
@@ -957,25 +1156,25 @@ export default function OperatorPanel({
           )}
 
           {/* Bookings Table / Cards on mobile */}
-          {filteredBookings.length === 0 ? (
+          {sortedBookings.length === 0 ? (
             <div className="p-12 text-center text-stone-400">
               <Trash2 className="w-10 h-10 mx-auto text-stone-300 stroke-1 mb-2.5" />
               <p className="text-sm font-semibold">Không tìm thấy yêu cầu đặt chỗ nào thỏa mãn bộ lọc!</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[950px]">
+              <table className="w-full min-w-[980px]">
                 <thead>
-                  <tr className="bg-stone-50/50 text-left border-b border-stone-100 text-[11px] text-stone-500 font-extrabold uppercase tracking-wider">
-                    <th className="py-4 px-4 text-center w-12">
+                  <tr className="bg-stone-100/80 text-left border-b border-stone-200 text-[11px] text-stone-600 font-extrabold uppercase tracking-wider">
+                    <th className="py-3 px-4 text-center w-12">
                       <input
                         type="checkbox"
-                        checked={filteredBookings.length > 0 && filteredBookings.every(b => selectedBookingIds.includes(b.id))}
+                        checked={sortedBookings.length > 0 && sortedBookings.every(b => selectedBookingIds.includes(b.id))}
                         onChange={(e) => {
                           if (e.target.checked) {
                             setSelectedBookingIds(prev => {
                               const newSelections = [...prev];
-                              filteredBookings.forEach(b => {
+                              sortedBookings.forEach(b => {
                                 if (!newSelections.includes(b.id)) {
                                   newSelections.push(b.id);
                                 }
@@ -983,320 +1182,683 @@ export default function OperatorPanel({
                               return newSelections;
                             });
                           } else {
-                            setSelectedBookingIds(prev => prev.filter(id => !filteredBookings.some(f => f.id === id)));
+                            setSelectedBookingIds(prev => prev.filter(id => !sortedBookings.some(f => f.id === id)));
                           }
                         }}
                         className="w-4 h-4 text-emerald-600 border-stone-300 rounded focus:ring-emerald-500 cursor-pointer"
                       />
                     </th>
-                    <th className="py-4 px-4">Mã giao dịch / Ngày</th>
-                    <th className="py-4 px-6">Hành khách</th>
-                    <th className="py-4 px-6">Chi tiết hành trình & Ghi chú</th>
-                    <th className="py-4 px-6 text-right">Tổng tiền & Cọc / Thu hộ</th>
-                    <th className="py-4 px-6">Trạng thái</th>
-                    <th className="py-4 px-6 text-center">Thao tác duyệt giữ chỗ</th>
+                    <th className="py-3 px-4">Mã đơn & Ngày đặt</th>
+                    <th className="py-3 px-6">Hành khách & Liên hệ</th>
+                    <th className="py-3 px-6">Hành trình & Ngày giờ đi (ngày/tháng/năm)</th>
+                    <th className="py-3 px-6 text-right">Tổng tiền & Cọc / Còn thu</th>
+                    <th className="py-3 px-6">Trạng thái</th>
+                    <th className="py-3 px-6 text-center">Thao tác duyệt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 text-xs text-stone-700">
-                  {filteredBookings.map((bk, idx) => {
-                    const deposit = bk.depositAmount || 0;
-                    const remaining = Math.max(0, bk.totalPrice - deposit);
+                  {viewMode === "grouped" ? (
+                    groupedByDateAndTrip.map((dateGroup, dIdx) => (
+                      <React.Fragment key={`date-group-${dateGroup.dateISO}-${dIdx}`}>
+                        {/* Level 1: Date Group Separator Banner */}
+                        <tr className="bg-gradient-to-r from-[#1b4332] via-[#24553f] to-emerald-800 text-white shadow-xs">
+                          <td colSpan={7} className="py-2.5 px-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <CalendarDays className="w-4 h-4 text-emerald-300" />
+                                <span className="font-black text-xs uppercase tracking-wider">
+                                  📅 NGÀY ĐI: {dateGroup.dayOfWeek ? `${dateGroup.dayOfWeek}, ` : ""}{dateGroup.dateDisplay}
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-white/20 text-white font-bold text-[10px]">
+                                  {dateGroup.bookingsCount} đơn đặt ({dateGroup.totalSeatsCount} khách/chỗ)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] font-mono">
+                                <span className="text-white/90">Tổng tiền: <strong className="text-white font-black">{dateGroup.totalRevenue.toLocaleString()}đ</strong></span>
+                                <span className="text-emerald-200">Đã cọc: <strong className="font-bold">{dateGroup.totalDeposit.toLocaleString()}đ</strong></span>
+                                <span className="text-amber-200">Còn thu: <strong className="font-black">{dateGroup.totalRemaining.toLocaleString()}đ</strong></span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
 
-                    return (
-                      <tr key={bk.id ? `bk-row-${bk.id}-${idx}` : `bk-row-idx-${idx}`} className={`hover:bg-stone-50/20 transition-colors ${selectedBookingIds.includes(bk.id) ? "bg-emerald-50/5" : ""}`}>
-                        <td className="py-4 px-4 text-center w-12">
-                          <input
-                            type="checkbox"
-                            checked={selectedBookingIds.includes(bk.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedBookingIds(prev => [...prev, bk.id]);
-                              } else {
-                                setSelectedBookingIds(prev => prev.filter(id => id !== bk.id));
-                              }
-                            }}
-                            className="w-4 h-4 text-emerald-600 border-stone-300 rounded focus:ring-emerald-500 cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-4 px-4 font-mono">
-                          <span className="font-extrabold text-[#1b4332] block">#{(bk.id || "").replace("bk_", "").toUpperCase()}</span>
-                          <span className="text-[10px] text-stone-500 mt-0.5 block">Đơn ngày: {bk.bookingDate}</span>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="space-y-1">
-                            <p className="font-extrabold text-[#111]">{bk.passengerName}</p>
-                            <p className="font-mono text-[10px] text-stone-500 flex items-center gap-0.5">
-                              <Phone className="w-3 h-3 text-stone-400" />
-                              {bk.passengerPhone}
-                            </p>
-                            <div className="flex items-center gap-1.5 pt-0.5">
-                              <a 
-                                href={`sms:${bk.passengerPhone}?body=${encodeURIComponent(`[Limousine Moc Chau] Xac nhan thanh cong ve xe #${(bk.id||'').replace('bk_','').toUpperCase()} cho quy khach ${bk.passengerName}. Chuyen ${bk.travelDate} luc ${bk.departureTime||''} (${(bk.seatNumbers||[]).join(', ')}). Hotline: 0971050324`)}`}
-                                className="text-[9px] bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-stone-200 transition-colors"
-                                title="Gửi SMS xác nhận đến điện thoại khách"
-                              >
-                                SMS
-                              </a>
-                              <a 
-                                href={`https://zalo.me/${bk.passengerPhone.replace(/^0/, '84')}`}
-                                target="_blank" 
-                                rel="noreferrer"
-                                className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded border border-blue-200 transition-colors"
-                                title="Nhắn tin Zalo cho khách"
-                              >
-                                Zalo
-                              </a>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          {bk.type === "limousine" && (
-                            <div className="space-y-1">
-                              <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
-                                <span className="px-1.5 py-0.5 text-[9px] bg-emerald-100 text-emerald-800 font-bold rounded-md">
-                                  XE LIMOUSINE
-                                </span>
-                                <span>Tuyến: {bk.routeSelection}</span>
-                              </p>
-                              <p className="text-stone-500 font-sans tracking-wide">
-                                Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime}</strong>
-                              </p>
-                              <p className="text-[10px] text-emerald-700 font-bold">
-                                Ghế đặt: {bk.seatNumbers?.join(", ")}
-                              </p>
-                            </div>
-                          )}
-                          {bk.type === "shared_car" && (
-                            <div className="space-y-1">
-                              <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
-                                <span className="px-1.5 py-0.5 text-[9px] bg-teal-100 text-teal-800 font-bold rounded-md">
-                                  XE GHÉP 7 CHỖ
-                                </span>
-                                <span>Tuyến: {bk.routeSelection}</span>
-                              </p>
-                              <p className="text-stone-500 font-sans tracking-wide">
-                                Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime}</strong>
-                              </p>
-                              <p className="text-[10px] text-teal-700 font-bold">
-                                Ghế đặt: {bk.seatNumbers?.join(", ")}
-                              </p>
-                            </div>
-                          )}
-                          {bk.type === "private_charter" && (
-                            <div className="space-y-1">
-                              <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
-                                <span className="px-1.5 py-0.5 text-[9px] bg-indigo-100 text-indigo-800 font-bold rounded-md">
-                                  THUÊ XE RIÊNG
-                                </span>
-                                <span>Tuyến: {bk.routeSelection || "Theo yêu cầu"}</span>
-                              </p>
-                              <p className="text-stone-500 font-sans tracking-wide">
-                                Ngày đi: <strong className="text-stone-700">{bk.travelDate}</strong> | Giờ: <strong className="text-stone-700">{bk.departureTime || '-'}</strong>
-                              </p>
-                              <p className="text-[10px] text-indigo-700 font-bold">
-                                Sức chứa: {bk.seatCount || "7"} chỗ
-                              </p>
-                            </div>
-                          )}
-                          {bk.type === "combo" && (
-                            <div className="space-y-1">
-                              <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
-                                <span className="px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 font-bold rounded-md">
-                                  COMBO
-                                </span>
-                                <span>{bk.accommodationName}</span>
-                              </p>
-                              <p className="text-stone-500 font-sans">
-                                Loại phòng: {bk.roomTypeName} ({bk.roomQuantity} phòng x {bk.nights} đêm)
-                              </p>
-                              <p className="text-[10px] text-amber-700 font-bold">
-                                Ngày đi xe khứ hồi: {bk.travelDate}
-                              </p>
-                            </div>
-                          )}
-                          <span className="text-[9px] text-stone-400 block mt-1.5">Đón: {bk.pickupPoint} ➜ Trả: {bk.dropoffPoint}</span>
+                        {/* Level 2: Trip Group Separator inside Date */}
+                        {dateGroup.trips.map((trip, tIdx) => (
+                          <React.Fragment key={`trip-group-${dateGroup.dateISO}-${trip.tripKey}-${tIdx}`}>
+                            <tr className="bg-emerald-50/90 border-y border-emerald-200 text-emerald-950">
+                              <td colSpan={7} className="py-2 px-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-3.5 h-3.5 text-emerald-700" />
+                                    <span className="font-black text-xs text-emerald-950 bg-white px-2 py-0.5 rounded-md border border-emerald-300 shadow-2xs font-mono">
+                                      ⏰ Chuyến {trip.departureTime}
+                                    </span>
+                                    <span className="font-extrabold text-xs text-stone-800 flex items-center gap-1">
+                                      <Bus className="w-3 h-3 text-stone-500" />
+                                      {trip.routeSelection}
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-extrabold text-[9px] uppercase">
+                                      {trip.serviceType === "limousine" ? "Limousine 9 chỗ" : trip.serviceType === "shared_car" ? "Xe Ghép 7 Chỗ" : trip.serviceType === "combo" ? "Combo Phòng" : "Thuê Riêng"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-[11px] text-stone-600 font-sans">
+                                    <span>
+                                      <strong className="text-emerald-800 font-bold">{trip.bookings.length}</strong> vé đặt
+                                    </span>
+                                    <span>•</span>
+                                    <span>
+                                      Ghế: <strong className="font-mono text-emerald-900">{trip.allSeatNumbers.length > 0 ? trip.allSeatNumbers.join(", ") : `${trip.totalSeats} chỗ`}</strong>
+                                    </span>
+                                    <span>•</span>
+                                    <span className="text-red-700 font-mono font-bold">
+                                      Còn thu: {trip.totalRemaining.toLocaleString()}đ
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
 
-                          {/* Ghi chú điều hành / Nhà xe */}
-                          {bk.operatorNotes && (
-                            <div className="mt-1.5 p-1.5 bg-amber-50/90 border border-amber-200 rounded-lg text-[10px] text-amber-950 font-medium flex items-start gap-1">
-                              <span className="font-black text-amber-800 shrink-0">📌 Nhà xe:</span>
-                              <span>{bk.operatorNotes}</span>
-                            </div>
-                          )}
+                            {/* Booking Rows for this Trip */}
+                            {trip.bookings.map((bk, bIdx) => {
+                              const deposit = bk.depositAmount || 0;
+                              const remaining = Math.max(0, bk.totalPrice - deposit);
 
-                          {/* Ghi chú khách gửi */}
-                          {bk.notes && (
-                            <div className="mt-1 p-1 bg-stone-50 border border-stone-200 rounded text-[10px] text-stone-600">
-                              <span className="font-bold text-stone-700">💬 Khách dặn:</span> {bk.notes}
+                              return (
+                                <tr key={bk.id ? `bk-row-${bk.id}-${bIdx}` : `bk-row-idx-${bIdx}`} className={`hover:bg-stone-50/50 transition-colors ${selectedBookingIds.includes(bk.id) ? "bg-emerald-50/20" : ""}`}>
+                                  <td className="py-3.5 px-4 text-center w-12">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedBookingIds.includes(bk.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedBookingIds(prev => [...prev, bk.id]);
+                                        } else {
+                                          setSelectedBookingIds(prev => prev.filter(id => id !== bk.id));
+                                        }
+                                      }}
+                                      className="w-4 h-4 text-emerald-600 border-stone-300 rounded focus:ring-emerald-500 cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="py-3.5 px-4 font-mono">
+                                    <span className="font-extrabold text-[#1b4332] block">#{(bk.id || "").replace("bk_", "").toUpperCase()}</span>
+                                    <span className="text-[10px] text-stone-500 mt-0.5 block">Đơn ngày: {formatDisplayDate(bk.bookingDate)}</span>
+                                  </td>
+                                  <td className="py-3.5 px-6">
+                                    <div className="space-y-1">
+                                      <p className="font-extrabold text-[#111]">{bk.passengerName}</p>
+                                      <p className="font-mono text-[10px] text-stone-500 flex items-center gap-0.5">
+                                        <Phone className="w-3 h-3 text-stone-400" />
+                                        {bk.passengerPhone}
+                                      </p>
+                                      <div className="flex items-center gap-1.5 pt-0.5">
+                                        <a 
+                                          href={`sms:${bk.passengerPhone}?body=${encodeURIComponent(`[Limousine Moc Chau] Xac nhan thanh cong ve xe #${(bk.id||'').replace('bk_','').toUpperCase()} cho quy khach ${bk.passengerName}. Chuyen ${formatDisplayDate(bk.travelDate)} luc ${bk.departureTime||''} (${(bk.seatNumbers||[]).join(', ')}). Hotline: 0971050324`)}`}
+                                          className="text-[9px] bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-stone-200 transition-colors"
+                                          title="Gửi SMS xác nhận đến điện thoại khách"
+                                        >
+                                          SMS
+                                        </a>
+                                        <a 
+                                          href={`https://zalo.me/${bk.passengerPhone.replace(/^0/, '84')}`}
+                                          target="_blank" 
+                                          rel="noreferrer"
+                                          className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded border border-blue-200 transition-colors"
+                                          title="Nhắn tin Zalo cho khách"
+                                        >
+                                          Zalo
+                                        </a>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3.5 px-6">
+                                    {bk.type === "limousine" && (
+                                      <div className="space-y-1">
+                                        <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                          <span className="px-1.5 py-0.5 text-[9px] bg-emerald-100 text-emerald-800 font-bold rounded-md">
+                                            XE LIMOUSINE
+                                          </span>
+                                          <span>Tuyến: {bk.routeSelection}</span>
+                                        </p>
+                                        <p className="text-stone-600 font-sans text-[11px]">
+                                          Ngày đi: <strong className="text-emerald-900 font-extrabold bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">{formatDisplayDate(bk.travelDate)}</strong> | Giờ: <strong className="text-stone-900 font-extrabold">{bk.departureTime}</strong>
+                                        </p>
+                                        <p className="text-[10px] text-emerald-700 font-bold">
+                                          Ghế đặt: {bk.seatNumbers?.join(", ")}
+                                        </p>
+                                      </div>
+                                    )}
+                                    {bk.type === "shared_car" && (
+                                      <div className="space-y-1">
+                                        <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                          <span className="px-1.5 py-0.5 text-[9px] bg-teal-100 text-teal-800 font-bold rounded-md">
+                                            XE GHÉP 7 CHỖ
+                                          </span>
+                                          <span>Tuyến: {bk.routeSelection}</span>
+                                        </p>
+                                        <p className="text-stone-600 font-sans text-[11px]">
+                                          Ngày đi: <strong className="text-teal-900 font-extrabold bg-teal-50 px-1 py-0.5 rounded border border-teal-200">{formatDisplayDate(bk.travelDate)}</strong> | Giờ: <strong className="text-stone-900 font-extrabold">{bk.departureTime}</strong>
+                                        </p>
+                                        <p className="text-[10px] text-teal-700 font-bold">
+                                          Ghế đặt: {bk.seatNumbers?.join(", ")}
+                                        </p>
+                                      </div>
+                                    )}
+                                    {bk.type === "private_charter" && (
+                                      <div className="space-y-1">
+                                        <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                          <span className="px-1.5 py-0.5 text-[9px] bg-indigo-100 text-indigo-800 font-bold rounded-md">
+                                            THUÊ XE RIÊNG
+                                          </span>
+                                          <span>Tuyến: {bk.routeSelection || "Theo yêu cầu"}</span>
+                                        </p>
+                                        <p className="text-stone-600 font-sans text-[11px]">
+                                          Ngày đi: <strong className="text-indigo-900 font-extrabold bg-indigo-50 px-1 py-0.5 rounded border border-indigo-200">{formatDisplayDate(bk.travelDate)}</strong> | Giờ: <strong className="text-stone-900 font-extrabold">{bk.departureTime || '-'}</strong>
+                                        </p>
+                                        <p className="text-[10px] text-indigo-700 font-bold">
+                                          Sức chứa: {bk.seatCount || "7"} chỗ
+                                        </p>
+                                      </div>
+                                    )}
+                                    {bk.type === "combo" && (
+                                      <div className="space-y-1">
+                                        <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                          <span className="px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 font-bold rounded-md">
+                                            COMBO
+                                          </span>
+                                          <span>{bk.accommodationName}</span>
+                                        </p>
+                                        <p className="text-stone-500 font-sans">
+                                          Loại phòng: {bk.roomTypeName} ({bk.roomQuantity} phòng x {bk.nights} đêm)
+                                        </p>
+                                        <p className="text-[11px] text-amber-900 font-bold">
+                                          Ngày đi xe khứ hồi: <span className="bg-amber-100/80 px-1 py-0.5 rounded border border-amber-300 font-extrabold">{formatDisplayDate(bk.travelDate)}</span>
+                                        </p>
+                                      </div>
+                                    )}
+                                    <span className="text-[9px] text-stone-400 block mt-1.5">Đón: {bk.pickupPoint} ➜ Trả: {bk.dropoffPoint}</span>
+
+                                    {/* Ghi chú điều hành / Nhà xe */}
+                                    {bk.operatorNotes && (
+                                      <div className="mt-1.5 p-1.5 bg-amber-50/90 border border-amber-200 rounded-lg text-[10px] text-amber-950 font-medium flex items-start gap-1">
+                                        <span className="font-black text-amber-800 shrink-0">📌 Nhà xe:</span>
+                                        <span>{bk.operatorNotes}</span>
+                                      </div>
+                                    )}
+
+                                    {/* Ghi chú khách gửi */}
+                                    {bk.notes && (
+                                      <div className="mt-1 p-1 bg-stone-50 border border-stone-200 rounded text-[10px] text-stone-600">
+                                        <span className="font-bold text-stone-700">💬 Khách dặn:</span> {bk.notes}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="py-3.5 px-6 text-right font-mono">
+                                    <div className="space-y-1">
+                                      <div className="font-black text-xs text-stone-900">
+                                        {bk.totalPrice.toLocaleString()}đ
+                                      </div>
+                                      
+                                      {/* Tiền đã cọc */}
+                                      <div>
+                                        {deposit > 0 ? (
+                                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                            Đã cọc: {deposit.toLocaleString()}đ
+                                          </span>
+                                        ) : (
+                                          <span className="inline-block px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 text-[10px]">
+                                            Chưa cọc: 0đ
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Còn phải thu */}
+                                      {remaining <= 0 ? (
+                                        <span className="block text-[10px] font-extrabold text-emerald-700">
+                                          ✓ Đã thu đủ
+                                        </span>
+                                      ) : (
+                                        <span className="block text-[11px] font-black text-red-600">
+                                          Còn thu: {remaining.toLocaleString()}đ
+                                        </span>
+                                      )}
+
+                                      {/* Nút bấm mở pop-up sửa nhanh cọc & ghi chú */}
+                                      <button
+                                        onClick={() => handleOpenDepositModal(bk)}
+                                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-bold transition-colors cursor-pointer"
+                                        title="Cập nhật tiền cọc, số tiền phải thu và ghi chú điều hành"
+                                      >
+                                        <Edit3 className="w-2.5 h-2.5" />
+                                        <span>Sửa cọc / Ghi chú</span>
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="py-3.5 px-6">
+                                    {bk.status === "pending" && (
+                                      <span className="px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px]">
+                                        Đang Chờ
+                                      </span>
+                                    )}
+                                    {bk.status === "success" && (
+                                      <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
+                                        Đã Đi / OK
+                                      </span>
+                                    )}
+                                    {bk.status === "completed" && (
+                                      <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-bold text-[10px]">
+                                        Đã Đi / Xong
+                                      </span>
+                                    )}
+                                    {bk.status === "cancelled" && (
+                                      <span className="px-2 py-1 bg-stone-100 text-stone-500 border border-stone-200 rounded-full font-bold text-[10px]">
+                                        Đã Hủy
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-3.5 px-6">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      {bk.status === "pending" && (
+                                        <>
+                                          <button
+                                            onClick={() => handleUpdateStatus(bk.id, "success")}
+                                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                            title="Xác nhận thanh toán thành công & tích điểm cho khách"
+                                          >
+                                            <Check className="w-3.5 h-3.5" />
+                                            Duyệt Đơn
+                                          </button>
+                                          <button
+                                            onClick={() => handleUpdateStatus(bk.id, "cancelled")}
+                                            className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                            title="Hủy chuyến giữ chỗ này"
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                            Hủy Đơn
+                                          </button>
+                                        </>
+                                      )}
+                                      {bk.status === "success" && (
+                                        <>
+                                          <button
+                                            onClick={() => handleUpdateStatus(bk.id, "completed")}
+                                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold cursor-pointer transition-colors"
+                                            title="Đánh dấu chuyến đi đã hoàn thành"
+                                          >
+                                            Hoàn thành
+                                          </button>
+                                          <button
+                                            onClick={() => handleUpdateStatus(bk.id, "cancelled")}
+                                            className="px-2 py-1 border border-stone-200 text-stone-400 rounded-md hover:text-red-500 hover:border-red-200 text-[10px] cursor-pointer"
+                                            title="Hủy chuyến"
+                                          >
+                                            Hủy đơn
+                                          </button>
+                                        </>
+                                      )}
+                                      {bk.status === "completed" && (
+                                        <button
+                                          onClick={() => handleUpdateStatus(bk.id, "success")}
+                                          className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
+                                          title="Khôi phục trạng thái Đã Duyệt"
+                                        >
+                                          Khôi phục 'Duyệt'
+                                        </button>
+                                      )}
+                                      {bk.status === "cancelled" && (
+                                        <button
+                                          onClick={() => handleUpdateStatus(bk.id, "pending")}
+                                          className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
+                                        >
+                                          Khôi phục 'Chờ'
+                                        </button>
+                                      )}
+                                      
+                                      {/* Permanent Storage Deletion Button */}
+                                      {deleteConfirmId === bk.id ? (
+                                        <div className="flex items-center bg-red-100 border border-red-300 p-0.5 rounded-lg animate-fadeIn ml-1 text-[10px]">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteBooking(bk.id)}
+                                            className="px-1.5 py-1 bg-red-700 hover:bg-red-800 text-white font-extrabold rounded-md shadow-xs transition-colors cursor-pointer text-[9px]"
+                                          >
+                                            Xóa thật
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setDeleteConfirmId(null)}
+                                            className="ml-1 text-[9px] font-bold text-stone-600 hover:text-stone-900 px-0.5 hover:underline cursor-pointer"
+                                          >
+                                            Hủy
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setDeleteConfirmId(bk.id);
+                                            setTimeout(() => {
+                                              setDeleteConfirmId(prev => prev === bk.id ? null : prev);
+                                            }, 4000);
+                                          }}
+                                          className="p-1 px-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 ml-1"
+                                          title="Xóa vĩnh viễn vé này"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                          <span className="text-[10px] font-bold">Xóa vé</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        ))}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    sortedBookings.map((bk, idx) => {
+                      const deposit = bk.depositAmount || 0;
+                      const remaining = Math.max(0, bk.totalPrice - deposit);
+
+                      return (
+                        <tr key={bk.id ? `bk-flat-${bk.id}-${idx}` : `bk-flat-idx-${idx}`} className={`hover:bg-stone-50/50 transition-colors ${selectedBookingIds.includes(bk.id) ? "bg-emerald-50/20" : ""}`}>
+                          <td className="py-3.5 px-4 text-center w-12">
+                            <input
+                              type="checkbox"
+                              checked={selectedBookingIds.includes(bk.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedBookingIds(prev => [...prev, bk.id]);
+                                } else {
+                                  setSelectedBookingIds(prev => prev.filter(id => id !== bk.id));
+                                }
+                              }}
+                              className="w-4 h-4 text-emerald-600 border-stone-300 rounded focus:ring-emerald-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-3.5 px-4 font-mono">
+                            <span className="font-extrabold text-[#1b4332] block">#{(bk.id || "").replace("bk_", "").toUpperCase()}</span>
+                            <span className="text-[10px] text-stone-500 mt-0.5 block">Đơn ngày: {formatDisplayDate(bk.bookingDate)}</span>
+                          </td>
+                          <td className="py-3.5 px-6">
+                            <div className="space-y-1">
+                              <p className="font-extrabold text-[#111]">{bk.passengerName}</p>
+                              <p className="font-mono text-[10px] text-stone-500 flex items-center gap-0.5">
+                                <Phone className="w-3 h-3 text-stone-400" />
+                                {bk.passengerPhone}
+                              </p>
+                              <div className="flex items-center gap-1.5 pt-0.5">
+                                <a 
+                                  href={`sms:${bk.passengerPhone}?body=${encodeURIComponent(`[Limousine Moc Chau] Xac nhan thanh cong ve xe #${(bk.id||'').replace('bk_','').toUpperCase()} cho quy khach ${bk.passengerName}. Chuyen ${formatDisplayDate(bk.travelDate)} luc ${bk.departureTime||''} (${(bk.seatNumbers||[]).join(', ')}). Hotline: 0971050324`)}`}
+                                  className="text-[9px] bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-stone-200 transition-colors"
+                                  title="Gửi SMS xác nhận đến điện thoại khách"
+                                >
+                                  SMS
+                                </a>
+                                <a 
+                                  href={`https://zalo.me/${bk.passengerPhone.replace(/^0/, '84')}`}
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded border border-blue-200 transition-colors"
+                                  title="Nhắn tin Zalo cho khách"
+                                >
+                                  Zalo
+                                </a>
+                              </div>
                             </div>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-right font-mono">
-                          <div className="space-y-1">
-                            <div className="font-black text-xs text-stone-900">
-                              {bk.totalPrice.toLocaleString()}đ
-                            </div>
-                            
-                            {/* Tiền đã cọc */}
-                            <div>
-                              {deposit > 0 ? (
-                                <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
-                                  Đã cọc: {deposit.toLocaleString()}đ
+                          </td>
+                          <td className="py-3.5 px-6">
+                            {bk.type === "limousine" && (
+                              <div className="space-y-1">
+                                <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 text-[9px] bg-emerald-100 text-emerald-800 font-bold rounded-md">
+                                    XE LIMOUSINE
+                                  </span>
+                                  <span>Tuyến: {bk.routeSelection}</span>
+                                </p>
+                                <p className="text-stone-600 font-sans text-[11px]">
+                                  Ngày đi: <strong className="text-emerald-900 font-extrabold bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">{formatDisplayDate(bk.travelDate)}</strong> | Giờ: <strong className="text-stone-900 font-extrabold">{bk.departureTime}</strong>
+                                </p>
+                                <p className="text-[10px] text-emerald-700 font-bold">
+                                  Ghế đặt: {bk.seatNumbers?.join(", ")}
+                                </p>
+                              </div>
+                            )}
+                            {bk.type === "shared_car" && (
+                              <div className="space-y-1">
+                                <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 text-[9px] bg-teal-100 text-teal-800 font-bold rounded-md">
+                                    XE GHÉP 7 CHỖ
+                                  </span>
+                                  <span>Tuyến: {bk.routeSelection}</span>
+                                </p>
+                                <p className="text-stone-600 font-sans text-[11px]">
+                                  Ngày đi: <strong className="text-teal-900 font-extrabold bg-teal-50 px-1 py-0.5 rounded border border-teal-200">{formatDisplayDate(bk.travelDate)}</strong> | Giờ: <strong className="text-stone-900 font-extrabold">{bk.departureTime}</strong>
+                                </p>
+                                <p className="text-[10px] text-teal-700 font-bold">
+                                  Ghế đặt: {bk.seatNumbers?.join(", ")}
+                                </p>
+                              </div>
+                            )}
+                            {bk.type === "private_charter" && (
+                              <div className="space-y-1">
+                                <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 text-[9px] bg-indigo-100 text-indigo-800 font-bold rounded-md">
+                                    THUÊ XE RIÊNG
+                                  </span>
+                                  <span>Tuyến: {bk.routeSelection || "Theo yêu cầu"}</span>
+                                </p>
+                                <p className="text-stone-600 font-sans text-[11px]">
+                                  Ngày đi: <strong className="text-indigo-900 font-extrabold bg-indigo-50 px-1 py-0.5 rounded border border-indigo-200">{formatDisplayDate(bk.travelDate)}</strong> | Giờ: <strong className="text-stone-900 font-extrabold">{bk.departureTime || '-'}</strong>
+                                </p>
+                                <p className="text-[10px] text-indigo-700 font-bold">
+                                  Sức chứa: {bk.seatCount || "7"} chỗ
+                                </p>
+                              </div>
+                            )}
+                            {bk.type === "combo" && (
+                              <div className="space-y-1">
+                                <p className="font-extrabold text-stone-800 flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 font-bold rounded-md">
+                                    COMBO
+                                  </span>
+                                  <span>{bk.accommodationName}</span>
+                                </p>
+                                <p className="text-stone-500 font-sans">
+                                  Loại phòng: {bk.roomTypeName} ({bk.roomQuantity} phòng x {bk.nights} đêm)
+                                </p>
+                                <p className="text-[11px] text-amber-900 font-bold">
+                                  Ngày đi xe khứ hồi: <span className="bg-amber-100/80 px-1 py-0.5 rounded border border-amber-300 font-extrabold">{formatDisplayDate(bk.travelDate)}</span>
+                                </p>
+                              </div>
+                            )}
+                            <span className="text-[9px] text-stone-400 block mt-1.5">Đón: {bk.pickupPoint} ➜ Trả: {bk.dropoffPoint}</span>
+
+                            {/* Ghi chú điều hành / Nhà xe */}
+                            {bk.operatorNotes && (
+                              <div className="mt-1.5 p-1.5 bg-amber-50/90 border border-amber-200 rounded-lg text-[10px] text-amber-950 font-medium flex items-start gap-1">
+                                <span className="font-black text-amber-800 shrink-0">📌 Nhà xe:</span>
+                                <span>{bk.operatorNotes}</span>
+                              </div>
+                            )}
+
+                            {/* Ghi chú khách gửi */}
+                            {bk.notes && (
+                              <div className="mt-1 p-1 bg-stone-50 border border-stone-200 rounded text-[10px] text-stone-600">
+                                <span className="font-bold text-stone-700">💬 Khách dặn:</span> {bk.notes}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-6 text-right font-mono">
+                            <div className="space-y-1">
+                              <div className="font-black text-xs text-stone-900">
+                                {bk.totalPrice.toLocaleString()}đ
+                              </div>
+                              
+                              {/* Tiền đã cọc */}
+                              <div>
+                                {deposit > 0 ? (
+                                  <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                    Đã cọc: {deposit.toLocaleString()}đ
+                                  </span>
+                                ) : (
+                                  <span className="inline-block px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 text-[10px]">
+                                    Chưa cọc: 0đ
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Còn phải thu */}
+                              {remaining <= 0 ? (
+                                <span className="block text-[10px] font-extrabold text-emerald-700">
+                                  ✓ Đã thu đủ
                                 </span>
                               ) : (
-                                <span className="inline-block px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 text-[10px]">
-                                  Chưa cọc: 0đ
+                                <span className="block text-[11px] font-black text-red-600">
+                                  Còn thu: {remaining.toLocaleString()}đ
                                 </span>
                               )}
+
+                              {/* Nút bấm mở pop-up sửa nhanh cọc & ghi chú */}
+                              <button
+                                onClick={() => handleOpenDepositModal(bk)}
+                                className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-bold transition-colors cursor-pointer"
+                                title="Cập nhật tiền cọc, số tiền phải thu và ghi chú điều hành"
+                              >
+                                <Edit3 className="w-2.5 h-2.5" />
+                                <span>Sửa cọc / Ghi chú</span>
+                              </button>
                             </div>
-
-                            {/* Còn phải thu */}
-                            {remaining <= 0 ? (
-                              <span className="block text-[10px] font-extrabold text-emerald-700">
-                                ✓ Đã thu đủ
-                              </span>
-                            ) : (
-                              <span className="block text-[11px] font-black text-red-600">
-                                Còn thu: {remaining.toLocaleString()}đ
-                              </span>
-                            )}
-
-                            {/* Nút bấm mở pop-up sửa nhanh cọc & ghi chú */}
-                            <button
-                              onClick={() => handleOpenDepositModal(bk)}
-                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-bold transition-colors cursor-pointer"
-                              title="Cập nhật tiền cọc, số tiền phải thu và ghi chú điều hành"
-                            >
-                              <Edit3 className="w-2.5 h-2.5" />
-                              <span>Sửa cọc / Ghi chú</span>
-                            </button>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          {bk.status === "pending" && (
-                            <span className="px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px]">
-                              Đang Chờ
-                            </span>
-                          )}
-                          {bk.status === "success" && (
-                            <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
-                              Đã Đi / OK
-                            </span>
-                          )}
-                          {bk.status === "completed" && (
-                            <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-bold text-[10px]">
-                              Đã Đi / Xong
-                            </span>
-                          )}
-                          {bk.status === "cancelled" && (
-                            <span className="px-2 py-1 bg-stone-100 text-stone-500 border border-stone-200 rounded-full font-bold text-[10px]">
-                              Đã Hủy
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center justify-center gap-1.5">
+                          </td>
+                          <td className="py-3.5 px-6">
                             {bk.status === "pending" && (
-                              <>
-                                <button
-                                  onClick={() => handleUpdateStatus(bk.id, "success")}
-                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                  title="Xác nhận thanh toán thành công & tích điểm cho khách"
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                  Duyệt Đơn
-                                </button>
-                                <button
-                                  onClick={() => handleUpdateStatus(bk.id, "cancelled")}
-                                  className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
-                                  title="Hủy chuyến giữ chỗ này"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                  Hủy Đơn
-                                </button>
-                              </>
+                              <span className="px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px]">
+                                Đang Chờ
+                              </span>
                             )}
                             {bk.status === "success" && (
-                              <>
-                                <button
-                                  onClick={() => handleUpdateStatus(bk.id, "completed")}
-                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold cursor-pointer transition-colors"
-                                  title="Đánh dấu chuyến đi đã hoàn thành"
-                                >
-                                  Hoàn thành
-                                </button>
-                                <button
-                                  onClick={() => handleUpdateStatus(bk.id, "cancelled")}
-                                  className="px-2 py-1 border border-stone-200 text-stone-400 rounded-md hover:text-red-500 hover:border-red-200 text-[10px] cursor-pointer"
-                                  title="Hủy chuyến"
-                                >
-                                  Hủy đơn
-                                </button>
-                              </>
+                              <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
+                                Đã Đi / OK
+                              </span>
                             )}
                             {bk.status === "completed" && (
-                              <button
-                                onClick={() => handleUpdateStatus(bk.id, "success")}
-                                className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
-                                title="Khôi phục trạng thái Đã Duyệt"
-                              >
-                                Khôi phục 'Duyệt'
-                              </button>
+                              <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-bold text-[10px]">
+                                Đã Đi / Xong
+                              </span>
                             )}
                             {bk.status === "cancelled" && (
-                              <button
-                                onClick={() => handleUpdateStatus(bk.id, "pending")}
-                                className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
-                              >
-                                Khôi phục 'Chờ'
-                              </button>
+                              <span className="px-2 py-1 bg-stone-100 text-stone-500 border border-stone-200 rounded-full font-bold text-[10px]">
+                                Đã Hủy
+                              </span>
                             )}
-                            
-                            {/* Permanent Storage Deletion Button */}
-                            {deleteConfirmId === bk.id ? (
-                              <div className="flex items-center bg-red-100 border border-red-300 p-0.5 rounded-lg animate-fadeIn ml-1 text-[10px]">
+                          </td>
+                          <td className="py-3.5 px-6">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {bk.status === "pending" && (
+                                <>
+                                  <button
+                                    onClick={() => handleUpdateStatus(bk.id, "success")}
+                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                    title="Xác nhận thanh toán thành công & tích điểm cho khách"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    Duyệt Đơn
+                                  </button>
+                                  <button
+                                    onClick={() => handleUpdateStatus(bk.id, "cancelled")}
+                                    className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg font-bold text-[10px] uppercase transition-all flex items-center gap-1 cursor-pointer"
+                                    title="Hủy chuyến giữ chỗ này"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                    Hủy Đơn
+                                  </button>
+                                </>
+                              )}
+                              {bk.status === "success" && (
+                                <>
+                                  <button
+                                    onClick={() => handleUpdateStatus(bk.id, "completed")}
+                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[10px] font-bold cursor-pointer transition-colors"
+                                    title="Đánh dấu chuyến đi đã hoàn thành"
+                                  >
+                                    Hoàn thành
+                                  </button>
+                                  <button
+                                    onClick={() => handleUpdateStatus(bk.id, "cancelled")}
+                                    className="px-2 py-1 border border-stone-200 text-stone-400 rounded-md hover:text-red-500 hover:border-red-200 text-[10px] cursor-pointer"
+                                    title="Hủy chuyến"
+                                  >
+                                    Hủy đơn
+                                  </button>
+                                </>
+                              )}
+                              {bk.status === "completed" && (
+                                <button
+                                  onClick={() => handleUpdateStatus(bk.id, "success")}
+                                  className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
+                                  title="Khôi phục trạng thái Đã Duyệt"
+                                >
+                                  Khôi phục 'Duyệt'
+                                </button>
+                              )}
+                              {bk.status === "cancelled" && (
+                                <button
+                                  onClick={() => handleUpdateStatus(bk.id, "pending")}
+                                  className="px-2 py-1 border border-stone-200 text-stone-500 rounded-md hover:text-[#1b4332] hover:bg-emerald-50 text-[10px] cursor-pointer"
+                                >
+                                  Khôi phục 'Chờ'
+                                </button>
+                              )}
+                              
+                              {/* Permanent Storage Deletion Button */}
+                              {deleteConfirmId === bk.id ? (
+                                <div className="flex items-center bg-red-100 border border-red-300 p-0.5 rounded-lg animate-fadeIn ml-1 text-[10px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteBooking(bk.id)}
+                                    className="px-1.5 py-1 bg-red-700 hover:bg-red-800 text-white font-extrabold rounded-md shadow-xs transition-colors cursor-pointer text-[9px]"
+                                  >
+                                    Xóa thật
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteConfirmId(null)}
+                                    className="ml-1 text-[9px] font-bold text-stone-600 hover:text-stone-900 px-0.5 hover:underline cursor-pointer"
+                                  >
+                                    Hủy
+                                  </button>
+                                </div>
+                              ) : (
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteBooking(bk.id)}
-                                  className="px-1.5 py-1 bg-red-700 hover:bg-red-800 text-white font-extrabold rounded-md shadow-xs transition-colors cursor-pointer text-[9px]"
+                                  onClick={() => {
+                                    setDeleteConfirmId(bk.id);
+                                    setTimeout(() => {
+                                      setDeleteConfirmId(prev => prev === bk.id ? null : prev);
+                                    }, 4000);
+                                  }}
+                                  className="p-1 px-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 ml-1"
+                                  title="Xóa vĩnh viễn vé này"
                                 >
-                                  Xóa thật
+                                  <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                  <span className="text-[10px] font-bold">Xóa vé</span>
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeleteConfirmId(null)}
-                                  className="ml-1 text-[9px] font-bold text-stone-600 hover:text-stone-900 px-0.5 hover:underline cursor-pointer"
-                                >
-                                  Hủy
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDeleteConfirmId(bk.id);
-                                  setTimeout(() => {
-                                    setDeleteConfirmId(prev => prev === bk.id ? null : prev);
-                                  }, 4000);
-                                }}
-                                className="p-1 px-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 ml-1"
-                                title="Xóa vĩnh viễn vé này"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                                <span className="text-[10px] font-bold">Xóa vé</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
 
-          {/* Quick Deposit & Operator Notes Modal */}
+      {/* Quick Deposit & Operator Notes Modal */}
           {editingDepositBooking && (
             <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[120] animate-fade-in text-left">
               <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-stone-200 flex flex-col animate-scale-up">

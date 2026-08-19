@@ -2,7 +2,7 @@ import React from "react";
 import { Compass, CalendarDays, Users, Search, Sparkles, MapPin, Ticket } from "lucide-react";
 import { motion } from "motion/react";
 
-const heroImg = "/src/assets/images/national_day_hero_1787038740264.jpg";
+const heroImg = "/src/assets/images/national_day_banner_1787127554476.jpg";
 
 interface HeroProps {
   activeTab: string;
