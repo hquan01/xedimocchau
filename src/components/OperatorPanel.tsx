@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification } from "../types";
-import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator, CalendarDays, ArrowUpDown, Layers, Bus, TrendingUp } from "lucide-react";
+import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator, CalendarDays, ArrowUpDown, Layers, Bus, TrendingUp, Car, PhoneCall, UserCheck } from "lucide-react";
 import { motion } from "motion/react";
 import { getOfficialSchedulesForRoute } from "./LimousineBooking";
 import { getSharedCarSchedules } from "./SharedCarBooking";
@@ -13,6 +13,15 @@ import DestinationManagement from "./operator/DestinationManagement";
 import ArticleManagement from "./operator/ArticleManagement";
 import ScheduleManagement from "./operator/ScheduleManagement";
 import ReviewManagement from "./operator/ReviewManagement";
+
+// Preset driver fleet for fast selection and autocomplete
+export const DEFAULT_DRIVERS = [
+  { name: "Lái xe Tuấn", phone: "0971050324", plate: "26B-008.99" },
+  { name: "Lái xe Hùng", phone: "0982112233", plate: "29B-608.24" },
+  { name: "Lái xe Nam", phone: "0912889966", plate: "29B-512.33" },
+  { name: "Lái xe Đức", phone: "0868445566", plate: "26F-001.29" },
+  { name: "Lái xe Phong", phone: "0989332211", plate: "29B-998.12" },
+];
 
 // Helper functions for Date Formatting (ngày/tháng/năm: DD/MM/YYYY) and ISO conversion for accurate sorting
 export const normalizeToISODate = (dateStr?: string): string => {
@@ -67,6 +76,9 @@ export interface TripGroupData {
   totalRevenue: number;
   totalDeposit: number;
   totalRemaining: number;
+  assignedDriverName?: string;
+  assignedDriverPhone?: string;
+  assignedVehiclePlate?: string;
 }
 
 export interface DateGroupData {
@@ -202,16 +214,31 @@ export default function OperatorPanel({
   const [seatNotes, setSeatNotes] = useState("");
   const [isUpdatingSeat, setIsUpdatingSeat] = useState(false);
 
-  // Deposit & Operator Notes Editing States
+  // Deposit, Driver & Operator Notes Editing States
   const [editingDepositBooking, setEditingDepositBooking] = useState<Booking | null>(null);
   const [editDepositAmount, setEditDepositAmount] = useState<number>(0);
   const [editOperatorNotes, setEditOperatorNotes] = useState<string>("");
+  const [editDriverName, setEditDriverName] = useState<string>("");
+  const [editDriverPhone, setEditDriverPhone] = useState<string>("");
+  const [editVehiclePlate, setEditVehiclePlate] = useState<string>("");
+  const [applyDriverToEntireTrip, setApplyDriverToEntireTrip] = useState<boolean>(false);
   const [isSavingDepositNotes, setIsSavingDepositNotes] = useState(false);
+
+  // Trip-level batch driver assignment
+  const [assigningTripGroup, setAssigningTripGroup] = useState<TripGroupData | null>(null);
+  const [tripDriverName, setTripDriverName] = useState<string>("");
+  const [tripDriverPhone, setTripDriverPhone] = useState<string>("");
+  const [tripVehiclePlate, setTripVehiclePlate] = useState<string>("");
+  const [isSavingTripDriver, setIsSavingTripDriver] = useState<boolean>(false);
 
   const handleOpenDepositModal = (bk: Booking) => {
     setEditingDepositBooking(bk);
     setEditDepositAmount(bk.depositAmount || 0);
     setEditOperatorNotes(bk.operatorNotes || "");
+    setEditDriverName(bk.driverName || "");
+    setEditDriverPhone(bk.driverPhone || "");
+    setEditVehiclePlate(bk.vehiclePlate || "");
+    setApplyDriverToEntireTrip(false);
   };
 
   const handleSaveDepositAndNotes = async () => {
@@ -221,28 +248,94 @@ export default function OperatorPanel({
       const updates: Partial<Booking> = {
         depositAmount: Math.max(0, Number(editDepositAmount) || 0),
         operatorNotes: editOperatorNotes.trim(),
+        driverName: editDriverName.trim(),
+        driverPhone: editDriverPhone.trim(),
+        vehiclePlate: editVehiclePlate.trim(),
       };
 
-      // Update Firestore database
       const { db } = await import("../firebase");
       const { doc, setDoc } = await import("firebase/firestore");
-      await setDoc(doc(db, "bookings", editingDepositBooking.id), updates, { merge: true });
-
-      // Update localStorage fallback
       const { getLocalList, setLocalList } = await import("../lib/firebaseUtils");
       const current = getLocalList<Booking>("bookings", []);
-      const idx = current.findIndex(b => b.id === editingDepositBooking.id);
-      if (idx > -1) {
-        current[idx] = { ...current[idx], ...updates };
-        setLocalList("bookings", current);
+
+      if (applyDriverToEntireTrip) {
+        // Find all bookings with same travelDate, departureTime, routeSelection
+        const sameTripBookings = bookings.filter(b => 
+          b.travelDate === editingDepositBooking.travelDate && 
+          b.departureTime === editingDepositBooking.departureTime &&
+          (b.routeSelection === editingDepositBooking.routeSelection || b.type === editingDepositBooking.type)
+        );
+
+        for (const b of sameTripBookings) {
+          const itemUpdates: Partial<Booking> = {
+            driverName: editDriverName.trim(),
+            driverPhone: editDriverPhone.trim(),
+            vehiclePlate: editVehiclePlate.trim(),
+            ...(b.id === editingDepositBooking.id ? {
+              depositAmount: Math.max(0, Number(editDepositAmount) || 0),
+              operatorNotes: editOperatorNotes.trim(),
+            } : {})
+          };
+          await setDoc(doc(db, "bookings", b.id), itemUpdates, { merge: true });
+          const idx = current.findIndex(item => item.id === b.id);
+          if (idx > -1) {
+            current[idx] = { ...current[idx], ...itemUpdates };
+          }
+        }
+      } else {
+        await setDoc(doc(db, "bookings", editingDepositBooking.id), updates, { merge: true });
+        const idx = current.findIndex(b => b.id === editingDepositBooking.id);
+        if (idx > -1) {
+          current[idx] = { ...current[idx], ...updates };
+        }
       }
 
+      setLocalList("bookings", current);
       setEditingDepositBooking(null);
     } catch (err) {
-      console.error("Error saving deposit and notes:", err);
-      alert("Đã xảy ra lỗi khi lưu thông tin cọc & ghi chú!");
+      console.error("Error saving deposit, driver and notes:", err);
+      alert("Đã xảy ra lỗi khi lưu thông tin cọc, lái xe & ghi chú!");
     } finally {
       setIsSavingDepositNotes(false);
+    }
+  };
+
+  const handleOpenAssignTripDriver = (trip: TripGroupData) => {
+    setAssigningTripGroup(trip);
+    setTripDriverName(trip.assignedDriverName || "");
+    setTripDriverPhone(trip.assignedDriverPhone || "");
+    setTripVehiclePlate(trip.assignedVehiclePlate || "");
+  };
+
+  const handleSaveTripDriver = async () => {
+    if (!assigningTripGroup || assigningTripGroup.bookings.length === 0) return;
+    setIsSavingTripDriver(true);
+    try {
+      const updates: Partial<Booking> = {
+        driverName: tripDriverName.trim(),
+        driverPhone: tripDriverPhone.trim(),
+        vehiclePlate: tripVehiclePlate.trim(),
+      };
+
+      const { db } = await import("../firebase");
+      const { doc, setDoc } = await import("firebase/firestore");
+      const { getLocalList, setLocalList } = await import("../lib/firebaseUtils");
+      const current = getLocalList<Booking>("bookings", []);
+
+      for (const b of assigningTripGroup.bookings) {
+        await setDoc(doc(db, "bookings", b.id), updates, { merge: true });
+        const idx = current.findIndex(item => item.id === b.id);
+        if (idx > -1) {
+          current[idx] = { ...current[idx], ...updates };
+        }
+      }
+      setLocalList("bookings", current);
+      setAssigningTripGroup(null);
+    } catch (err) {
+      console.error("Error saving trip driver:", err);
+      alert("Đã xảy ra lỗi khi gán lái xe cho chuyến!");
+    } finally {
+      setIsSavingTripDriver(false);
     }
   };
 
@@ -295,7 +388,11 @@ export default function OperatorPanel({
       (bk.passengerName || "").toLowerCase().includes(sTerm) ||
       (bk.passengerPhone || "").includes(sTerm) ||
       (bk.seatNumbers && bk.seatNumbers.join(", ").toLowerCase().includes(sTerm)) ||
-      ((bk.id || "").toLowerCase().includes(sTerm));
+      ((bk.id || "").toLowerCase().includes(sTerm)) ||
+      ((bk.driverName || "").toLowerCase().includes(sTerm)) ||
+      ((bk.driverPhone || "").includes(sTerm)) ||
+      ((bk.vehiclePlate || "").toLowerCase().includes(sTerm)) ||
+      ((bk.operatorNotes || "").toLowerCase().includes(sTerm));
 
     const matchesStatus = statusFilter === "all" || bk.status === statusFilter;
     const matchesType = typeFilter === "all" || bk.type === typeFilter;
@@ -381,6 +478,9 @@ export default function OperatorPanel({
         totalRevenue: 0,
         totalDeposit: 0,
         totalRemaining: 0,
+        assignedDriverName: bk.driverName,
+        assignedDriverPhone: bk.driverPhone,
+        assignedVehiclePlate: bk.vehiclePlate,
       };
       dateGroup.trips.push(tripGroup);
     }
@@ -393,6 +493,13 @@ export default function OperatorPanel({
     tripGroup.totalRevenue += bk.totalPrice;
     tripGroup.totalDeposit += deposit;
     tripGroup.totalRemaining += remaining;
+
+    // If tripGroup didn't have driver assigned yet, take from booking if present
+    if (!tripGroup.assignedDriverName && bk.driverName) {
+      tripGroup.assignedDriverName = bk.driverName;
+      tripGroup.assignedDriverPhone = bk.driverPhone;
+      tripGroup.assignedVehiclePlate = bk.vehiclePlate;
+    }
   });
 
   // Handle professional dispatch sheet export (UTF-8 Excel CSV Compatible)
@@ -404,7 +511,7 @@ export default function OperatorPanel({
     }
     
     let csvContent = "\uFEFF"; // UTF-8 BOM so Vietnamese displays perfectly in Excel!
-    csvContent += "Mã Vé,Họ Tên Khách,Số Điện Thoại,Loại Hình,Hành Trình,Chi Tiết Ghế/Phòng,Ngày Khởi Hành,Giờ Chạy,Đón Khách,Trả Khách,Tổng Tiền (VNĐ),Đã Cọc (VNĐ),Còn Phải Thu (VNĐ),Ghi Chú Nhà Xe,Ghi Chú Khách,Trạng Thái\n";
+    csvContent += "Mã Vé,Họ Tên Khách,Số Điện Thoại,Loại Hình,Hành Trình,Chi Tiết Ghế/Phòng,Ngày Khởi Hành,Giờ Chạy,Lái Xe Phụ Trách,SĐT Lái Xe,Biển Số Xe,Điểm Đón,Điểm Trả,Tổng Tiền (VNĐ),Đã Cọc (VNĐ),Còn Phải Thu (VNĐ),Ghi Chú Nhà Xe,Ghi Chú Khách,Trạng Thái\n";
     
     activeBookings.forEach(b => {
       const seatOrRooms = (b.type === "limousine" || b.type === "shared_car")
@@ -419,8 +526,11 @@ export default function OperatorPanel({
       const remaining = Math.max(0, b.totalPrice - deposit);
       const opNotes = (b.operatorNotes || "").replace(/"/g, '""');
       const custNotes = (b.notes || "").replace(/"/g, '""');
+      const drName = (b.driverName || "").replace(/"/g, '""');
+      const drPhone = (b.driverPhone || "").replace(/"/g, '""');
+      const drPlate = (b.vehiclePlate || "").replace(/"/g, '""');
 
-      csvContent += `"${(b.id || "").toUpperCase()}","${b.passengerName}","${b.passengerPhone}","${serviceType}","${route}","${seatOrRooms}","${formatDisplayDate(b.travelDate)}","${b.departureTime || '-'}","${b.pickupPoint}","${b.dropoffPoint}","${b.totalPrice}","${deposit}","${remaining}","${opNotes}","${custNotes}","${b.status === 'success' ? 'Đã duyệt (OK)' : b.status === 'completed' ? 'Đã hoàn thành' : 'Chờ xử lý'}"\n`;
+      csvContent += `"${(b.id || "").toUpperCase()}","${b.passengerName}","${b.passengerPhone}","${serviceType}","${route}","${seatOrRooms}","${formatDisplayDate(b.travelDate)}","${b.departureTime || '-'}","${drName}","${drPhone}","${drPlate}","${b.pickupPoint}","${b.dropoffPoint}","${b.totalPrice}","${deposit}","${remaining}","${opNotes}","${custNotes}","${b.status === 'success' ? 'Đã duyệt (OK)' : b.status === 'completed' ? 'Đã hoàn thành' : 'Chờ xử lý'}"\n`;
     });
     
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -1228,7 +1338,7 @@ export default function OperatorPanel({
                             <tr className="bg-emerald-50/90 border-y border-emerald-200 text-emerald-950">
                               <td colSpan={7} className="py-2 px-4">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <Clock className="w-3.5 h-3.5 text-emerald-700" />
                                     <span className="font-black text-xs text-emerald-950 bg-white px-2 py-0.5 rounded-md border border-emerald-300 shadow-2xs font-mono">
                                       ⏰ Chuyến {trip.departureTime}
@@ -1240,8 +1350,32 @@ export default function OperatorPanel({
                                     <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-extrabold text-[9px] uppercase">
                                       {trip.serviceType === "limousine" ? "Limousine 9 chỗ" : trip.serviceType === "shared_car" ? "Xe Ghép 7 Chỗ" : trip.serviceType === "combo" ? "Combo Phòng" : "Thuê Riêng"}
                                     </span>
+
+                                    {/* Lái xe phụ trách chuyến */}
+                                    {trip.assignedDriverName ? (
+                                      <span className="px-2 py-0.5 rounded-md bg-blue-100/90 text-blue-950 font-bold text-[10px] border border-blue-300 flex items-center gap-1">
+                                        <Car className="w-3 h-3 text-blue-700" />
+                                        <span>LX: <strong className="font-black text-blue-900">{trip.assignedDriverName}</strong> {trip.assignedDriverPhone ? `(${trip.assignedDriverPhone})` : ""} {trip.assignedVehiclePlate ? `• ${trip.assignedVehiclePlate}` : ""}</span>
+                                        <button
+                                          onClick={() => handleOpenAssignTripDriver(trip)}
+                                          className="ml-1 text-[9px] underline text-blue-700 hover:text-blue-950 font-bold cursor-pointer"
+                                          title="Đổi lái xe cho toàn bộ chuyến này"
+                                        >
+                                          Đổi
+                                        </button>
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleOpenAssignTripDriver(trip)}
+                                        className="px-2 py-0.5 rounded-md bg-white hover:bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-300 shadow-2xs transition-colors cursor-pointer flex items-center gap-1"
+                                        title="Gán lái xe & biển số xe cho toàn bộ khách của chuyến này"
+                                      >
+                                        <Car className="w-3 h-3 text-blue-600" />
+                                        <span>+ Phân Lái Xe Chuyến</span>
+                                      </button>
+                                    )}
                                   </div>
-                                  <div className="flex items-center gap-3 text-[11px] text-stone-600 font-sans">
+                                  <div className="flex items-center gap-3 text-[11px] text-stone-600 font-sans flex-wrap">
                                     <span>
                                       <strong className="text-emerald-800 font-bold">{trip.bookings.length}</strong> vé đặt
                                     </span>
@@ -1377,6 +1511,50 @@ export default function OperatorPanel({
                                     )}
                                     <span className="text-[9px] text-stone-400 block mt-1.5">Đón: {bk.pickupPoint} ➜ Trả: {bk.dropoffPoint}</span>
 
+                                    {/* Thông tin Lái xe phụ trách khách này */}
+                                    {bk.driverName ? (
+                                      <div className="mt-1.5 p-1.5 bg-blue-50/90 border border-blue-200 rounded-lg text-[10px] text-blue-950 font-medium flex items-center justify-between gap-1 flex-wrap">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="font-black text-blue-800 flex items-center gap-1">
+                                            <Car className="w-3 h-3 text-blue-700" /> Lái xe:
+                                          </span>
+                                          <strong className="text-blue-950 font-extrabold">{bk.driverName}</strong>
+                                          {bk.driverPhone && (
+                                            <a 
+                                              href={`tel:${bk.driverPhone}`} 
+                                              className="text-blue-700 hover:text-blue-950 underline font-mono flex items-center gap-0.5 font-bold"
+                                              title="Gọi điện cho lái xe"
+                                            >
+                                              📞 {bk.driverPhone}
+                                            </a>
+                                          )}
+                                          {bk.vehiclePlate && (
+                                            <span className="px-1.5 py-0.2 bg-white rounded border border-blue-300 font-mono font-bold text-stone-800 text-[9px]">
+                                              Biển số: {bk.vehiclePlate}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <button
+                                          onClick={() => handleOpenDepositModal(bk)}
+                                          className="text-[9px] text-blue-700 hover:text-blue-900 font-bold underline cursor-pointer shrink-0 ml-auto"
+                                          title="Đổi thông tin lái xe cho khách này"
+                                        >
+                                          Đổi
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="mt-1 flex items-center gap-1">
+                                        <button
+                                          onClick={() => handleOpenDepositModal(bk)}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 text-[10px] font-bold transition-colors cursor-pointer"
+                                          title="Phân lái xe và biển số xe đưa đón khách này"
+                                        >
+                                          <Car className="w-3 h-3 text-blue-600" />
+                                          <span>+ Gán Lái Xe</span>
+                                        </button>
+                                      </div>
+                                    )}
+
                                     {/* Ghi chú điều hành / Nhà xe */}
                                     {bk.operatorNotes && (
                                       <div className="mt-1.5 p-1.5 bg-amber-50/90 border border-amber-200 rounded-lg text-[10px] text-amber-950 font-medium flex items-start gap-1">
@@ -1422,14 +1600,14 @@ export default function OperatorPanel({
                                         </span>
                                       )}
 
-                                      {/* Nút bấm mở pop-up sửa nhanh cọc & ghi chú */}
+                                      {/* Nút bấm mở pop-up sửa nhanh cọc & ghi chú & lái xe */}
                                       <button
                                         onClick={() => handleOpenDepositModal(bk)}
                                         className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-bold transition-colors cursor-pointer"
-                                        title="Cập nhật tiền cọc, số tiền phải thu và ghi chú điều hành"
+                                        title="Cập nhật lái xe, tiền cọc, số tiền phải thu và ghi chú điều hành"
                                       >
                                         <Edit3 className="w-2.5 h-2.5" />
-                                        <span>Sửa cọc / Ghi chú</span>
+                                        <span>Sửa cọc / Lái xe</span>
                                       </button>
                                     </div>
                                   </td>
@@ -1675,6 +1853,50 @@ export default function OperatorPanel({
                             )}
                             <span className="text-[9px] text-stone-400 block mt-1.5">Đón: {bk.pickupPoint} ➜ Trả: {bk.dropoffPoint}</span>
 
+                            {/* Thông tin Lái xe phụ trách khách này */}
+                            {bk.driverName ? (
+                              <div className="mt-1.5 p-1.5 bg-blue-50/90 border border-blue-200 rounded-lg text-[10px] text-blue-950 font-medium flex items-center justify-between gap-1 flex-wrap">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-black text-blue-800 flex items-center gap-1">
+                                    <Car className="w-3 h-3 text-blue-700" /> Lái xe:
+                                  </span>
+                                  <strong className="text-blue-950 font-extrabold">{bk.driverName}</strong>
+                                  {bk.driverPhone && (
+                                    <a 
+                                      href={`tel:${bk.driverPhone}`} 
+                                      className="text-blue-700 hover:text-blue-950 underline font-mono flex items-center gap-0.5 font-bold"
+                                      title="Gọi điện cho lái xe"
+                                    >
+                                      📞 {bk.driverPhone}
+                                    </a>
+                                  )}
+                                  {bk.vehiclePlate && (
+                                    <span className="px-1.5 py-0.2 bg-white rounded border border-blue-300 font-mono font-bold text-stone-800 text-[9px]">
+                                      Biển số: {bk.vehiclePlate}
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleOpenDepositModal(bk)}
+                                  className="text-[9px] text-blue-700 hover:text-blue-900 font-bold underline cursor-pointer shrink-0 ml-auto"
+                                  title="Đổi thông tin lái xe cho khách này"
+                                >
+                                  Đổi
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="mt-1 flex items-center gap-1">
+                                <button
+                                  onClick={() => handleOpenDepositModal(bk)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 text-[10px] font-bold transition-colors cursor-pointer"
+                                  title="Phân lái xe và biển số xe đưa đón khách này"
+                                >
+                                  <Car className="w-3 h-3 text-blue-600" />
+                                  <span>+ Gán Lái Xe</span>
+                                </button>
+                              </div>
+                            )}
+
                             {/* Ghi chú điều hành / Nhà xe */}
                             {bk.operatorNotes && (
                               <div className="mt-1.5 p-1.5 bg-amber-50/90 border border-amber-200 rounded-lg text-[10px] text-amber-950 font-medium flex items-start gap-1">
@@ -1724,10 +1946,10 @@ export default function OperatorPanel({
                               <button
                                 onClick={() => handleOpenDepositModal(bk)}
                                 className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-bold transition-colors cursor-pointer"
-                                title="Cập nhật tiền cọc, số tiền phải thu và ghi chú điều hành"
+                                title="Cập nhật lái xe, tiền cọc, số tiền phải thu và ghi chú điều hành"
                               >
                                 <Edit3 className="w-2.5 h-2.5" />
-                                <span>Sửa cọc / Ghi chú</span>
+                                <span>Sửa cọc / Lái xe</span>
                               </button>
                             </div>
                           </td>
@@ -1981,6 +2203,82 @@ export default function OperatorPanel({
                     </div>
                   </div>
 
+                  {/* LÁI XE & BIỂN SỐ XE PHỤ TRÁCH KHÁCH NÀY */}
+                  <div className="bg-blue-50/70 rounded-2xl p-4 border border-blue-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-blue-950 flex items-center gap-1.5 uppercase tracking-wide">
+                        <Car className="w-4 h-4 text-blue-700" />
+                        Phân Lái Xe & Xe Đón Khách
+                      </label>
+                      <span className="text-[10px] text-blue-700 font-medium">Chọn nhanh bên dưới hoặc tự điền</span>
+                    </div>
+
+                    {/* Quick selection chips for drivers */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {DEFAULT_DRIVERS.map((dr, idx) => (
+                        <button
+                          key={`dr-chip-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            setEditDriverName(dr.name);
+                            setEditDriverPhone(dr.phone);
+                            setEditVehiclePlate(dr.plate);
+                          }}
+                          className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg text-[10px] font-bold transition-all shadow-2xs cursor-pointer text-left"
+                        >
+                          🚗 <strong>{dr.name}</strong> • {dr.plate}
+                        </button>
+                      ))}
+                      {(editDriverName || editDriverPhone || editVehiclePlate) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditDriverName("");
+                            setEditDriverPhone("");
+                            setEditVehiclePlate("");
+                          }}
+                          className="px-2 py-1 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          Xóa phân công
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Inputs for driver details */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-600 block mb-0.5">Tên lái xe</label>
+                        <input
+                          type="text"
+                          value={editDriverName}
+                          onChange={(e) => setEditDriverName(e.target.value)}
+                          placeholder="VD: Anh Hải"
+                          className="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl text-xs font-bold text-stone-800 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-600 block mb-0.5">SĐT lái xe</label>
+                        <input
+                          type="text"
+                          value={editDriverPhone}
+                          onChange={(e) => setEditDriverPhone(e.target.value)}
+                          placeholder="VD: 0971050324"
+                          className="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl text-xs font-mono font-bold text-stone-800 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-600 block mb-0.5">Biển số xe</label>
+                        <input
+                          type="text"
+                          value={editVehiclePlate}
+                          onChange={(e) => setEditVehiclePlate(e.target.value)}
+                          placeholder="VD: 26F-008.88"
+                          className="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl text-xs font-mono font-bold text-stone-800 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Operator Notes Field */}
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-extrabold text-stone-700 flex items-center justify-between">
@@ -1993,7 +2291,7 @@ export default function OperatorPanel({
                       rows={3}
                       value={editOperatorNotes}
                       onChange={(e) => setEditOperatorNotes(e.target.value)}
-                      placeholder="VD: Đã nhận cọc 200k qua VCB. Tài xế thu nốt 700k tại điểm đón BigC Thăng Long..."
+                      placeholder="VD: Đã nhận cọc 200k qua VCB. Lái xe đón khách tại BigC Thăng Long..."
                       className="w-full p-3 bg-white border border-stone-300 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     />
 
@@ -2004,7 +2302,8 @@ export default function OperatorPanel({
                         "Đã cọc qua VCB",
                         "Đã cọc qua Momo",
                         "Khách dặn gọi trước 30p",
-                        "Đã gửi vé qua Zalo"
+                        "Đã gửi vé qua Zalo",
+                        "Đã báo lái xe"
                       ].map((tag) => (
                         <button
                           key={tag}
@@ -2041,11 +2340,148 @@ export default function OperatorPanel({
                       className="flex-1 bg-[#1b4332] hover:bg-emerald-800 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-md shadow-emerald-900/10 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                     >
                       <Check className="w-4 h-4" />
-                      {isSavingDepositNotes ? "Đang lưu..." : "Lưu Thông Tin Cọc & Ghi Chú"}
+                      {isSavingDepositNotes ? "Đang lưu..." : "Lưu Thông Tin Lái Xe & Tiền Cọc"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditingDepositBooking(null)}
+                      className="px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 py-3 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TRIP LEVEL DRIVER ASSIGNMENT MODAL (BATCH ASSIGNMENT) */}
+          {assigningTripGroup && (
+            <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[120] animate-fade-in text-left">
+              <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-stone-200 flex flex-col animate-scale-up">
+                <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white p-5 relative">
+                  <button 
+                    onClick={() => setAssigningTripGroup(null)}
+                    className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold cursor-pointer transition-colors"
+                  >
+                    ✕
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Car className="w-5 h-5 text-blue-300" />
+                    <span className="text-[10px] bg-blue-400 text-blue-950 font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      PHÂN LÁI XE TOÀN BỘ CHUYẾN
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black tracking-tight mt-2 text-white">
+                    Chuyến {assigningTripGroup.departureTime} • {assigningTripGroup.routeSelection}
+                  </h3>
+                  <p className="text-blue-200 text-xs mt-0.5">
+                    Áp dụng lái xe & biển số xe cho <strong>{assigningTripGroup.bookings.length} vé đặt</strong> ({assigningTripGroup.allSeatNumbers.length > 0 ? assigningTripGroup.allSeatNumbers.join(", ") : `${assigningTripGroup.totalSeats} khách`})
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                  {/* Select from fleet chips */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-stone-700 uppercase tracking-wide flex items-center justify-between">
+                      <span>Chọn nhanh lái xe trong đội xe:</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {DEFAULT_DRIVERS.map((dr, idx) => (
+                        <button
+                          key={`trip-dr-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            setTripDriverName(dr.name);
+                            setTripDriverPhone(dr.phone);
+                            setTripVehiclePlate(dr.plate);
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            tripDriverName === dr.name 
+                              ? "bg-blue-100 border-blue-600 text-blue-950 ring-2 ring-blue-500/20" 
+                              : "bg-stone-50 hover:bg-blue-50/50 border-stone-200 text-stone-800"
+                          }`}
+                        >
+                          <div className="font-black text-xs text-blue-900 flex items-center justify-between">
+                            <span>🚗 {dr.name}</span>
+                            <span className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-stone-200 font-mono">{dr.plate}</span>
+                          </div>
+                          <p className="text-[11px] text-stone-500 font-mono mt-0.5">SĐT: {dr.phone}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Manual / custom edit */}
+                  <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-3">
+                    <span className="text-[11px] font-extrabold text-stone-700 block uppercase tracking-wider">
+                      Hoặc tùy chỉnh thông tin tài xế chuyến:
+                    </span>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-600 block mb-0.5">Họ tên lái xe:</label>
+                        <input
+                          type="text"
+                          value={tripDriverName}
+                          onChange={(e) => setTripDriverName(e.target.value)}
+                          placeholder="VD: Anh Hải"
+                          className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-800 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-600 block mb-0.5">Số điện thoại:</label>
+                          <input
+                            type="text"
+                            value={tripDriverPhone}
+                            onChange={(e) => setTripDriverPhone(e.target.value)}
+                            placeholder="VD: 0971050324"
+                            className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-mono font-bold text-stone-800 focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-stone-600 block mb-0.5">Biển số xe:</label>
+                          <input
+                            type="text"
+                            value={tripVehiclePlate}
+                            onChange={(e) => setTripVehiclePlate(e.target.value)}
+                            placeholder="VD: 26F-008.88"
+                            className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-mono font-bold text-stone-800 focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* List of bookings to be updated */}
+                  <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-200">
+                    <span className="text-[10px] font-bold text-blue-900 uppercase block mb-1">
+                      Danh sách {assigningTripGroup.bookings.length} khách trên chuyến sẽ được gán:
+                    </span>
+                    <div className="space-y-1 max-h-28 overflow-y-auto">
+                      {assigningTripGroup.bookings.map((b, idx) => (
+                        <div key={`trip-bk-item-${idx}`} className="text-[11px] text-stone-700 flex justify-between">
+                          <span>• <strong>{b.passengerName}</strong> ({b.passengerPhone})</span>
+                          <span className="font-mono text-emerald-800 font-bold">{b.seatNumbers?.join(", ") || `${b.seatCount || 1} chỗ`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      disabled={isSavingDepositNotes}
+                      onClick={handleSaveTripDriver}
+                      className="flex-1 bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-md shadow-blue-900/10 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      {isSavingDepositNotes ? "Đang cập nhật..." : `Gán Cho Toàn Bộ ${assigningTripGroup.bookings.length} Vé`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAssigningTripGroup(null)}
                       className="px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 py-3 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                     >
                       Đóng

@@ -27,6 +27,11 @@
         "passengerName": { "type": "string" },
         "passengerPhone": { "type": "string" },
         "totalPrice": { "type": "number" },
+        "depositAmount": { "type": "number" },
+        "operatorNotes": { "type": "string" },
+        "driverName": { "type": "string" },
+        "driverPhone": { "type": "string" },
+        "vehiclePlate": { "type": "string" },
         "status": { "type": "string" }
       },
       "required": ["id", "userId", "type", "status"]

@@ -73,6 +73,9 @@ export interface Booking {
   totalPrice: number;
   depositAmount?: number; // Tiền khách đã cọc (VNĐ)
   operatorNotes?: string; // Ghi chú điều hành / thu tiền của nhà xe
+  driverName?: string; // Tên tài xế / lái xe đi khách này
+  driverPhone?: string; // Số điện thoại lái xe
+  vehiclePlate?: string; // Biển số xe đưa đón khách
   status: 'pending' | 'success' | 'completed' | 'cancelled';
   notes?: string;
   couponCode?: string;
