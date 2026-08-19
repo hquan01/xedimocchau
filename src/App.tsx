@@ -63,6 +63,8 @@ export default function App() {
     setDestinations,
     articles,
     setArticles,
+    drivers,
+    setDrivers,
     notifications,
     setNotifications
   } = useFirebaseSync();
@@ -629,6 +631,11 @@ export default function App() {
                   setArticles(updated); 
                   await saveConfigToFirebase("articles", updated); 
                   alert("Đã cập nhật Bài viết thành công!");
+              }}
+              drivers={drivers}
+              onUpdateDrivers={async (updated) => {
+                  setDrivers(updated);
+                  await saveConfigToFirebase("drivers", updated);
               }}
             />
           )}

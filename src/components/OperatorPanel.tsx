@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification } from "../types";
+import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification, Driver } from "../types";
 import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator, CalendarDays, ArrowUpDown, Layers, Bus, TrendingUp, Car, PhoneCall, UserCheck } from "lucide-react";
 import { motion } from "motion/react";
 import { getOfficialSchedulesForRoute } from "./LimousineBooking";
 import { getSharedCarSchedules } from "./SharedCarBooking";
+import { INITIAL_DRIVERS } from "../data/drivers";
 import ComboManagement from "./operator/ComboManagement";
 import PricingManagement from "./operator/PricingManagement";
 import CouponManagement from "./operator/CouponManagement";
@@ -13,15 +14,10 @@ import DestinationManagement from "./operator/DestinationManagement";
 import ArticleManagement from "./operator/ArticleManagement";
 import ScheduleManagement from "./operator/ScheduleManagement";
 import ReviewManagement from "./operator/ReviewManagement";
+import DriverManagement from "./operator/DriverManagement";
 
 // Preset driver fleet for fast selection and autocomplete
-export const DEFAULT_DRIVERS = [
-  { name: "Lái xe Tuấn", phone: "0971050324", plate: "26B-008.99" },
-  { name: "Lái xe Hùng", phone: "0982112233", plate: "29B-608.24" },
-  { name: "Lái xe Nam", phone: "0912889966", plate: "29B-512.33" },
-  { name: "Lái xe Đức", phone: "0868445566", plate: "26F-001.29" },
-  { name: "Lái xe Phong", phone: "0989332211", plate: "29B-998.12" },
-];
+export const DEFAULT_DRIVERS = INITIAL_DRIVERS;
 
 // Helper functions for Date Formatting (ngày/tháng/năm: DD/MM/YYYY) and ISO conversion for accurate sorting
 export const normalizeToISODate = (dateStr?: string): string => {
@@ -121,6 +117,8 @@ interface OperatorPanelProps {
   notifications: AppNotification[];
   onUpdateNotifications: (updated: AppNotification[]) => void;
   onSendNotification: (title: string, message: string) => void;
+  drivers?: Driver[];
+  onUpdateDrivers?: (updated: Driver[]) => void;
 }
 
 const INITIAL_SEATS_TEMPLATE: Seat[] = [
@@ -168,10 +166,12 @@ export default function OperatorPanel({
   destinations,
   onUpdateDestinations,
   articles,
-  onUpdateArticles
+  onUpdateArticles,
+  drivers = INITIAL_DRIVERS,
+  onUpdateDrivers = () => {}
 }: OperatorPanelProps) {
   // Navigation tabs inside Operator view
-  const [panelTab, setPanelTab] = useState<"bookings" | "seatLock" | "customers" | "overview" | "travelServices" | "pricing" | "coupons" | "locations" | "content" | "schedules" | "reviews">("bookings");
+  const [panelTab, setPanelTab] = useState<"bookings" | "seatLock" | "customers" | "overview" | "travelServices" | "pricing" | "coupons" | "locations" | "content" | "schedules" | "reviews" | "drivers">("bookings");
   const [activeContentTab, setActiveContentTab] = useState<"destinations" | "articles">("destinations");
   const [userToDelete, setUserToDelete] = useState<any>(null);
 
@@ -874,6 +874,16 @@ export default function OperatorPanel({
               }`}
             >
               Lịch trình
+            </button>
+            <button
+              onClick={() => setPanelTab("drivers")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                panelTab === "drivers"
+                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
+                  : "bg-white/10 hover:bg-white/15 text-white"
+              }`}
+            >
+              🚗 Lái xe ({drivers.length})
             </button>
             <button
               onClick={() => setPanelTab("coupons")}
@@ -2215,9 +2225,9 @@ export default function OperatorPanel({
 
                     {/* Quick selection chips for drivers */}
                     <div className="flex flex-wrap gap-1.5">
-                      {DEFAULT_DRIVERS.map((dr, idx) => (
+                      {drivers.map((dr, idx) => (
                         <button
-                          key={`dr-chip-${idx}`}
+                          key={`dr-chip-${dr.id || idx}`}
                           type="button"
                           onClick={() => {
                             setEditDriverName(dr.name);
@@ -2387,9 +2397,9 @@ export default function OperatorPanel({
                       <span>Chọn nhanh lái xe trong đội xe:</span>
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {DEFAULT_DRIVERS.map((dr, idx) => (
+                      {drivers.map((dr, idx) => (
                         <button
-                          key={`trip-dr-${idx}`}
+                          key={`trip-dr-${dr.id || idx}`}
                           type="button"
                           onClick={() => {
                             setTripDriverName(dr.name);
@@ -2878,6 +2888,12 @@ export default function OperatorPanel({
       {panelTab === "locations" && (
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 sm:p-8" id="locations_manager_section">
           <LocationManagement locations={locations} onUpdateLocations={onUpdateLocations} />
+        </div>
+      )}
+
+      {panelTab === "drivers" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 sm:p-8" id="drivers_manager_section">
+          <DriverManagement drivers={drivers} onUpdateDrivers={onUpdateDrivers} />
         </div>
       )}
 

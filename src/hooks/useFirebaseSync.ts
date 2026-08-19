@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { collection, doc, onSnapshot, getDocs, setDoc, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
-import { Booking, BlockedSeat, User, AppNotification, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle } from "../types";
+import { Booking, BlockedSeat, User, AppNotification, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, Driver } from "../types";
 import { INITIAL_COMBOS } from "../data/combos";
 import { INITIAL_ACCOMMODATIONS } from "../data/accommodations";
 import { DEFAULT_LIMOUSINE_CONFIG, DEFAULT_SHARED_CAR_CONFIG, INITIAL_COUPONS, INITIAL_LOCATIONS } from "../data/config";
 import { INITIAL_DESTINATIONS } from "../data/destinations";
 import { INITIAL_ARTICLES } from "../data/articles";
+import { INITIAL_DRIVERS } from "../data/drivers";
 import { getLocalList, getDeviceId } from "../lib/firebaseUtils";
 
 export function useFirebaseSync() {
@@ -29,6 +30,7 @@ export function useFirebaseSync() {
   const [locations, setLocations] = useState<LocationPoint[]>(INITIAL_LOCATIONS);
   const [destinations, setDestinations] = useState<Destination[]>(INITIAL_DESTINATIONS);
   const [articles, setArticles] = useState<GuideArticle[]>(INITIAL_ARTICLES);
+  const [drivers, setDrivers] = useState<Driver[]>(() => getLocalList<Driver>("drivers", INITIAL_DRIVERS));
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
@@ -201,6 +203,7 @@ export function useFirebaseSync() {
              if (data.limousineConfig) setLimousineConfig({ ...DEFAULT_LIMOUSINE_CONFIG, ...data.limousineConfig });
              if (data.sharedCarConfig) setSharedCarConfig({ ...DEFAULT_SHARED_CAR_CONFIG, ...data.sharedCarConfig });
              if (data.locations) setLocations(data.locations);
+             if (data.drivers && Array.isArray(data.drivers)) setDrivers(data.drivers);
            });
          } else {
            // Create initial configs document quietly if operator exists (first run)
@@ -209,6 +212,7 @@ export function useFirebaseSync() {
                limousineConfig: DEFAULT_LIMOUSINE_CONFIG,
                sharedCarConfig: DEFAULT_SHARED_CAR_CONFIG,
                locations: INITIAL_LOCATIONS,
+               drivers: INITIAL_DRIVERS,
              };
              Object.entries(initialData).forEach(([key, val]) => {
                setDoc(doc(db, "configs", key), { [key]: val }).catch(console.error);
@@ -258,6 +262,9 @@ export function useFirebaseSync() {
         const localUsers = getLocalList<User>("users", []);
         setUsers(localUsers);
 
+        const localDrivers = getLocalList<Driver>("drivers", INITIAL_DRIVERS);
+        setDrivers(localDrivers);
+
         try {
           const configsStr = localStorage.getItem("xemc_configs");
           if (configsStr) {
@@ -270,6 +277,7 @@ export function useFirebaseSync() {
             if (parsed.locations) setLocations(parsed.locations);
             if (parsed.destinations) setDestinations(parsed.destinations);
             if (parsed.articles) setArticles(parsed.articles);
+            if (parsed.drivers) setDrivers(parsed.drivers);
           }
         } catch (e) {
           // ignore
@@ -314,6 +322,8 @@ export function useFirebaseSync() {
     destinations,
     setDestinations,
     articles,
-    setArticles
+    setArticles,
+    drivers,
+    setDrivers
   };
 }

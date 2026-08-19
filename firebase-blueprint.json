@@ -50,6 +50,21 @@
       },
       "required": ["id", "tripId", "travelDate", "seatId"]
     },
+    "Driver": {
+      "title": "Driver",
+      "description": "Driver and vehicle fleet information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "plate": { "type": "string" },
+        "carType": { "type": "string" },
+        "note": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "busy", "off"] }
+      },
+      "required": ["id", "name", "phone", "plate"]
+    },
     "Config": {
        "title": "Config",
        "description": "Global config models for coupons, combos, articles, etc",

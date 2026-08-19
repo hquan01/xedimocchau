@@ -215,6 +215,18 @@ export interface SharedCarConfig {
   weekdayDiscountPercentage: number;
 }
 
+export interface Driver {
+  id: string;
+  name: string;
+  phone: string;
+  plate: string;
+  carType?: string;
+  note?: string;
+  status?: 'active' | 'busy' | 'off';
+  avatar?: string;
+  experienceYears?: number;
+}
+
 export interface Coupon {
   id: string;
   code: string;
