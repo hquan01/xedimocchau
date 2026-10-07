@@ -6,6 +6,7 @@ import Hero from "./components/Hero";
 import BookingSwitcher from "./components/BookingSwitcher";
 import ComboBooking from "./components/ComboBooking";
 import FloatingContact from "./components/FloatingContact";
+import { useSEO } from "./hooks/useSEO";
 
 // Lazy load heavy or secondary components
 const AIPlanner = lazy(() => import("./components/AIPlanner"));
@@ -35,6 +36,7 @@ import {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>("limousine");
+  useSEO(activeTab);
   const [limousineSubTab, setLimousineSubTab] = useState<"limousine" | "shared" | "charter">("limousine");
   const [isMotorbikeOpen, setIsMotorbikeOpen] = useState(false);
   
