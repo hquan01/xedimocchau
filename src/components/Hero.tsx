@@ -2,7 +2,7 @@ import React from "react";
 import { Compass, CalendarDays, Users, Search, Sparkles, MapPin, Ticket } from "lucide-react";
 import { motion } from "motion/react";
 
-const heroImg = "/src/assets/images/national_day_banner_1787127554476.jpg";
+const heroImg = "/src/assets/images/moc_chau_hero_1779246188232.png";
 
 interface HeroProps {
   activeTab: string;
@@ -173,11 +173,11 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-600/30 via-amber-500/20 to-emerald-600/30 border border-amber-400/40 px-4 py-1.5 rounded-full text-amber-300 text-xs font-bold uppercase tracking-wider mb-6 backdrop-blur-md shadow-lg shadow-red-950/20"
+          className="inline-flex items-center space-x-2 bg-gradient-to-r from-emerald-600/30 via-amber-500/20 to-teal-600/30 border border-emerald-400/40 px-4 py-1.5 rounded-full text-emerald-300 text-xs font-bold uppercase tracking-wider mb-6 backdrop-blur-md shadow-lg shadow-emerald-950/20"
         >
-          <span className="text-sm">🇻🇳</span>
+          <span className="text-sm">🌸</span>
           <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-          <span>Chào Mừng Đại Lễ Quốc Khánh 2/9 • Mở Bán Vé Sớm & Combo Ưu Đãi</span>
+          <span>Mùa Hoa Mận & Đồi Chè Xanh Ngát Mộc Châu • Xe Limousine Đón Trả Tận Nhà</span>
         </motion.div>
 
         {/* Catchy Slogan */}
@@ -197,7 +197,7 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mt-4 text-sm sm:text-base md:text-lg text-stone-200 max-w-3xl font-sans"
         >
-          Kỳ nghỉ Lễ 2/9 vi vu trọn vẹn tại thảo nguyên Mộc Châu xanh ngát! Limousine Mộc Châu cam kết giữ đúng 100% số ghế đã đặt, không phụ thu vô lý, đưa đón tận nơi. Đặt vé Limousine & Combo Xe + Khách sạn sớm để nhận giá tốt nhất!
+          Khám phá thảo nguyên Mộc Châu mùa hoa mận trắng tinh khôi và đồi chè xanh ngát! Limousine Mộc Châu cam kết giữ đúng 100% số ghế đã đặt, không phụ thu, đưa đón tận nơi. Đặt vé Limousine & Combo Xe + Khách sạn tốt nhất ngay hôm nay!
         </motion.p>
 
         {/* Search Engine Booking Bar */}

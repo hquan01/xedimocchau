@@ -171,8 +171,7 @@ export default function LimousineBooking({
 
   // Selection states
   const [selectedTrip, setSelectedTrip] = useState<LimousineTrip | null>(null);
-  const [seats, setSeats] = useState<Seat[]>(getFreshSeats());
-  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
+  const [seatCount, setSeatCount] = useState<number>(1);
   
   // Passenger states
   const [passengerName, setPassengerName] = useState("");
@@ -272,36 +271,7 @@ export default function LimousineBooking({
     }
   }, [currentUser]);
 
-  // Sync seats dynamically with operator offline blocks & active customer bookings
-  useEffect(() => {
-    const dynamicPriceSeats = getFreshSeats();
-    if (selectedTrip) {
-      const liveSeats = dynamicPriceSeats.map((seat) => {
-        const isBlockedOffline = blockedSeats.some(
-          (b) => b.tripId === selectedTrip.id && b.travelDate === date && b.seatId === seat.id
-        );
 
-        const isBookedOnline = bookings.some(
-          (b) =>
-            b.type === "limousine" &&
-            b.status !== "cancelled" &&
-            b.travelDate === date &&
-            b.departureTime === selectedTrip.departureTime &&
-            b.seatNumbers?.includes(seat.number)
-        );
-
-        return {
-          ...seat,
-          isBooked: isBlockedOffline || isBookedOnline
-        };
-      });
-      setSeats(liveSeats);
-      // Empty selection if it was already selected but now occupied
-      setSelectedSeatIds((prev) => prev.filter((id) => !liveSeats.find(ls => ls.id === id)?.isBooked));
-    } else {
-      setSeats(dynamicPriceSeats.map(s => ({ ...s, isBooked: false })));
-    }
-  }, [selectedTrip, date, bookings, blockedSeats, limousineConfig]);
 
   // Sync state whenever searchParams changes
   useEffect(() => {
@@ -398,33 +368,12 @@ export default function LimousineBooking({
 
   const handleTripSelect = (trip: LimousineTrip) => {
     setSelectedTrip(trip);
-    setSelectedSeatIds([]);
-  };
-
-  const toggleSeat = (seatId: string) => {
-    const seat = seats.find((s) => s.id === seatId);
-    if (!seat || seat.isBooked) return;
-
-    if (selectedSeatIds.includes(seatId)) {
-      setSelectedSeatIds(selectedSeatIds.filter((id) => id !== seatId));
-    } else {
-      setSelectedSeatIds([...selectedSeatIds, seatId]);
-    }
-  };
-
-  const selectAllNineSeats = () => {
-    if (selectedSeatIds.length === seats.length) {
-      setSelectedSeatIds([]);
-    } else {
-      setSelectedSeatIds(seats.map((s) => s.id));
-    }
+    setSeatCount(1);
   };
 
   const getSelectedSeatsPrice = () => {
-    return selectedSeatIds.reduce((total, id) => {
-      const s = seats.find((seat) => seat.id === id);
-      return total + (s ? s.price : 0);
-    }, 0);
+    const pricePerSeat = selectedTrip ? selectedTrip.priceStandard : 300000;
+    return seatCount * pricePerSeat;
   };
 
   const handleBookingSubmit = (e: React.FormEvent) => {
@@ -452,8 +401,8 @@ export default function LimousineBooking({
       }
     }
 
-    if (selectedSeatIds.length === 0) {
-      setErrorMsg("Vui lòng chọn ít nhất một ghế ngồi trên xe!");
+    if (!seatCount || seatCount < 1) {
+      setErrorMsg("Vui lòng chọn số lượng ghế ngồi!");
       return;
     }
 
@@ -511,8 +460,7 @@ export default function LimousineBooking({
     setErrorMsg("");
 
     try {
-      const selectedSeats = seats.filter((s) => selectedSeatIds.includes(s.id));
-      const seatNumbers = selectedSeats.map((s) => s.number);
+      const seatNumbers = [`${seatCount} chỗ (Nhà xe sắp xếp)`];
       const originalTotalPrice = getSelectedSeatsPrice();
       
       let pointsDeducted = 0;
@@ -564,6 +512,7 @@ export default function LimousineBooking({
         discountAmount: totalDiscount > 0 ? totalDiscount : undefined,
         status: 'pending',
         seatNumbers,
+        seatCount,
         departureTime: selectedTrip.departureTime,
         routeSelection: `${from} ➔ ${to}`
       };
@@ -576,7 +525,7 @@ export default function LimousineBooking({
 
       // Reset steps
       setSelectedTrip(null);
-      setSelectedSeatIds([]);
+      setSeatCount(1);
       setUsePoints(false);
       setSpamAnswer("");
       
@@ -796,200 +745,47 @@ export default function LimousineBooking({
                   </div>
                 </div>
 
-                {/* LIMITLESS SOLATI BUS SCHEMATIC DESIGN */}
-                <div>
-                  <h4 className="text-xs font-bold text-stone-800 uppercase tracking-widest text-center mb-4">
-                    SƠ ĐỒ CHỌN GHẾ XE DCAR VIP (9 CHỖ)
+                {/* Seat Quantity Selector */}
+                <div className="bg-stone-50 p-5 rounded-2xl border border-stone-200">
+                  <h4 className="text-xs font-bold text-stone-800 uppercase tracking-widest mb-3">
+                    CHỌN SỐ LƯỢNG GHẾ ĐẶT (XE DCAR VIP 9 CHỖ)
                   </h4>
-                  
-                  <div className="flex flex-col items-center mb-6">
-                    <button
-                      type="button"
-                      onClick={selectAllNineSeats}
-                      className={`text-xs font-extrabold px-4 py-2 rounded-full border transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs ${
-                        selectedSeatIds.length === seats.length
-                          ? "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200"
-                          : "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
-                      }`}
-                    >
-                      <span>🌟</span>
-                      <span>
-                        {selectedSeatIds.length === seats.length
-                          ? "Hủy chọn toàn bộ 9 ghế"
-                          : "Chọn đặt nhanh nguyên xe 9 chỗ"}
-                      </span>
-                    </button>
-                    <p className="text-[10px] text-stone-400 mt-2 text-center max-w-xs font-sans">
-                      * Khách hàng được tự do chọn lẻ các ghế hoặc bao trọn toàn bộ 9 ghế của dòng xe limousine này.
-                    </p>
+                  <div className="flex items-center space-x-2 sm:space-x-3 overflow-x-auto pb-2">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setSeatCount(num)}
+                        className={`w-10 h-10 rounded-xl font-mono font-bold text-sm transition-all cursor-pointer flex-shrink-0 ${
+                          seatCount === num
+                            ? "bg-[#1b4332] text-white shadow-md scale-105"
+                            : "bg-white text-stone-700 border border-stone-200 hover:bg-stone-100"
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
                   </div>
-                  
-                  <div className="w-[280px] sm:w-[320px] mx-auto bg-stone-950 p-6 rounded-3xl border-4 border-stone-800 shadow-inner text-center relative">
-                    {/* Front view marker */}
-                    <div className="text-[10px] tracking-widest font-extrabold text-stone-500 uppercase border-b border-stone-800 pb-2.5 mb-6 text-center">
-                      ĐẦU XE / KÍNH LÀI
-                    </div>
-
-                    {/* Driver and pilot seats */}
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                      <div className="w-12 h-12 rounded-lg bg-stone-800 border border-stone-700 flex items-center justify-center text-stone-500 text-[10px] font-bold">
-                        Vô lăng
-                      </div>
-                      
-                      {/* Seat 1 and 2 (Front) */}
-                      {seats.slice(0, 2).map((seat) => {
-                        const isSelected = selectedSeatIds.includes(seat.id);
-                        return (
-                          <button
-                            key={seat.id}
-                            type="button"
-                            onClick={() => toggleSeat(seat.id)}
-                            className={`w-12 h-12 rounded-lg flex flex-col justify-center items-center text-[10px] font-mono leading-none transition-all relative ${
-                              seat.isBooked
-                                ? "bg-stone-800 border border-stone-700 text-stone-600 cursor-not-allowed"
-                                : isSelected
-                                ? "bg-emerald-500 border border-emerald-400 text-white scale-105 shadow-md shadow-emerald-500/20"
-                                : "bg-stone-700 border border-stone-600 text-stone-200 hover:bg-stone-600"
-                            }`}
-                            disabled={seat.isBooked}
-                            title={`Ghế ${seat.number}: ${seat.price.toLocaleString()}đ`}
-                          >
-                            <span className="font-sans text-[10px] leading-tight block">{seat.number}</span>
-                            <span className="text-[8px] opacity-80 font-mono mt-0.5">{seat.price / 1000}k</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Cabin aisle spacer line */}
-                    <div className="h-px bg-stone-800 w-full mb-6" />
-
-                    {/* Executive row 2 & 3 VIP chairs */}
-                    <div className="space-y-4 mb-6">
-                      {/* Row 2 (Seat 3, 4) */}
-                      <div className="grid grid-cols-2 gap-8 px-4">
-                        {seats.slice(2, 4).map((seat) => {
-                          const isSelected = selectedSeatIds.includes(seat.id);
-                          return (
-                            <button
-                              key={seat.id}
-                              type="button"
-                              onClick={() => toggleSeat(seat.id)}
-                              className={`h-14 rounded-xl flex flex-col justify-center items-center font-mono leading-none transition-all relative ${
-                                seat.isBooked
-                                  ? "bg-stone-850 text-stone-700 border border-stone-800 cursor-not-allowed"
-                                  : isSelected
-                                  ? "bg-emerald-600 text-white scale-105 border-2 border-emerald-400 shadow-md shadow-emerald-500/20"
-                                  : "bg-[#1b4332] text-stone-100 border border-emerald-800 hover:bg-[#2d5a45]"
-                              }`}
-                              disabled={seat.isBooked}
-                            >
-                              <span className="font-extrabold text-xs block">{seat.number}</span>
-                              <span className="text-[9px] text-amber-400 mt-1 font-bold">VIP</span>
-                              <span className="text-[9px] block text-amber-200/90 font-mono">{seat.price / 1000}k</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Row 3 (Seat 5, 6) */}
-                      <div className="grid grid-cols-2 gap-8 px-4">
-                        {seats.slice(4, 6).map((seat) => {
-                          const isSelected = selectedSeatIds.includes(seat.id);
-                          return (
-                            <button
-                              key={seat.id}
-                              type="button"
-                              onClick={() => toggleSeat(seat.id)}
-                              className={`h-14 rounded-xl flex flex-col justify-center items-center font-mono leading-none transition-all relative ${
-                                seat.isBooked
-                                  ? "bg-stone-850 text-stone-700 border border-stone-800 cursor-not-allowed"
-                                  : isSelected
-                                  ? "bg-emerald-600 text-white scale-105 border-2 border-emerald-400 shadow-md shadow-emerald-500/20"
-                                  : "bg-[#1b4332] text-stone-100 border border-emerald-800 hover:bg-[#2d5a45]"
-                              }`}
-                              disabled={seat.isBooked}
-                            >
-                              <span className="font-extrabold text-xs block">{seat.number}</span>
-                              <span className="text-[9px] text-amber-400 mt-1 font-bold">VIP</span>
-                              <span className="text-[9px] block text-amber-200/90 font-mono">{seat.price / 1000}k</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Back standard bench (Seat 7, 8, 9) */}
-                    <div className="grid grid-cols-3 gap-2.5 pt-4 border-t border-stone-900">
-                      {seats.slice(6, 9).map((seat) => {
-                        const isSelected = selectedSeatIds.includes(seat.id);
-                        return (
-                          <button
-                            key={seat.id}
-                            type="button"
-                            onClick={() => toggleSeat(seat.id)}
-                            className={`h-12 rounded-lg flex flex-col justify-center items-center font-mono leading-none transition-all ${
-                              seat.isBooked
-                                ? "bg-stone-800 border border-stone-700 text-stone-600 cursor-not-allowed"
-                                : isSelected
-                                ? "bg-emerald-500 border border-emerald-400 text-white scale-105 shadow-md shadow-emerald-500/20"
-                                : "bg-stone-700 border border-stone-600 text-stone-200 hover:bg-stone-600"
-                            }`}
-                            disabled={seat.isBooked}
-                          >
-                            <span className="font-sans text-[10px] leading-tight block">{seat.number}</span>
-                            <span className="text-[8px] opacity-80 font-mono mt-0.5">{seat.price / 1000}k</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Seat category legend */}
-                  <div className="mt-4 flex justify-between text-[11px] text-stone-500 max-w-sm mx-auto p-2 bg-stone-50 rounded-lg">
-                    <span className="flex items-center space-x-1">
-                      <span className="w-3 h-3 bg-[#1b4332] border border-emerald-800 rounded-xs inline-block" />
-                      <span>VIP</span>
-                    </span>
-                    <span className="flex items-center space-x-1">
-                      <span className="w-3 h-3 bg-stone-750 border border-stone-650 rounded-xs inline-block" />
-                      <span>Phổ thông / Phụ</span>
-                    </span>
-                    <span className="flex items-center space-x-1">
-                      <span className="w-3 h-3 bg-stone-800 rounded-xs inline-block" />
-                      <span>Đặc khít / Đã khóa</span>
-                    </span>
-                    <span className="flex items-center space-x-1">
-                      <span className="w-3 h-3 bg-emerald-500 rounded-xs inline-block" />
-                      <span>Đã chọn</span>
-                    </span>
-                  </div>
+                  <p className="text-[11px] text-stone-500 mt-2.5 font-sans leading-relaxed">
+                    💡 <strong>Lưu ý:</strong> Quý khách chỉ cần chọn số lượng ghế. Tài xế và nhân viên điều hành sẽ chủ động sắp xếp vị trí ghế ngồi tốt nhất và phù hợp nhất cho quý khách (Không cần chọn trước sơ đồ ghế).
+                  </p>
                 </div>
 
                 {/* Selected summary */}
-                {selectedSeatIds.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex justify-between items-center text-left"
-                  >
-                    <div>
-                      <span className="text-xs text-amber-800 font-bold block">Ghế đã chọn của bạn:</span>
-                      <span className="font-extrabold text-[#1b4332] text-sm">
-                        {seats
-                          .filter((s) => selectedSeatIds.includes(s.id))
-                          .map((s) => s.number)
-                          .join(", ")}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-amber-800 font-bold block">Tổng cộng tạm tính</span>
-                      <span className="font-extrabold text-lg text-amber-600 font-mono">
-                        {getSelectedSeatsPrice().toLocaleString()} VNĐ
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex justify-between items-center text-left">
+                  <div>
+                    <span className="text-xs text-emerald-800 font-bold block">Số lượng đặt:</span>
+                    <span className="font-extrabold text-[#1b4332] text-sm font-mono">
+                      {seatCount} ghế Limousine VIP
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-stone-500 block">Tổng tạm tính</span>
+                    <span className="font-extrabold text-emerald-700 text-base font-mono">
+                      {getSelectedSeatsPrice().toLocaleString()}đ
+                    </span>
+                  </div>
+                </div>
 
                 {/* Form inputs for passenger */}
                 <form onSubmit={handleBookingSubmit} className="space-y-4 text-left border-t border-stone-100 pt-6">
@@ -1191,8 +987,8 @@ export default function LimousineBooking({
                    {/* Summary dynamic pricing display */}
                    <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 text-xs space-y-1.5" id="checkout_price_totals_summary">
                      <div className="flex justify-between text-stone-600">
-                       <span>Số ghế đã chọn ({selectedSeatIds.length} ghế):</span>
-                       <span className="font-mono font-bold text-stone-800">{seats.filter(s => selectedSeatIds.includes(s.id)).map(s => s.number).join(", ")}</span>
+                       <span>Số lượng ghế đặt:</span>
+                       <span className="font-mono font-bold text-stone-800">{seatCount} ghế Limousine VIP</span>
                      </div>
                      <div className="flex justify-between text-stone-600">
                        <span>Đơn giá gốc:</span>

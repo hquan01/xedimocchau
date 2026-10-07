@@ -131,8 +131,7 @@ export default function SharedCarBooking({
 
   // Selection states
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
-  const [seats, setSeats] = useState<Seat[]>(getFreshSeats());
-  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
+  const [seatCount, setSeatCount] = useState<number>(1);
   
   // Passenger states
   const [passengerName, setPassengerName] = useState("");
@@ -207,38 +206,7 @@ export default function SharedCarBooking({
     }
   }, [currentUser]);
 
-  // Sync seats dynamically with active customer bookings & operator offline blocks
-  useEffect(() => {
-    const dynamicPriceSeats = getFreshSeats();
-    if (selectedTrip) {
-      const liveSeats = dynamicPriceSeats.map((seat) => {
-        const isBlockedOffline = blockedSeats.some(
-          (b) =>
-            b.travelDate === date &&
-            b.tripId === `shared_car_trip_custom_${selectedTrip.departureTime.replace(":", "_")}` &&
-            b.seatId === seat.id
-        );
 
-        const isBookedOnline = bookings.some(
-          (b) =>
-            b.type === "shared_car" &&
-            b.status !== "cancelled" &&
-            b.travelDate === date &&
-            b.departureTime === selectedTrip.departureTime &&
-            b.seatNumbers?.includes(seat.number)
-        );
-
-        return {
-          ...seat,
-          isBooked: isBlockedOffline || isBookedOnline
-        };
-      });
-      setSeats(liveSeats);
-      setSelectedSeatIds((prev) => prev.filter((id) => !liveSeats.find(ls => ls.id === id)?.isBooked));
-    } else {
-      setSeats(dynamicPriceSeats.map(s => ({ ...s, isBooked: false })));
-    }
-  }, [selectedTrip, date, bookings, blockedSeats, sharedCarConfig]);
 
   // Sync state whenever searchParams changes
   useEffect(() => {
@@ -348,22 +316,11 @@ export default function SharedCarBooking({
 
   const handleTripSelect = (trip: any) => {
     setSelectedTrip(trip);
-    setSelectedSeatIds([]);
-  };
-
-  const toggleSeat = (seatId: string) => {
-    const seat = seats.find((s) => s.id === seatId);
-    if (!seat || seat.isBooked) return;
-
-    if (selectedSeatIds.includes(seatId)) {
-      setSelectedSeatIds(selectedSeatIds.filter((id) => id !== seatId));
-    } else {
-      setSelectedSeatIds([...selectedSeatIds, seatId]);
-    }
+    setSeatCount(1);
   };
 
   const getSelectedSeatsPrice = () => {
-    return selectedSeatIds.length * currentPrice;
+    return seatCount * currentPrice;
   };
 
   const handleBookingSubmit = (e: React.FormEvent) => {
@@ -376,8 +333,8 @@ export default function SharedCarBooking({
       setErrorMsg("Vui lòng chọn khung giờ di chuyển phù hợp bên trái!");
       return;
     }
-    if (selectedSeatIds.length === 0) {
-      setErrorMsg("Vui lòng click chọn ít nhất một ghế ngồi trên sơ đồ xe!");
+    if (!seatCount || seatCount < 1) {
+      setErrorMsg("Vui lòng chọn số lượng ghế!");
       return;
     }
 
@@ -433,8 +390,7 @@ export default function SharedCarBooking({
 
     setIsSubmitting(true);
 
-    const selectedSeats = seats.filter((s) => selectedSeatIds.includes(s.id));
-    const seatNumbers = selectedSeats.map((s) => s.number);
+    const seatNumbers = [`${seatCount} chỗ (Nhà xe sắp xếp)`];
     const originalTotalPrice = getSelectedSeatsPrice();
 
     let pointsDeducted = 0;
@@ -482,7 +438,7 @@ export default function SharedCarBooking({
       discountAmount: totalDiscount > 0 ? totalDiscount : undefined,
       status: 'pending',
       seatNumbers,
-      seatCount: selectedSeatIds.length,
+      seatCount,
       departureTime: selectedTrip.departureTime,
       routeSelection: `${from} ➔ ${to}`
     };
@@ -492,7 +448,7 @@ export default function SharedCarBooking({
 
     // Clean states
     setSelectedTrip(null);
-    setSelectedSeatIds([]);
+    setSeatCount(1);
     setUsePoints(false);
     setSpamAnswer("");
     setIsSubmitting(false);
@@ -706,176 +662,47 @@ export default function SharedCarBooking({
                   </div>
                 </div>
 
-                {/* VISUAL SUV SEATING CHART */}
-                <div>
-                  <h4 className="text-xs font-bold text-stone-800 uppercase tracking-widest text-center mb-4">
-                    SƠ ĐỒ CHỌN GHẾ XE SUV (7 CHỖ CHUYÊN TÙNG)
+                {/* Seat Quantity Selector */}
+                <div className="bg-stone-50 p-5 rounded-2xl border border-stone-200">
+                  <h4 className="text-xs font-bold text-stone-800 uppercase tracking-widest mb-3">
+                    CHỌN SỐ LƯỢNG GHẾ ĐẶT (XE GHÉP SUV 7 CHỖ)
                   </h4>
-                  
-                  <div className="w-[280px] sm:w-[320px] mx-auto bg-stone-900 p-6 rounded-3xl border-4 border-stone-850 shadow-inner text-center relative">
-                    {/* Front view marker */}
-                    <div className="text-[10px] tracking-widest font-extrabold text-stone-500 uppercase border-b border-stone-800 pb-2.5 mb-6 text-center animate-pulse">
-                      ĐẦU XE / TÀI XẾ CHUYÊN NGHIỆP
-                    </div>
-
-                    {/* Driver and Row 1 (A1) */}
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                      <div className="w-12 h-12 rounded-lg bg-stone-800 border border-stone-700 flex items-center justify-center text-stone-500 text-[10px] font-bold">
-                        Vô lăng
-                      </div>
-                      
-                      <div className="w-12 h-12 rounded-lg bg-stone-800/10 border border-transparent flex items-center justify-center" />
-
-                      {/* Seat 1 (Front: A1) */}
-                      {seats.slice(0, 1).map((seat) => {
-                        const isSelected = selectedSeatIds.includes(seat.id);
-                        return (
-                          <button
-                            key={seat.id}
-                            type="button"
-                            onClick={() => toggleSeat(seat.id)}
-                            className={`w-12 h-12 rounded-lg flex flex-col justify-center items-center text-[10px] font-mono leading-none transition-all relative ${
-                              seat.isBooked
-                                ? "bg-stone-800 border border-stone-700 text-stone-600 cursor-not-allowed"
-                                : isSelected
-                                ? "bg-emerald-500 border border-emerald-400 text-white scale-105 shadow-md shadow-emerald-500/20"
-                                : "bg-stone-700 border border-stone-600 text-stone-200 hover:bg-stone-600"
-                            }`}
-                            disabled={seat.isBooked}
-                            title={`Ghế ${seat.number}: ${seat.price.toLocaleString()}đ`}
-                          >
-                            <span className="font-sans text-[10px] leading-tight block">{seat.number}</span>
-                            <span className="text-[8px] opacity-80 font-mono mt-0.5">{seat.price / 1000}k</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Cabin aisle spacer line */}
-                    <div className="h-px bg-stone-800 w-full mb-6" />
-
-                    {/* Middle Row (Seat B1, B2, B3) */}
-                    <div className="space-y-4 mb-6">
-                      <div className="grid grid-cols-3 gap-3">
-                        {seats.slice(1, 4).map((seat) => {
-                          const isSelected = selectedSeatIds.includes(seat.id);
-                          return (
-                            <button
-                              key={seat.id}
-                              type="button"
-                              onClick={() => toggleSeat(seat.id)}
-                              className={`h-12 rounded-lg flex flex-col justify-center items-center font-mono leading-none transition-all relative ${
-                                seat.isBooked
-                                  ? "bg-stone-850 text-stone-700 border border-stone-800 cursor-not-allowed"
-                                  : isSelected
-                                  ? "bg-emerald-600 text-white scale-105 border-2 border-emerald-400 shadow-md shadow-emerald-500/20"
-                                  : "bg-[#1b4332] text-stone-100 border border-emerald-800 hover:bg-[#2d5a45]"
-                              }`}
-                              disabled={seat.isBooked}
-                            >
-                              <span className="font-extrabold text-xs block">{seat.number}</span>
-                              <span className="text-[9px] block text-amber-200/90 font-mono mt-1">{seat.price / 1000}k</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Rear row 3 (C1, C2) */}
-                    <div className="grid grid-cols-3 gap-3 pt-4 border-t border-stone-900">
-                      {seats.slice(4, 5).map((seat) => {
-                        const isSelected = selectedSeatIds.includes(seat.id);
-                        return (
-                          <button
-                            key={seat.id}
-                            type="button"
-                            onClick={() => toggleSeat(seat.id)}
-                            className={`h-12 rounded-lg flex flex-col justify-center items-center font-mono leading-none transition-all ${
-                              seat.isBooked
-                                ? "bg-stone-800 border border-stone-700 text-stone-600 cursor-not-allowed"
-                                : isSelected
-                                ? "bg-emerald-500 border border-emerald-400 text-white scale-105 shadow-md shadow-emerald-500/20"
-                                : "bg-stone-700 border border-stone-600 text-stone-200 hover:bg-stone-600"
-                            }`}
-                            disabled={seat.isBooked}
-                          >
-                            <span className="font-sans text-[10px] leading-tight block">{seat.number}</span>
-                            <span className="text-[8px] opacity-80 font-mono mt-0.5">{seat.price / 1000}k</span>
-                          </button>
-                        );
-                      })}
-
-                      <div className="h-12 flex items-center justify-center text-[9px] text-stone-600">Lối đi</div>
-
-                      {seats.slice(5, 6).map((seat) => {
-                        const isSelected = selectedSeatIds.includes(seat.id);
-                        return (
-                          <button
-                            key={seat.id}
-                            type="button"
-                            onClick={() => toggleSeat(seat.id)}
-                            className={`h-12 rounded-lg flex flex-col justify-center items-center font-mono leading-none transition-all ${
-                              seat.isBooked
-                                ? "bg-stone-800 border border-stone-700 text-stone-600 cursor-not-allowed"
-                                : isSelected
-                                ? "bg-emerald-500 border border-emerald-400 text-white scale-105 shadow-md shadow-emerald-500/20"
-                                : "bg-stone-700 border border-stone-600 text-stone-200 hover:bg-stone-600"
-                            }`}
-                            disabled={seat.isBooked}
-                          >
-                            <span className="font-sans text-[10px] leading-tight block">{seat.number}</span>
-                            <span className="text-[8px] opacity-80 font-mono mt-0.5">{seat.price / 1000}k</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <div className="flex items-center space-x-2 sm:space-x-3 overflow-x-auto pb-2">
+                    {[1, 2, 3, 4, 5, 6].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setSeatCount(num)}
+                        className={`w-10 h-10 rounded-xl font-mono font-bold text-sm transition-all cursor-pointer flex-shrink-0 ${
+                          seatCount === num
+                            ? "bg-[#1b4332] text-white shadow-md scale-105"
+                            : "bg-white text-stone-700 border border-stone-200 hover:bg-stone-100"
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
                   </div>
-
-                  {/* Seat category legend */}
-                  <div className="mt-4 flex justify-between text-[11px] text-stone-500 max-w-sm mx-auto p-2 bg-stone-50 rounded-lg">
-                    <span className="flex items-center space-x-1">
-                      <span className="w-3 h-3 bg-[#1b4332] border border-emerald-800 rounded-xs inline-block" />
-                      <span>Ghế giữa</span>
-                    </span>
-                    <span className="flex items-center space-x-1">
-                      <span className="w-3 h-3 bg-stone-750 border border-stone-650 rounded-xs inline-block" />
-                      <span>Lái phụ / Sau</span>
-                    </span>
-                    <span className="flex items-center space-x-1">
-                      <span className="w-3 h-3 bg-stone-800 rounded-xs inline-block" />
-                      <span>Ghế đã đặt</span>
-                    </span>
-                    <span className="flex items-center space-x-1">
-                      <span className="w-3 h-3 bg-emerald-500 rounded-xs inline-block" />
-                      <span>Đang chọn</span>
-                    </span>
-                  </div>
+                  <p className="text-[11px] text-stone-500 mt-2.5 font-sans leading-relaxed">
+                    💡 <strong>Lưu ý:</strong> Quý khách chỉ cần chọn số lượng ghế. Tài xế và nhân viên điều hành sẽ sắp xếp vị trí ghế ngồi tốt nhất và phù hợp nhất cho quý khách (Không cần chọn trước sơ đồ ghế).
+                  </p>
                 </div>
 
                 {/* Selected summary */}
-                {selectedSeatIds.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex justify-between items-center text-left"
-                  >
-                    <div>
-                      <span className="text-xs text-amber-800 font-bold block">Chỗ ngồi đã giữ:</span>
-                      <span className="font-extrabold text-[#1b4332] text-sm">
-                        {seats
-                          .filter((s) => selectedSeatIds.includes(s.id))
-                          .map((s) => s.number)
-                          .join(", ")}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-amber-800 font-bold block">Tổng tiền tạm tính</span>
-                      <span className="font-extrabold text-lg text-[#1b4332] font-mono">
-                        {getSelectedSeatsPrice().toLocaleString()}đ
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex justify-between items-center text-left">
+                  <div>
+                    <span className="text-xs text-emerald-800 font-bold block">Số lượng đặt:</span>
+                    <span className="font-extrabold text-[#1b4332] text-sm font-mono">
+                      {seatCount} ghế Xe ghép SUV
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-stone-500 block">Tổng tạm tính</span>
+                    <span className="font-extrabold text-emerald-700 text-base font-mono">
+                      {getSelectedSeatsPrice().toLocaleString()}đ
+                    </span>
+                  </div>
+                </div>
 
                 {/* Form inputs for passenger details */}
                 <form onSubmit={handleBookingSubmit} className="space-y-4 text-left border-t border-stone-100 pt-6">
@@ -1075,8 +902,8 @@ export default function SharedCarBooking({
                   {/* Summary dynamic pricing display */}
                   <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 text-xs space-y-1.5" id="shared_car_checkout_totals">
                     <div className="flex justify-between text-stone-600">
-                      <span>Số ghế đã chọn ({selectedSeatIds.length} ghế):</span>
-                      <span className="font-mono font-bold text-stone-800">{seats.filter(s => selectedSeatIds.includes(s.id)).map(s => s.number).join(", ")}</span>
+                      <span>Số lượng ghế đặt:</span>
+                      <span className="font-mono font-bold text-stone-800">{seatCount} ghế Xe ghép SUV</span>
                     </div>
                     <div className="flex justify-between text-stone-600">
                       <span>Đơn giá vé:</span>
