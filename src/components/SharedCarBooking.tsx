@@ -390,7 +390,7 @@ export default function SharedCarBooking({
 
     setIsSubmitting(true);
 
-    const seatNumbers = [`${seatCount} chỗ (Nhà xe sắp xếp)`];
+    const seatNumbers = [`${seatCount} chỗ Xe ghép`];
     const originalTotalPrice = getSelectedSeatsPrice();
 
     let pointsDeducted = 0;

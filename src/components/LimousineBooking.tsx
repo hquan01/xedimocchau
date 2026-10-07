@@ -460,7 +460,7 @@ export default function LimousineBooking({
     setErrorMsg("");
 
     try {
-      const seatNumbers = [`${seatCount} chỗ (Nhà xe sắp xếp)`];
+      const seatNumbers = [`${seatCount} chỗ Limousine`];
       const originalTotalPrice = getSelectedSeatsPrice();
       
       let pointsDeducted = 0;
