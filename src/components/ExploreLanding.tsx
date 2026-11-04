@@ -34,8 +34,14 @@ export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSi
         {heroSlides.length>1 && <>
           <button type="button" aria-label="Ảnh banner trước" onClick={()=>setSlideIndex(i=>(i-1+heroSlides.length)%heroSlides.length)} className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/60 text-white rounded-full p-2"><ChevronLeft className="w-5 h-5"/></button>
           <button type="button" aria-label="Ảnh banner tiếp theo" onClick={()=>setSlideIndex(i=>(i+1)%heroSlides.length)} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/60 text-white rounded-full p-2"><ChevronRight className="w-5 h-5"/></button>
-          <div role="group" aria-label="Chọn ảnh banner" className="absolute bottom-2.5 inset-x-0 z-10 flex justify-center gap-2">
-            {heroSlides.map((slide,i)=><button key={slide.id} type="button" aria-label={`Xem banner ${i+1}`} aria-current={i===slideIndex%heroSlides.length ? 'true' : undefined} onClick={()=>setSlideIndex(i)} className={`w-2.5 h-2.5 rounded-full border border-white shadow-sm ${i===slideIndex%heroSlides.length?'bg-white':'bg-white/35'}`}/>) }
+          {/* The original hero artwork already has decorative dots baked into its pixels.
+              Mask only that narrow strip; preserve the supplied photograph and keep a
+              single, fully interactive set of navigation buttons over it. */}
+          {currentSlide.imageUrl === '/mocchau-hero-v5.jpg' && (
+            <div aria-hidden="true" className="absolute pointer-events-none bottom-0 left-1/2 -translate-x-1/2 w-[190px] h-12 bg-gradient-to-t from-[#113c29] via-[#113c29] to-transparent" />
+          )}
+          <div role="group" aria-label="Chọn ảnh banner" className="absolute bottom-2.5 inset-x-0 z-10 flex justify-center gap-3">
+            {heroSlides.map((slide,i)=><button key={slide.id} type="button" aria-label={`Xem banner ${i+1}`} aria-current={i===slideIndex%heroSlides.length ? 'true' : undefined} onClick={()=>setSlideIndex(i)} className={`w-3 h-3 rounded-full border-2 border-white shadow-md transition-colors ${i===slideIndex%heroSlides.length?'bg-white':'bg-black/25'}`}/>) }
           </div>
         </>}
       </section>
