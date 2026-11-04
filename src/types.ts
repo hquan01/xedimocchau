@@ -79,6 +79,7 @@ export interface Booking {
   status: 'pending' | 'success' | 'completed' | 'cancelled';
   notes?: string;
   couponCode?: string;
+  couponId?: string;
   pointsDeducted?: number;
   pointsRefunded?: boolean; // Prevent double refunds when a reservation is cancelled.
   discountAmount?: number;
