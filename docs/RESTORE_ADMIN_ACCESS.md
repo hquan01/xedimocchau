@@ -9,10 +9,12 @@ Cảnh báo: mã nguồn cũ có đăng nhập quản trị giả trong trình d
 4. Đăng xuất, đăng nhập lại để lấy token mới; vào **Quản lý** kiểm tra quyền. Kiểm tra admin có thể xem đơn dịch vụ, chỉnh nội dung; tài khoản khách không thể truy cập.
 5. Trước khi siết `firestore.rules`, sao lưu Firestore thật và kiểm thử Firebase Emulator với tài khoản Admin và khách, đặc biệt các luồng đơn xe cũ. Quy tắc cũ còn `allow read, write: if true` ở nhiều collection; chưa được coi là an toàn.
 
-## Đăng nhập bằng điện thoại
-1. Trong Firebase Authentication > Sign-in method, bật **Phone** và **Email/Password** (và Google nếu sử dụng).
-2. Cấu hình danh sách tên miền được phép, reCAPTCHA, giới hạn gửi SMS và các điều kiện giá/anti-abuse của nhà cung cấp.
-3. Kiểm thử SMS bằng số thử nghiệm của Firebase trên bản preview trước khi sử dụng số thật.
-4. **Đăng nhập bằng số điện thoại chưa tự liên kết với tài khoản email cũ.** Với người đã có tài khoản email, hãy đăng nhập bằng email để giữ UID/voucher/đơn hàng. Việc liên kết provider cần triển khai và kiểm thử riêng.
+## Đăng nhập SĐT không SMS ở giai đoạn đầu
+1. Mộc Châu Travel dùng **email/mật khẩu thật của Firebase** và cho phép SĐT làm tên đăng nhập sau khi email khôi phục được xác minh.
+2. Không bật Phone Authentication hoặc chi phí SMS ở giai đoạn này. Cần cấu hình Firebase Admin SDK **chỉ trên máy chủ** để ánh xạ SĐT với đúng UID và xác minh mật khẩu an toàn.
+3. Khách quên mật khẩu nhập SĐT đã liên kết; hệ thống gửi **email đặt lại mật khẩu**, không tạo mật khẩu mặc định.
+4. Xem hướng dẫn đầy đủ tại `docs/PHONE_PASSWORD_SETUP.md`.
+
+**Riêng tài khoản Admin cũ:** SĐT và mật khẩu mặc định từng nằm trong mã nguồn frontend không phải một tài khoản Firebase Auth thật. Cần dùng chủ dự án Firebase xác minh danh tính, đăng ký/khôi phục tài khoản thật và cấp custom claim `admin: true`. Tuyệt đối không đưa lại mật khẩu cũ vào frontend.
 
 Không có cách an toàn để khôi phục quyền Admin chỉ bằng cách chép lại mật khẩu cố định trước đây vào mã frontend.
