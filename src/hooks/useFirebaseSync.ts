@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { collection, doc, onSnapshot, getDocs, setDoc, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { hasOperatorAccess } from "../lib/simpleAuth";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
 import { Booking, BlockedSeat, User, AppNotification, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, Driver, ZaloGroup } from "../types";
 import { INITIAL_COMBOS } from "../data/combos";
@@ -45,7 +46,7 @@ export function useFirebaseSync() {
       }
       try {
         const token = await firebaseUser.getIdTokenResult();
-        const isAdmin = token.claims.admin === true || token.claims.operator === true;
+        const isAdmin = hasOperatorAccess(token);
         unsubscribeProfile = onSnapshot(doc(db, "users", firebaseUser.uid), snap => {
           if (snap.exists()) {
             const profile = snap.data() as User;
