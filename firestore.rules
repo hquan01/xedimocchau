@@ -109,5 +109,59 @@ service cloud.firestore {
     match /destinations/{destId} {
       allow read, write: if true;
     }
+
+    match /zalo_groups/{groupId} {
+      allow read, write: if true;
+    }
+
+    match /community_posts/{postId} {
+      allow read, write: if true;
+    }
+
+    // New isolated features. The existing booking/users collections still require a separate safe migration.
+    function hasAdminClaim() {
+      return request.auth != null && (request.auth.token.admin == true || request.auth.token.operator == true);
+    }
+
+    match /site_content/{contentId} {
+      allow read: if contentId == 'public';
+      allow create, update, delete: if hasAdminClaim() && contentId == 'public';
+    }
+
+    match /service_requests/{requestId} {
+      allow create: if request.resource.data.keys().hasOnly([
+        'kind','customerName','customerPhone','status','createdAt','createdAtServer',
+        'customerUid','quotedPrice','pickupPoint','dropoffPoint','seats','travelDate',
+        'departureTime','bikeType','quantity','startDate','endDate','deliveryLocation','notes'
+      ])
+        && request.resource.data.kind in ['taxi','motorbike']
+        && request.resource.data.status == 'pending'
+        && request.resource.data.quotedPrice == 0
+        && request.resource.data.customerName is string
+        && request.resource.data.customerName.size() >= 2
+        && request.resource.data.customerName.size() <= 100
+        && request.resource.data.customerPhone is string
+        && request.resource.data.customerPhone.matches('^(\\+84|84|0)[35789][0-9]{8}$')
+        && request.resource.data.createdAt is string
+        && request.resource.data.createdAtServer == request.time
+        && request.resource.data.customerUid is string
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 1000
+        && (
+           (request.resource.data.kind == 'taxi'
+            && request.resource.data.seats in [4,7,9,16]
+            && request.resource.data.pickupPoint is string
+            && request.resource.data.dropoffPoint is string
+            && request.resource.data.travelDate is string)
+           || (request.resource.data.kind == 'motorbike'
+            && request.resource.data.quantity is int
+            && request.resource.data.quantity >= 1
+            && request.resource.data.quantity <= 20
+            && request.resource.data.startDate is string
+            && request.resource.data.endDate is string
+            && request.resource.data.deliveryLocation is string)
+        );
+      allow get, list, update, delete: if hasAdminClaim();
+    }
   }
 }

@@ -6,18 +6,31 @@ import Hero from "./components/Hero";
 import BookingSwitcher from "./components/BookingSwitcher";
 import ComboBooking from "./components/ComboBooking";
 import FloatingContact from "./components/FloatingContact";
+import AIChatWidget from "./components/AIChatWidget";
+import BottomNavigation from "./components/BottomNavigation";
+import {submitServiceInquiry} from "./lib/serviceRequests";
+import CategoryDirectoryView from "./components/CategoryDirectoryView";
+import CategoryItemDetail from "./components/CategoryItemDetail";
 import { useSEO } from "./hooks/useSEO";
+
+import NotificationCenter from "./components/NotificationCenter";
 
 // Lazy load heavy or secondary components
 const AIPlanner = lazy(() => import("./components/AIPlanner"));
 const ExploreMocChau = lazy(() => import("./components/ExploreMocChau"));
+const ExploreLanding = lazy(() => import("./components/ExploreLanding"));
 const TravelGuide = lazy(() => import("./components/TravelGuide"));
 const BookingList = lazy(() => import("./components/BookingList"));
 const PaymentModal = lazy(() => import("./components/PaymentModal"));
 const AuthModal = lazy(() => import("./components/AuthModal"));
 const OperatorPanel = lazy(() => import("./components/OperatorPanel"));
 const CustomerDashboard = lazy(() => import("./components/CustomerDashboard"));
-const NotificationCenter = lazy(() => import("./components/NotificationCenter"));
+const TripPrepView = lazy(() => import("./components/TripPrepView"));
+const ExploreAroundView = lazy(() => import("./components/ExploreAroundView"));
+const MocChauTodayView = lazy(() => import("./components/MocChauTodayView"));
+const CommunityView = lazy(() => import("./components/CommunityView"));
+const TripHubView = lazy(() => import("./components/TripHubView"));
+const ServicesHubView = lazy(() => import("./components/ServicesHubView"));
 
 import { Booking, AppNotification } from "./types";
 import { useFirebaseSync } from "./hooks/useFirebaseSync";
@@ -35,11 +48,48 @@ import {
 } from "./lib/firebaseUtils";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<string>("limousine");
+  const [activeTab, setActiveTab] = useState<string>("explore");
   useSEO(activeTab);
   const [limousineSubTab, setLimousineSubTab] = useState<"limousine" | "shared" | "charter">("limousine");
   const [isMotorbikeOpen, setIsMotorbikeOpen] = useState(false);
-  
+  // Motorbike inquiry. Keep the established Limousine, shared-car and private-charter forms untouched.
+  const [motorbikeName, setMotorbikeName] = useState("");
+  const [motorbikePhone, setMotorbikePhone] = useState("");
+  const [motorbikeType, setMotorbikeType] = useState<"manual" | "scooter">("manual");
+  const [motorbikeQuantity, setMotorbikeQuantity] = useState(1);
+  const [motorbikeStart, setMotorbikeStart] = useState("");
+  const [motorbikeEnd, setMotorbikeEnd] = useState("");
+  const [motorbikeDelivery, setMotorbikeDelivery] = useState("");
+  const [motorbikeNotes, setMotorbikeNotes] = useState("");
+  const [motorbikeDraftSaved, setMotorbikeDraftSaved] = useState(false);
+  const [motorbikeSaving, setMotorbikeSaving] = useState(false);
+  const [motorbikeError, setMotorbikeError] = useState("");
+  const [motorbikeRequestId, setMotorbikeRequestId] = useState("");
+  const handleMotorbikeInquiry = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMotorbikeSaving(true);
+    setMotorbikeError("");
+    try {
+      const id = await submitServiceInquiry({
+        kind: "motorbike",
+        customerName: motorbikeName,
+        customerPhone: motorbikePhone,
+        bikeType: motorbikeType === "manual" ? "Xe số" : "Xe tay ga",
+        quantity: motorbikeQuantity,
+        startDate: motorbikeStart,
+        endDate: motorbikeEnd,
+        deliveryLocation: motorbikeDelivery,
+        notes: motorbikeNotes
+      });
+      setMotorbikeRequestId(id);
+      setMotorbikeDraftSaved(true);
+    } catch (err: any) {
+      setMotorbikeError("Chưa gửi được yêu cầu: " + (err?.message || "Lỗi mạng") + ". Vui lòng thử lại hoặc liên hệ Zalo.");
+    } finally {
+      setMotorbikeSaving(false);
+    }
+  };
+
   // Custom states for notifications
   const {
     currentUser,
@@ -67,6 +117,8 @@ export default function App() {
     setArticles,
     drivers,
     setDrivers,
+    zaloGroups,
+    setZaloGroups,
     notifications,
     setNotifications
   } = useFirebaseSync();
@@ -75,6 +127,7 @@ export default function App() {
   const [isBookingListOpen, setIsBookingListOpen] = useState(false);
   const [activePaymentBooking, setActivePaymentBooking] = useState<Booking | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [selectedCategoryItem, setSelectedCategoryItem] = useState<any | null>(null);
 
   // Quick search synchronization states
   const [limousineSearch, setLimousineSearch] = useState<{ from: string; to: string; date: string; time: string } | null>(null);
@@ -330,8 +383,8 @@ export default function App() {
     }
   };
 
-  const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all") => {
-    setLimousineSearch({ from, to, date, time });
+  const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all", pickup?: string, dropoff?: string) => {
+    setLimousineSearch({ from, to, date, time, pickup, dropoff });
     setActiveTab("limousine");
     // Scroll smoothly to active section
     setTimeout(() => {
@@ -339,8 +392,8 @@ export default function App() {
     }, 100);
   };
 
-  const handleSearchCombo = (hotelId: string, date: string, from?: string, to?: string, time?: string) => {
-    setComboSearch({ hotelId, date, from, to, time });
+  const handleSearchCombo = (hotelId: string, date: string, from?: string, to?: string, time?: string, pickup?: string, dropoff?: string) => {
+    setComboSearch({ hotelId, date, from, to, time, pickup, dropoff });
     setActiveTab("combo");
     setTimeout(() => {
       document.getElementById("combo_booking_section")?.scrollIntoView({ behavior: "smooth" });
@@ -398,8 +451,92 @@ export default function App() {
     setActiveTab("limousine");
   };
 
+  const renderCategoryDirectory = () => {
+    const catKey = activeTab.replace("cat:", "");
+    let title = "Chuyên mục Mộc Châu";
+    let desc = "Thông tin và dịch vụ xác thực tại Mộc Châu";
+    let dataList: any[] = [];
+
+    switch (catKey) {
+      case "thoi-tiet":
+        title = "Thời Tiết Mộc Châu";
+        desc = "Cập nhật dự báo thời tiết cao nguyên, nhiệt độ và trang phục gợi ý hàng ngày.";
+        dataList = articles;
+        break;
+      case "mua-hoa":
+        title = "Mùa Hoa Mận & Sắc Hoa Tây Bắc";
+        desc = "Lịch hoa mận nở rộ tháng 1-2, hoa cải trắng, hoa dã quỳ và các tọa độ săn hoa đẹp nhất.";
+        dataList = destinations;
+        break;
+      case "lich-trinh":
+        title = "Lịch Trình & Tour Gợi Ý";
+        desc = "Gợi ý lịch trình du lịch Mộc Châu tự túc hoặc cùng gia đình 2N1Đ, 3N2Đ tối ưu chi phí.";
+        dataList = articles;
+        break;
+      case "dia-diem":
+        title = "Điểm Tham Quan Nổi Bật";
+        desc = "Tổng hợp danh sách các tọa độ check-in sống ảo, đồi chè, thác nước và cầu kính nổi tiếng.";
+        dataList = destinations;
+        break;
+      case "homestay":
+        title = "Homestay View Đẹp Mộc Châu";
+        desc = "Danh sách homestay nhà sàn, nhà gỗ view đồi chè, thung lũng mận đã được xác thực.";
+        dataList = accommodations;
+        break;
+      case "khach-san":
+        title = "Khách Sạn & Resort Cao Cấp";
+        desc = "Hệ thống khách sạn từ 3 đến 5 sao tại trung tâm thị trấn Mộc Châu và Farmstay.";
+        dataList = accommodations;
+        break;
+      case "nha-hang":
+        title = "Nhà Hàng & Ẩm Thực Bản Địa";
+        desc = "Thưởng thức bê chao, cá suối, gà đồi, trâu gác bếp tại các nhà hàng uy tín hàng đầu.";
+        dataList = destinations;
+        break;
+      case "dac-san":
+        title = "Đặc Sản Mộc Châu Làm Quà";
+        desc = "Sữa tươi nguyên chất, bánh sữa, mận hậu, chè ô long và các sản phẩm OCOP chính hiệu.";
+        dataList = destinations;
+        break;
+      case "trai-nghiem":
+        title = "Trải Nghiệm & Khám Phá";
+        desc = "Hái mận tại vườn, cắm trại săn mây, thuê xe máy khám phá các cung đường Tây Bắc.";
+        dataList = destinations;
+        break;
+      case "di-chuyen":
+        title = "Di Chuyển & Xe Limousine VIP";
+        desc = "Dịch vụ xe Limousine đưa đón tận nơi Hà Nội - Mộc Châu, xe ghép và cho thuê xe máy.";
+        dataList = [{ id: 'limo_1', name: 'Xe Limousine VIP 9 Chỗ', description: 'Đón trả tận nhà, ghế massage êm ái, wifi miễn phí.', price: '300.000đ/ghế' }];
+        break;
+      case "chi-phi":
+        title = "Dự Toán Chi Phí Du Lịch";
+        desc = "Bảng ước tính chi phí di chuyển, lưu trú, ăn uống và vé tham quan chi tiết cho mọi đối tượng.";
+        dataList = [{ id: 'cost_1', name: 'Gói 2N1Đ Tự Túc (Xe + Homestay + Ăn uống)', description: 'Khoảng 1.200.000đ - 1.800.000đ/người.', price: 'Từ 1.2M đ' }];
+        break;
+      case "ho-tro":
+        title = "Hỗ Trợ & Cứu Hộ 24/7";
+        desc = "Đội ngũ điều hành nhà xe và hướng dẫn viên túc trực hỗ trợ khẩn cấp trong suốt chuyến đi.";
+        dataList = [{ id: 'sup_1', name: 'Hotline Cứu Hộ & Điều Hành', description: 'Gọi ngay 0971.050.324 hoặc Zalo để được hỗ trợ 24/7.', price: 'Miễn phí' }];
+        break;
+      default:
+        dataList = destinations;
+    }
+
+    return (
+      <CategoryDirectoryView
+        categoryKey={catKey}
+        categoryTitle={title}
+        categoryDescription={desc}
+        onBack={() => setActiveTab("limousine")}
+        onSelectBooking={() => setActiveTab("limousine")}
+        onOpenItemDetail={(item) => setSelectedCategoryItem(item)}
+        items={dataList}
+      />
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col justify-between selection:bg-[#1b4332] selection:text-white" id="app_root">
+    <div className="min-h-screen bg-stone-50 flex flex-col justify-between selection:bg-[#1b4332] selection:text-white pb-24 md:pb-0" id="app_root">
       {/* Platform Header */}
       <Header
         activeTab={activeTab}
@@ -428,6 +565,8 @@ export default function App() {
             <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
           </div>
         }>
+          {activeTab.startsWith("cat:") && renderCategoryDirectory()}
+
           {activeTab === "limousine" && limousineSearch && (
             <BookingSwitcher
               initialSubTab={limousineSubTab}
@@ -468,7 +607,8 @@ export default function App() {
             />
           )}
 
-          {activeTab === "explore" && (
+          {activeTab === "explore" && <ExploreLanding setActiveTab={setActiveTab} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
+          {activeTab === "explore_legacy" && (
             <ExploreMocChau 
               destinations={destinations} 
               currentUser={currentUser}
@@ -480,6 +620,83 @@ export default function App() {
           )}
           {activeTab === "guide" && <TravelGuide articles={articles} />}
           {activeTab === "ai" && <AIPlanner />}
+
+          {activeTab === "trip" && (
+            <TripHubView
+              setActiveTab={setActiveTab}
+              currentUser={currentUser}
+              bookings={bookings}
+              accommodations={accommodations}
+              destinations={destinations}
+              combos={combos}
+              locations={locations}
+              blockedSeats={blockedSeats}
+              limousineConfig={limousineConfig}
+              sharedCarConfig={sharedCarConfig}
+              coupons={coupons}
+              onAddBooking={handleAddBooking}
+              onOpenPayment={setActivePaymentBooking}
+              onCancelBooking={handleCancelBooking}
+              onDeleteBooking={handleDeleteBooking}
+              onDeductPoints={(deducted) => {
+                if (!currentUser || !currentUser.id) return;
+                const nextPoints = Math.max(0, currentUser.points - deducted);
+                saveUserToFirebase(currentUser.id, { points: nextPoints });
+              }}
+              onOpenAuth={() => setIsAuthOpen(true)}
+            />
+          )}
+
+          {activeTab === "services" && (
+            <ServicesHubView
+              setActiveTab={setActiveTab}
+              accommodations={accommodations}
+              combos={combos}
+              destinations={destinations}
+              currentUser={currentUser}
+              onSearchLimousine={handleSearchLimousine}
+              onSearchCombo={handleSearchCombo}
+              onOpenMotorbikeModal={() => setIsMotorbikeOpen(true)}
+            />
+          )}
+
+          {activeTab === "trip_prep" && (
+            <TripPrepView
+              setActiveTab={setActiveTab}
+              accommodations={accommodations}
+              destinations={destinations}
+              combos={combos}
+              onSearchLimousine={(from, to, date, time) => {
+                setLimousineSearch({ from, to, date, time: time || "06:30" });
+                setActiveTab("limousine");
+              }}
+              onSearchCombo={(hotelId, date, from, to, time) => {
+                setComboSearch({ hotelId, date, from, to, time });
+                setActiveTab("combo");
+              }}
+            />
+          )}
+
+          {activeTab === "explore_around" && (
+            <ExploreAroundView
+              setActiveTab={setActiveTab}
+              destinations={destinations}
+              accommodations={accommodations}
+            />
+          )}
+
+          {activeTab === "moc_chau_today" && (
+            <MocChauTodayView setActiveTab={setActiveTab} />
+          )}
+
+          {activeTab === "community" && (
+            <CommunityView
+              setActiveTab={setActiveTab}
+              currentUser={currentUser}
+              onOpenAuth={() => setIsAuthOpen(true)}
+              zaloGroups={zaloGroups}
+            />
+          )}
 
           {activeTab === "member" && currentUser && (
             <CustomerDashboard
@@ -639,6 +856,16 @@ export default function App() {
                   setDrivers(updated);
                   await saveConfigToFirebase("drivers", updated);
               }}
+              zaloGroups={zaloGroups}
+              onUpdateZaloGroups={async (updated) => {
+                  setZaloGroups(updated);
+                  const { saveZaloGroupToFirebase } = await import("./lib/firebaseUtils");
+                  // Save each group
+                  for (const g of updated) {
+                    await saveZaloGroupToFirebase(g);
+                  }
+                  alert("Đã cập nhật danh sách nhóm Zalo cộng đồng thành công!");
+              }}
             />
           )}
         </Suspense>
@@ -700,18 +927,25 @@ export default function App() {
 
       {/* Floating fast support buttons */}
       <FloatingContact />
+      <AIChatWidget hideLauncher onOpenLimousine={() => setActiveTab("limousine")} onOpenAIPlanner={() => setActiveTab("ai")} />
+
+      {/* Mobile Fixed Bottom Navigation Bar */}
+      <BottomNavigation
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        openBookingList={() => setIsBookingListOpen(true)}
+        bookingCount={bookings.filter(b => b.status !== "cancelled").length}
+      />
 
       {currentUser?.role === "operator" && (
-        <Suspense fallback={null}>
-          <NotificationCenter 
-            notifications={notifications} 
-            onMarkAsRead={markNotificationAsRead}
-            onMarkAllAsRead={markAllNotificationsAsRead}
-            onDeleteNotification={deleteNotification}
-            onDeleteAll={deleteAllNotifications}
-            onRequestPermission={requestNotificationPermission}
-          />
-        </Suspense>
+        <NotificationCenter 
+          notifications={notifications} 
+          onMarkAsRead={markNotificationAsRead}
+          onMarkAllAsRead={markAllNotificationsAsRead}
+          onDeleteNotification={deleteNotification}
+          onDeleteAll={deleteAllNotifications}
+          onRequestPermission={requestNotificationPermission}
+        />
       )}
 
       {/* Modal - Motorbike Rental Info */}
@@ -764,6 +998,41 @@ export default function App() {
                   <li>Thủ tục đơn giản: Chỉ cần ảnh chụp căn cước công dân hoặc bằng lái xe.</li>
                 </ul>
               </div>
+
+              {/* Customer inquiry form; local draft until a secured backend is configured. */}
+              <form onSubmit={handleMotorbikeInquiry} className="space-y-3 rounded-2xl border border-emerald-100 p-4 bg-white">
+                <h4 className="font-extrabold text-base text-[#1b4332]">Gửi yêu cầu thuê xe máy</h4>
+                <p className="text-xs text-stone-600">Nhập họ tên và số điện thoại để gửi yêu cầu đến Admin. Chúng tôi sẽ liên hệ xác nhận tình trạng xe và báo giá.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-stone-700">Họ và tên <span className="text-red-600">*</span>
+                    <input required autoComplete="name" maxLength={100} value={motorbikeName} onChange={e=>{setMotorbikeName(e.target.value);setMotorbikeDraftSaved(false)}} placeholder="Tên người thuê" className="block w-full mt-1 p-3 rounded-xl border border-stone-300 text-sm" />
+                  </label>
+                  <label className="text-xs font-semibold text-stone-700">Số điện thoại <span className="text-red-600">*</span>
+                    <input required type="tel" inputMode="tel" autoComplete="tel" pattern="(?:\+84|84|0)[0-9]{9}" title="Nhập số điện thoại Việt Nam, ví dụ 0912345678" value={motorbikePhone} onChange={e=>{setMotorbikePhone(e.target.value);setMotorbikeDraftSaved(false)}} placeholder="09xxxxxxxx" className="block w-full mt-1 p-3 rounded-xl border border-stone-300 text-sm" />
+                  </label>
+                  <label className="text-xs font-semibold text-stone-700">Loại xe
+                    <select value={motorbikeType} onChange={e=>setMotorbikeType(e.target.value as "manual"|"scooter")} className="block w-full mt-1 p-3 rounded-xl border border-stone-300 text-sm"><option value="manual">Xe số</option><option value="scooter">Xe tay ga</option></select>
+                  </label>
+                  <label className="text-xs font-semibold text-stone-700">Số xe
+                    <input type="number" min={1} max={20} required value={motorbikeQuantity} onChange={e=>setMotorbikeQuantity(Number(e.target.value))} className="block w-full mt-1 p-3 rounded-xl border border-stone-300 text-sm" />
+                  </label>
+                  <label className="text-xs font-semibold text-stone-700">Ngày nhận <span className="text-red-600">*</span>
+                    <input type="date" required value={motorbikeStart} onChange={e=>setMotorbikeStart(e.target.value)} className="block w-full mt-1 p-3 rounded-xl border border-stone-300 text-sm" />
+                  </label>
+                  <label className="text-xs font-semibold text-stone-700">Ngày trả <span className="text-red-600">*</span>
+                    <input type="date" required min={motorbikeStart||undefined} value={motorbikeEnd} onChange={e=>setMotorbikeEnd(e.target.value)} className="block w-full mt-1 p-3 rounded-xl border border-stone-300 text-sm" />
+                  </label>
+                </div>
+                <label className="text-xs font-semibold text-stone-700 block">Địa điểm nhận xe <span className="text-red-600">*</span>
+                  <input required value={motorbikeDelivery} onChange={e=>setMotorbikeDelivery(e.target.value)} placeholder="Khách sạn, homestay hoặc địa chỉ" className="block w-full mt-1 p-3 rounded-xl border border-stone-300 text-sm" />
+                </label>
+                <label className="text-xs font-semibold text-stone-700 block">Ghi chú
+                  <textarea rows={2} value={motorbikeNotes} onChange={e=>setMotorbikeNotes(e.target.value)} placeholder="Giờ nhận, yêu cầu giao xe..." className="block w-full mt-1 p-3 rounded-xl border border-stone-300 text-sm" />
+                </label>
+                <button type="submit" disabled={motorbikeSaving} className="w-full py-3 rounded-xl bg-[#1b4332] text-white text-sm font-bold disabled:opacity-50">{motorbikeSaving ? "Đang gửi..." : "Gửi yêu cầu thuê xe"}</button>
+                {motorbikeError && <p role="alert" className="text-xs bg-red-50 border border-red-200 rounded-xl p-3 text-red-800">{motorbikeError}</p>}
+                {motorbikeDraftSaved && <p role="status" className="text-xs bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-900">Đã tiếp nhận yêu cầu #{motorbikeRequestId.slice(0, 12)}. Admin sẽ liên hệ xác nhận; <strong>chưa phải đơn thuê xe đã xác nhận.</strong></p>}
+              </form>
 
               {/* Action buttons */}
               <div className="flex gap-2 shrink-0 pt-2">
@@ -858,6 +1127,18 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {selectedCategoryItem && (
+        <CategoryItemDetail
+          item={selectedCategoryItem}
+          categoryTitle="Chi tiết Mộc Châu"
+          onClose={() => setSelectedCategoryItem(null)}
+          onSelectBooking={() => {
+            setSelectedCategoryItem(null);
+            setActiveTab("limousine");
+          }}
+        />
       )}
     </div>
   );

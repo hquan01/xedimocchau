@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { collection, doc, onSnapshot, getDocs, setDoc, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
-import { Booking, BlockedSeat, User, AppNotification, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, Driver } from "../types";
+import { Booking, BlockedSeat, User, AppNotification, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, Driver, ZaloGroup } from "../types";
 import { INITIAL_COMBOS } from "../data/combos";
 import { INITIAL_ACCOMMODATIONS } from "../data/accommodations";
 import { DEFAULT_LIMOUSINE_CONFIG, DEFAULT_SHARED_CAR_CONFIG, INITIAL_COUPONS, INITIAL_LOCATIONS } from "../data/config";
 import { INITIAL_DESTINATIONS } from "../data/destinations";
 import { INITIAL_ARTICLES } from "../data/articles";
 import { INITIAL_DRIVERS } from "../data/drivers";
+import { INITIAL_ZALO_GROUPS } from "../data/zaloGroups";
 import { getLocalList, getDeviceId } from "../lib/firebaseUtils";
 
 export function useFirebaseSync() {
@@ -31,55 +32,33 @@ export function useFirebaseSync() {
   const [destinations, setDestinations] = useState<Destination[]>(INITIAL_DESTINATIONS);
   const [articles, setArticles] = useState<GuideArticle[]>(INITIAL_ARTICLES);
   const [drivers, setDrivers] = useState<Driver[]>(() => getLocalList<Driver>("drivers", INITIAL_DRIVERS));
+  const [zaloGroups, setZaloGroups] = useState<ZaloGroup[]>(() => getLocalList<ZaloGroup>("zalo_groups", INITIAL_ZALO_GROUPS));
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        onSnapshot(doc(db, "users", user.uid), (docSnap) => {
-          if (docSnap.exists()) {
-            setCurrentUser(docSnap.data() as User);
-          } else {
-            // Document doesn't exist in Firestore yet (creation in progress or not created)
-            const isHardcoded = user.email === "hquansl001@gmail.com" || user.email === "nhaxe@mocchau.vn";
-            if (isHardcoded) {
-              setCurrentUser({
-                id: user.uid,
-                email: user.email || "nhaxe@mocchau.vn",
-                name: "Quản lý Limousine Mộc Châu",
-                phone: "0971050324",
-                role: "operator",
-                points: 9999
-              });
-            } else {
-              setCurrentUser(null);
-            }
-          }
-        }, (error) => {
-          console.warn("Retrying profile or using graceful fallback", error);
-          if (user.email === "hquansl001@gmail.com" || user.email === "nhaxe@mocchau.vn") {
-            setCurrentUser({
-              id: user.uid,
-              email: user.email || "nhaxe@mocchau.vn",
-              name: "Quản lý Limousine Mộc Châu",
-              phone: "0971050324",
-              role: "operator",
-              points: 9999
-            });
-          } else {
-            setCurrentUser(null);
-          }
-        });
-      } else {
-        const cachedAdmin = localStorage.getItem("mock_admin_session");
-        if (cachedAdmin) {
-          setCurrentUser(JSON.parse(cachedAdmin));
-        } else {
-          setCurrentUser(null);
-        }
+    let unsubscribeProfile = () => {};
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      unsubscribeProfile();
+      if (!firebaseUser) {
+        setCurrentUser(null);
+        setAuthReady(true);
+        return;
       }
-      setAuthReady(true);
+      try {
+        const token = await firebaseUser.getIdTokenResult();
+        const isAdmin = token.claims.admin === true || token.claims.operator === true;
+        unsubscribeProfile = onSnapshot(doc(db, "users", firebaseUser.uid), snap => {
+          if (snap.exists()) {
+            const profile = snap.data() as User;
+            // The UI role must not trust a self-editable Firestore role field.
+            setCurrentUser({...profile, id:firebaseUser.uid, role:isAdmin ? 'operator' : 'customer'});
+          } else {
+            setCurrentUser({id:firebaseUser.uid,email:firebaseUser.email||'',name:firebaseUser.displayName||'Thành viên',phone:firebaseUser.phoneNumber||'',points:0,role:isAdmin?'operator':'customer'});
+          }
+          setAuthReady(true);
+        }, error=>{console.error('Could not load profile',error);setCurrentUser(null);setAuthReady(true)});
+      } catch (error) {console.error('Auth claim lookup failed',error);setCurrentUser(null);setAuthReady(true)}
     });
-    return () => unsubAuth();
+    return () => {unsubAuth();unsubscribeProfile()};
   }, []);
 
   useEffect(() => {
@@ -94,6 +73,7 @@ export function useFirebaseSync() {
     let unsubArticlesCol = () => {};
     let unsubCouponsCol = () => {};
     let unsubDestinationsCol = () => {};
+    let unsubZaloGroups = () => {};
 
     if (authReady) {
       // Bookings: Public read access now allowed by rules, operator gets all, customers can filter frontend
@@ -236,6 +216,14 @@ export function useFirebaseSync() {
 
         setNotifications(filtered.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
       }, (error) => handleFirestoreError(error, OperationType.LIST, "notifications"));
+
+      // Zalo Groups - public read for community
+      unsubZaloGroups = onSnapshot(collection(db, "zalo_groups"), (snap) => {
+        if (!snap.empty) {
+          const list = snap.docs.map(d => d.data() as ZaloGroup);
+          setZaloGroups(list.sort((a, b) => (a.order || 0) - (b.order || 0)));
+        }
+      }, (error) => console.warn("Could not read zalo_groups from Firestore, using local defaults:", error));
     }
 
     return () => {
@@ -248,6 +236,7 @@ export function useFirebaseSync() {
       unsubArticlesCol();
       unsubCouponsCol();
       unsubDestinationsCol();
+      unsubZaloGroups();
     };
   }, [authReady, currentUser?.role, currentUser?.id]);
 
@@ -324,6 +313,8 @@ export function useFirebaseSync() {
     articles,
     setArticles,
     drivers,
-    setDrivers
+    setDrivers,
+    zaloGroups,
+    setZaloGroups
   };
 }

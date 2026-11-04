@@ -1,0 +1,1 @@
+GIỮ NGUYÊN GIAO DIỆN GỐC từ xe-đi-mộc-châu (3).zip. Chỉ sửa src/App.tsx (thêm biểu mẫu thuê xe máy) và src/components/ServicesHubView.tsx (kiểm tra tên/SĐT taxi, thông báo bản nháp và cuộn modal). Không thay đổi các trang/tab/đặt xe cũ. Dữ liệu vẫn chỉ ở localStorage, CHƯA gửi Admin thiết bị khác. CHƯA deploy/đẩy GitHub.

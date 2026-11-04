@@ -38,6 +38,22 @@ export function useSEO(activeTab: string) {
         title = "Hệ Thống Điều Hành Nhà Xe & Phân Công Lái Xe Mộc Châu";
         description = "Trang quản trị điều hành chuyến xe, sắp xếp tài xế, quản lý sơ đồ ghế, khóa chuyến offline và thống kê doanh thu.";
         break;
+      case 'community':
+        title = "Trung Tâm Cộng Đồng Du Lịch Mộc Châu • Nhóm Zalo & Hỏi Đáp";
+        description = "Mạng lưới các nhóm Zalo du lịch Mộc Châu chính thức: Hỏi đáp, săn mây, cập nhật thời tiết mùa hoa mận, homestay và đặt xe QT Limousine.";
+        break;
+      case 'trip_prep':
+        title = "Chuẩn Bị Chuyến Đi Mộc Châu • Kế Hoạch, Chi Phí & Homestay";
+        description = "Lập kế hoạch du lịch Mộc Châu chi tiết: Dự toán chi phí, AI tạo lịch trình, gợi ý homestay và xe Limousine đón tận nơi.";
+        break;
+      case 'explore_around':
+        title = "Khám Phá Quanh Tôi Tại Mộc Châu • Bản Đồ & Địa Điểm Thực Tế";
+        description = "Định vị GPS tìm điểm tham quan, nhà hàng ẩm thực bản địa và dịch vụ di chuyển gần bạn nhất tại cao nguyên Mộc Châu.";
+        break;
+      case 'moc_chau_today':
+        title = "Mộc Châu Hôm Nay Có Gì? • Thời Tiết Thực Tế & Mùa Hoa Đang Nở";
+        description = "Dữ liệu thời tiết trực tuyến, cập nhật hoa mận, mận chín, lễ hội địa phương được xác thực từ thực tế.";
+        break;
       default:
         break;
     }

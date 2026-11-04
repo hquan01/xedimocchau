@@ -175,7 +175,7 @@ export default function PaymentModal({
                           Hàng ghế VIP giữ chỗ:
                         </span>
                         <span className="font-mono font-extrabold text-emerald-700 text-xs px-1.5 py-0.5 bg-emerald-100/50 rounded inline-block mt-0.5">
-                          {booking.seatNumbers?.join(", ") || "Chưa xếp"}
+                          {booking.seatNumbers ? booking.seatNumbers.map(s => s.replace(/\s*\(Nhà xe sắp xếp\)/gi, '')).join(", ") : "Chưa xếp"}
                         </span>
                       </div>
                     </>
@@ -500,7 +500,7 @@ export default function PaymentModal({
                   <p>
                     ✓ <b>Vị trí ghế:</b>{" "}
                     <span className="font-mono font-bold text-emerald-700">
-                      {booking.seatNumbers.join(", ")}
+                      {booking.seatNumbers.map(s => s.replace(/\s*\(Nhà xe sắp xếp\)/gi, '')).join(", ")}
                     </span>
                   </p>
                 )}

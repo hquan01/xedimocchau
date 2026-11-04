@@ -1,6 +1,6 @@
 import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
-import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review } from "../types";
+import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review, ZaloGroup, CommunityQuestion } from "../types";
 
 // Let's get things from localStorage
 export const getDeviceId = (): string => {
@@ -261,3 +261,55 @@ export const saveNotificationToFirebase = async (notification: AppNotification) 
     }
   }
 };
+
+export const saveZaloGroupToFirebase = async (group: ZaloGroup) => {
+  const current = getLocalList<ZaloGroup>("zalo_groups", []);
+  const existingIdx = current.findIndex(g => g.id === group.id);
+  if (existingIdx > -1) {
+    current[existingIdx] = group;
+  } else {
+    current.push(group);
+  }
+  setLocalList("zalo_groups", current);
+
+  try {
+    const sanitized = JSON.parse(JSON.stringify(group));
+    await setDoc(doc(db, "zalo_groups", group.id), sanitized, { merge: true });
+    console.log(`Zalo group ${group.id} saved to Firestore`);
+  } catch (err) {
+    console.warn("Could not save zalo_group to Firestore, saved locally:", err);
+  }
+};
+
+export const deleteZaloGroupFromFirebase = async (id: string) => {
+  const current = getLocalList<ZaloGroup>("zalo_groups", []);
+  const updated = current.filter(g => g.id !== id);
+  setLocalList("zalo_groups", updated);
+
+  try {
+    await deleteDoc(doc(db, "zalo_groups", id));
+    console.log(`Zalo group ${id} deleted from Firestore`);
+  } catch (err) {
+    console.warn("Could not delete zalo_group from Firestore:", err);
+  }
+};
+
+export const saveCommunityQuestionToFirebase = async (question: CommunityQuestion) => {
+  const current = getLocalList<CommunityQuestion>("community_questions", []);
+  const existingIdx = current.findIndex(q => q.id === question.id);
+  if (existingIdx > -1) {
+    current[existingIdx] = question;
+  } else {
+    current.push(question);
+  }
+  setLocalList("community_questions", current);
+
+  try {
+    const sanitized = JSON.parse(JSON.stringify(question));
+    await setDoc(doc(db, "community_posts", question.id), sanitized, { merge: true });
+    console.log(`Community question ${question.id} saved to Firestore`);
+  } catch (err) {
+    console.warn("Could not save community_post to Firestore, saved locally:", err);
+  }
+};
+
