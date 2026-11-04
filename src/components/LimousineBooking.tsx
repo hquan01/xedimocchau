@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
+import {couponDecision} from "../lib/couponEligibility";
 import { Seat, LimousineTrip, LimousineConfig, LocationPoint } from "../types";
 import { Compass, Users, Check, Phone, Mail, User, Info, MapPin, Armchair, ShieldCheck, CreditCard, Award, Tag, ArrowLeftRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -200,6 +201,9 @@ export default function LimousineBooking({
     if (!couponCodeInput.trim()) return;
     const found = coupons.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false && c.isPublished === true);
     if (found) {
+      const eligibility=couponDecision(found,currentUser);
+      if(!eligibility.eligible){setCouponError(eligibility.reason);setAppliedCoupon(null);return;}
+
        if (currentUser && currentUser.usedCoupons?.includes(found.code.toUpperCase())) {
           setCouponError("Bạn đã sử dụng mã giảm giá này rồi.");
           return;
@@ -399,6 +403,7 @@ export default function LimousineBooking({
         dropoffPoint: finalDropoffPoint,
         totalPrice: finalPrice,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        couponId: appliedCoupon?.id,
         pointsDeducted: pointsDeducted > 0 ? pointsDeducted : undefined,
         discountAmount: totalDiscount > 0 ? totalDiscount : undefined,
         status: 'pending',
