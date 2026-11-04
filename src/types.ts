@@ -145,7 +145,10 @@ export interface User {
   name: string;
   email?: string;
   role: 'customer' | 'operator';
-  points: number; // Available credit; 1 point = 1,000 VND after one confirmed booking
+  points: number; // Available credit; 1 point = 1,000 VND, discounts start on second order
+  welcomeBonusGranted?: boolean; // True once a new membership receives its 10-point welcome reward
+  welcomeBonusPoints?: number;
+  welcomeBonusAt?: string;
   rewardedBookingIds?: string[]; // Unique confirmed orders, prevents duplicate +1 awards
   completedBookingsCount?: number; // Legacy-safe count, at least rewardedBookingIds.length
   usedCoupons?: string[];
