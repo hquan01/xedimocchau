@@ -4,7 +4,7 @@ import { Compass, Users, Check, Phone, Mail, User, Info, MapPin, Armchair, Shiel
 import { motion, AnimatePresence } from "motion/react";
 
 interface LimousineBookingProps {
-  onAddBooking: (booking: any) => void;
+  onAddBooking: (booking: any) => Promise<void>;
   searchParams: { from: string; to: string; date: string; time?: string; pickup?: string; dropoff?: string } | null;
   onOpenPayment: (booking: any) => void;
   bookings: any[];
@@ -311,7 +311,7 @@ export default function LimousineBooking({
     return seatCount * pricePerSeat;
   };
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -375,10 +375,7 @@ export default function LimousineBooking({
 
       const totalDiscount = pointsDiscountAmount + couponDiscountAmount;
       const finalPrice = Math.max(0, originalTotalPrice - totalDiscount);
-
-      if (pointsDeducted > 0) {
-        onDeductPoints(pointsDeducted);
-      }
+      // Points are deducted only after successful Firestore booking submission.
 
       const trimmedEmail = passengerEmail.trim();
 
@@ -406,7 +403,8 @@ export default function LimousineBooking({
         routeSelection: `${from} ➔ ${to}`
       };
 
-      onAddBooking(bookingData);
+      await onAddBooking(bookingData);
+      if (pointsDeducted > 0) onDeductPoints(pointsDeducted);
       onOpenPayment(bookingData);
 
       setSelectedTrip(null);
