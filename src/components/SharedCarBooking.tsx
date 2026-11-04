@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
 import { Seat, SharedCarConfig, LocationPoint } from "../types";
 import { Users, User, Phone, Mail, MapPin, Armchair, ChevronRight, Check, Compass, Info, ShieldCheck, Award, Tag, ArrowLeftRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -151,10 +152,14 @@ export default function SharedCarBooking({
 
   const handleApplyCoupon = () => {
     setCouponError("");
+    if (!eligibleForNextBookingReward(currentUser)) {
+      setCouponError("Voucher chỉ được dùng từ lần đặt vé thứ hai, sau khi vé đầu tiên được xác nhận.");
+      return;
+    }
     if (!couponCodeInput.trim()) return;
     
     // Find published coupon
-    const found = coupons?.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false);
+    const found = coupons?.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false && c.isPublished === true);
     
     if (found) {
        // Check if this coupon is already used by currentUser
@@ -175,8 +180,8 @@ export default function SharedCarBooking({
     )
   ).length;
   
-  const usablePoints = currentUser ? Math.min(1000, Math.floor(currentUser.points / 50) * 50) : 0;
-  const isEligibleForPointsDeduction = usablePoints >= 50 && currentUser?.role === "customer";
+  const usablePoints = redeemablePoints(currentUser);
+  const isEligibleForPointsDeduction = usablePoints >= 1 && currentUser?.role === "customer";
 
   // Form notifications and challenge elements
   const [errorMsg, setErrorMsg] = useState("");
@@ -396,11 +401,11 @@ export default function SharedCarBooking({
     let pointsDeducted = 0;
     let pointsDiscountAmount = 0;
     if (usePoints && isEligibleForPointsDeduction) {
-       pointsDiscountAmount = usablePoints * 1000;
+       pointsDiscountAmount = usablePoints * POINT_VALUE_VND;
        pointsDeducted = usablePoints; 
        if (pointsDiscountAmount > originalTotalPrice) {
           pointsDiscountAmount = originalTotalPrice;
-          pointsDeducted = Math.ceil(originalTotalPrice / 1000);
+          pointsDeducted = Math.ceil(originalTotalPrice / POINT_VALUE_VND);
        }
     }
 
@@ -935,14 +940,14 @@ export default function SharedCarBooking({
                     {usePoints && isEligibleForPointsDeduction && currentUser && currentUser.role === "customer" && (
                       <div className="flex justify-between text-emerald-700 font-bold">
                         <span>Giảm trừ điểm tích lũy ({Math.min(getSelectedSeatsPrice() / 1000, usablePoints)} điểm):</span>
-                        <span className="font-mono">- {Math.min(getSelectedSeatsPrice(), usablePoints * 1000).toLocaleString()}đ</span>
+                        <span className="font-mono">- {Math.min(getSelectedSeatsPrice(), usablePoints * POINT_VALUE_VND).toLocaleString()}đ</span>
                       </div>
                     )}
                     <div className="h-px bg-stone-200 my-2" />
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-extrabold text-stone-850">Tổng thanh toán:</span>
                       <span className="text-lg font-black text-[#1b4332] font-mono">
-                        {Math.max(0, getSelectedSeatsPrice() - ((appliedCoupon ? (getSelectedSeatsPrice() * appliedCoupon.discountPercentage) / 100 : 0) + (usePoints && isEligibleForPointsDeduction ? Math.min(getSelectedSeatsPrice(), usablePoints * 1000) : 0))).toLocaleString()}đ
+                        {Math.max(0, getSelectedSeatsPrice() - ((appliedCoupon ? (getSelectedSeatsPrice() * appliedCoupon.discountPercentage) / 100 : 0) + (usePoints && isEligibleForPointsDeduction ? Math.min(getSelectedSeatsPrice(), usablePoints * POINT_VALUE_VND) : 0))).toLocaleString()}đ
                       </span>
                     </div>
                   </div>
