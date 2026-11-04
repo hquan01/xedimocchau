@@ -187,19 +187,19 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
       fetchedAt: new Date().toISOString(),
       updatedAtTimeOnly: "--:--",
       cached: false,
-      source: "Trạm khí tượng Mộc Châu",
+      source: "Open-Meteo (không kết nối được)",
       current: {
         time: new Date().toISOString(),
-        temperature: 22,
-        apparentTemperature: 22,
-        humidity: 80,
-        windSpeed: 8,
-        precipitation: 0,
+        temperature: null as any,
+        apparentTemperature: null as any,
+        humidity: null as any,
+        windSpeed: null as any,
+        precipitation: null as any,
         weatherCode: 2,
         conditionText: "Chưa thể kết nối trạm thời tiết trực tuyến",
         icon: "Cloud",
         isRain: false,
-        rainProbabilityToday: 20
+        rainProbabilityToday: null as any
       },
       hourly: [],
       daily: [],
@@ -469,7 +469,7 @@ function generateMocChauChatReplyLocally(message: string, _history?: Array<{ rol
   }
 
   if (/hoa|mận|mùa hoa|đào|cải/.test(text)) {
-    return "Mùa hoa Mộc Châu đang rất đẹp bạn nhé! Hoa mận trắng đang nở rộ tại thung lũng Nà Ka và Mu Náu, hoa cải trắng nở bạt ngàn tại Bản Áng. Khoảng 8h - 10h sáng là lúc nắng chiếu qua màn sương tạo nên khung cảnh như chốn bồng lai tiên cảnh!";
+    return "Mộc Châu có các mùa hoa mận, hoa đào và hoa cải theo thời điểm trong năm. Tôi chưa có dữ liệu xác minh tình trạng hoa đang nở hôm nay, nên bạn hãy xem cập nhật mùa hoa có nguồn trên website hoặc hỏi người địa phương trước khi đi.";
   }
 
   if (/ăn|quán|nhà hàng|đặc sản|bê chao|cá suối/.test(text)) {
@@ -917,4 +917,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Vercel invokes Express as a serverless function; never open a listening port there.
+if (process.env.VERCEL !== "1") {
+  startServer();
+}
+
+export default app;
