@@ -1,5 +1,6 @@
-import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy, runTransaction } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
+import {POINTS_PER_CONFIRMED_BOOKING, previousConfirmedBookings} from "./loyalty";
 import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review, ZaloGroup, CommunityQuestion } from "../types";
 
 // Let's get things from localStorage
@@ -86,7 +87,36 @@ export const saveBookingToFirebase = async (booking: Booking) => {
       // Remove undefined values and add deviceId
       const sanitizedBooking = JSON.parse(JSON.stringify(booking));
       sanitizedBooking.deviceId = getDeviceId();
-      await setDoc(doc(db, "bookings", booking.id), sanitizedBooking);
+      const bookingRef=doc(db,"bookings",booking.id);
+      const spendingPoints=Math.max(0,Math.floor(Number(booking.pointsDeducted||0)));
+      const couponCode=typeof booking.couponCode==="string" ? booking.couponCode.trim().toUpperCase() : "";
+      if(spendingPoints>0 || couponCode) {
+        const uid=auth.currentUser?.uid;
+        if(!uid || !booking.userId || uid!==booking.userId) {
+          throw new Error("Bạn cần đăng nhập thành viên để dùng điểm hoặc voucher.");
+        }
+        const profileRef=doc(db,"users",uid);
+        await runTransaction(db,async tx=>{
+          const [profileDoc,existingBooking]=await Promise.all([tx.get(profileRef),tx.get(bookingRef)]);
+          if(existingBooking.exists())throw new Error("Mã đặt vé này đã tồn tại.");
+          if(!profileDoc.exists())throw new Error("Chưa tìm thấy ví điểm thành viên.");
+          const profile=profileDoc.data() as any;
+          if(previousConfirmedBookings({...profile,id:uid,role:'customer'})<1)
+            throw new Error("Điểm và voucher chỉ áp dụng từ lần đặt vé thứ hai, sau khi vé đầu đã được xác nhận.");
+          const points=Math.max(0,Math.floor(Number(profile.points||0)));
+          if(spendingPoints>points)throw new Error("Số dư điểm không đủ. Vui lòng tải lại trang.");
+          const alreadyUsed:string[]=Array.isArray(profile.usedCoupons)?profile.usedCoupons:[];
+          if(couponCode && alreadyUsed.includes(couponCode))
+            throw new Error("Voucher này đã được sử dụng.");
+          const profileChange:any={};
+          if(spendingPoints>0)profileChange.points=points-spendingPoints;
+          if(couponCode)profileChange.usedCoupons=[...alreadyUsed,couponCode];
+          tx.set(profileRef,profileChange,{merge:true});
+          tx.set(bookingRef,sanitizedBooking);
+        });
+      } else {
+        await setDoc(bookingRef,sanitizedBooking);
+      }
       setLocalList("bookings", current);
       console.log("Booking saved to Firebase successfully");
     } catch (error) {
@@ -121,6 +151,69 @@ export const updateStatusInFirebase = async (id: string, data: any, collectionNa
 
 export const updateBookingStatusInFirebase = async (bookingId: string, booking: Booking) => {
   await updateStatusInFirebase(bookingId, booking, "bookings");
+};
+
+/**
+ * An operator confirms a booking once, and the linked customer receives +1 point.
+ * This transaction updates booking + customer wallet atomically. Repeated
+ * confirmations cannot credit the same booking twice.
+ *
+ * NOTE: Real fraud protection still requires secure Firestore rules; the
+ * legacy publicly writable rules are not sufficient for production discounts.
+ */
+export const updateBookingStatusWithRewards = async (
+  bookingId:string,status:Booking["status"]
+):Promise<void> => {
+  const bookingRef=doc(db,"bookings",bookingId);
+  await runTransaction(db,async tx=>{
+    const existing=await tx.get(bookingRef);
+    if(!existing.exists())throw new Error("Không tìm thấy vé để cập nhật.");
+    const booking=existing.data() as Booking;
+    const customerRef=booking.userId ? doc(db,"users",booking.userId) : null;
+    const customer=customerRef ? await tx.get(customerRef) : null;
+    const profile=customer?.exists()?customer.data() as any:null;
+    const rewarded:string[]=Array.isArray(profile?.rewardedBookingIds)?profile.rewardedBookingIds:[];
+    const usedCoupons:string[]=Array.isArray(profile?.usedCoupons)?profile.usedCoupons:[];
+    const existingPoints=Math.max(0,Math.floor(Number(profile?.points||0)));
+    const confirmed=status==="success" || status==="completed";
+    const cancelled=status==="cancelled";
+    const alreadyRewarded=rewarded.includes(bookingId);
+    let nextRewarded=rewarded;
+    let points=existingPoints;
+    let changed=false;
+    const bookingChange:any={status};
+
+    if(profile && confirmed && !alreadyRewarded){
+      nextRewarded=[...rewarded,bookingId];
+      points+=POINTS_PER_CONFIRMED_BOOKING;
+      changed=true;
+    } else if(profile && cancelled && alreadyRewarded){
+      nextRewarded=rewarded.filter(id=>id!==bookingId);
+      points=Math.max(0,points-POINTS_PER_CONFIRMED_BOOKING);
+      changed=true;
+    }
+    if(profile && cancelled && (booking.pointsDeducted||0)>0 && !booking.pointsRefunded){
+      points+=Math.floor(booking.pointsDeducted||0);
+      bookingChange.pointsRefunded=true;
+      changed=true;
+    }
+    if(profile && cancelled && booking.couponCode && usedCoupons.includes(booking.couponCode.toUpperCase())){
+      changed=true;
+    }
+    if(changed && customerRef && profile){
+      const nextUsed=cancelled && booking.couponCode
+        ? usedCoupons.filter(code=>code!==booking.couponCode?.toUpperCase()) : usedCoupons;
+      tx.set(customerRef,{
+        points,rewardedBookingIds:nextRewarded,
+        completedBookingsCount:nextRewarded.length,
+        usedCoupons:nextUsed
+      },{merge:true});
+    }
+    tx.set(bookingRef,bookingChange,{merge:true});
+  });
+  const current=getLocalList<Booking>("bookings",[]);
+  const index=current.findIndex(b=>b.id===bookingId);
+  if(index>=0){current[index]={...current[index],status};setLocalList("bookings",current);}
 };
 
 export const deleteBookingFromFirebase = async (bookingId: string) => {
