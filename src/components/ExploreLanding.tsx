@@ -26,6 +26,17 @@ export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSi
     }
     setActiveTab(target); window.scrollTo({top:0,behavior:'smooth'});
   };
+  const navigateTile = (tile:HomeTile) => {
+    if(tile.target==='ticket-prices') {navigate('ticket-prices');return;}
+    const serviceCategory:Record<string,string>={
+      taxi:'transport',stay:'accommodation',food:'restaurant',
+      tour:'tour',motorbike:'motorbike'
+    };
+    if(tile.target==='services' && serviceCategory[tile.id]){
+      try {sessionStorage.setItem('mocchau_services_open_category',serviceCategory[tile.id]);} catch {}
+    }
+    navigate(tile.target);
+  };
   const tiles=content.tiles.filter(x=>x.visible);
   const hot=content.stories.filter(x=>x.visible);
   return <div className="bg-[#f7faf7] text-[#17382b] pb-28 min-h-screen" id="explore_mobile_home">
@@ -54,7 +65,7 @@ export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSi
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-2"><h2 className="text-lg sm:text-2xl font-black">🌿 Bạn muốn tìm gì?</h2><button onClick={()=>navigate('services')} className="text-xs text-emerald-700 font-bold whitespace-nowrap">Xem dịch vụ <ChevronRight className="inline w-3 h-3"/></button></div>
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
-          {tiles.map((tile:HomeTile)=>{const Icon=icons[tile.icon]||MapPin;return <button key={tile.id} onClick={()=>navigate(tile.id==='tour'&&tile.target==='services'?'ticket-prices':tile.target)} className="group bg-white border border-[#e2ebe4] shadow-sm rounded-2xl px-1.5 py-4 flex flex-col items-center text-center min-h-[113px] hover:border-emerald-400 hover:shadow-md transition-all active:scale-[.98]">
+          {tiles.map((tile:HomeTile)=>{const Icon=icons[tile.icon]||MapPin;return <button key={tile.id} onClick={()=>navigateTile(tile)} className="group bg-white border border-[#e2ebe4] shadow-sm rounded-2xl px-1.5 py-4 flex flex-col items-center text-center min-h-[113px] hover:border-emerald-400 hover:shadow-md transition-all active:scale-[.98]">
             <span className="w-11 h-11 mb-2 rounded-2xl bg-[#e9f8ef] flex items-center justify-center group-hover:bg-emerald-100"><Icon className="w-6 h-6 text-emerald-700"/></span>
             <span className="text-[11px] sm:text-xs font-black leading-tight">{tile.title}</span><span className="text-[10px] text-stone-500 mt-1 leading-tight">{tile.subtitle}</span>
           </button>})}
