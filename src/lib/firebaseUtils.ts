@@ -2,7 +2,7 @@ import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy, 
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
 import {POINTS_PER_CONFIRMED_BOOKING, previousConfirmedBookings} from "./loyalty";
 import {couponDecision} from "./couponEligibility";
-import type {Coupon,User} from "../types";
+import type {User} from "../types";
 import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review, ZaloGroup, CommunityQuestion } from "../types";
 
 // Let's get things from localStorage
