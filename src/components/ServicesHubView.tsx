@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {submitServiceInquiry} from "../lib/serviceRequests";
+import {useSiteContent} from "../lib/siteContent";
 import { 
   Bus, Car, Bike, Hotel, Star, DollarSign, Sparkles, MapPin, Phone, 
   Search, CheckCircle2, ChevronRight, ShieldCheck, Clock, CalendarDays, 
@@ -28,7 +29,16 @@ export default function ServicesHubView({
   onSearchCombo,
   onOpenMotorbikeModal
 }: ServicesHubViewProps) {
-  const [selectedCategory, setSelectedCategory] = useState<"all" | "transport" | "motorbike" | "accommodation" | "combo" | "restaurant" | "tour">("all");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | "transport" | "motorbike" | "accommodation" | "combo" | "restaurant" | "tour">(()=>{
+    // Homepage "Giá vé tham quan" tile opens this tab directly.
+    try {
+      const selected = sessionStorage.getItem("mocchau_services_open_category");
+      sessionStorage.removeItem("mocchau_services_open_category");
+      if (selected === "tour") return "tour";
+    } catch {}
+    return "all";
+  });
+  const {content: siteContent} = useSiteContent();
   const [searchTerm, setSearchTerm] = useState("");
   const [foodFilter, setFoodFilter] = useState<"all" | "restaurant" | "cafe" | "grill" | "snack">("all");
   const serviceSearchItems = [
@@ -37,7 +47,7 @@ export default function ServicesHubView({
     { category:'accommodation' as const, name:'Homestay & Khách sạn', keywords:'homestay khach san luu tru nha nghi' },
     { category:'combo' as const, name:'Combo xe và phòng', keywords:'combo phong khach san' },
     { category:'restaurant' as const, name:'Ẩm thực: địa điểm & món ngon', keywords:'an uong nha hang quan an cafe ca phe dac san be chao mon ngon' },
-    { category:'tour' as const, name:'Tour & Trải nghiệm', keywords:'tour tham quan trai nghiem' },
+    { category:'tour' as const, name:'Bảng giá vé tham quan Mộc Châu', keywords:'ve tham quan gia ve diem du lich thac dai yem cau kinh bach long rung thong' },
   ];
   const simplify=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d');
   const searchMatches=searchTerm.trim()?serviceSearchItems.filter(x=>simplify(x.name+' '+x.keywords).includes(simplify(searchTerm.trim()))):[];
@@ -125,7 +135,7 @@ export default function ServicesHubView({
             <option value="all">Tất cả dịch vụ</option><option value="transport">Xe Limousine & Taxi</option>
             <option value="motorbike">Thuê xe máy</option><option value="accommodation">Lưu trú & Homestay</option>
             <option value="combo">Combo xe + phòng</option><option value="restaurant">Ẩm thực & Đặc sản</option>
-            <option value="tour">Tour & Vé tham quan</option>
+            <option value="tour">Bảng giá vé tham quan</option>
           </select>
           <div className="hidden sm:flex space-x-2 overflow-x-auto custom-tab-scrollbar pb-1.5 pt-0.5">
             {[
@@ -135,7 +145,7 @@ export default function ServicesHubView({
               { id: "accommodation", label: "Lưu Trú & Homestay", icon: Hotel },
               { id: "combo", label: "Combo Xe + Phòng", icon: Star },
               { id: "restaurant", label: "Ẩm Thực & Đặc Sản", icon: UtensilsCrossed },
-              { id: "tour", label: "Tour & Vé Tham Quan", icon: MapPin }
+              { id: "tour", label: "Bảng Giá Vé Tham Quan", icon: MapPin }
             ].map((cat) => {
               const Icon = cat.icon;
               const isActive = selectedCategory === cat.id;
@@ -542,6 +552,60 @@ export default function ServicesHubView({
                 </div>
               </div>
             </div>
+          </section>
+        )}
+
+
+        {/* SECTION 5: GIÁ VÉ THAM QUAN, CHỈ ĐỂ THAM KHẢO - KHÔNG BÁN VÉ */}
+        {(selectedCategory === "all" || selectedCategory === "tour") && (
+          <section className="space-y-4 scroll-mt-24" id="mocchau_attraction_ticket_prices" aria-label="Bảng giá vé tham quan Mộc Châu">
+            <div className="flex items-start justify-between flex-wrap gap-2 border-b border-stone-200 pb-3">
+              <div>
+                <h2 className="font-black text-lg sm:text-xl text-[#1b4332] flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-emerald-700" />
+                  Bảng giá vé các điểm tham quan Mộc Châu
+                </h2>
+                <p className="text-xs sm:text-sm text-stone-500 mt-1">
+                  So sánh giá vé theo địa điểm để dự trù chi phí trước chuyến đi.
+                </p>
+              </div>
+              <span className="border border-amber-200 rounded-full bg-amber-50 text-amber-900 text-xs font-bold px-3 py-1.5">Giá tham khảo, không bán vé</span>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+              <div className="hidden sm:grid grid-cols-[minmax(0,1.25fr)_minmax(145px,0.7fr)_minmax(165px,0.8fr)_minmax(0,1.7fr)] gap-3 bg-[#1b4332] text-white px-4 py-3 text-xs font-black">
+                <span>Địa điểm</span><span>Vé người lớn</span><span>Vé trẻ em</span><span>Ghi chú và nguồn giá</span>
+              </div>
+              <div className="divide-y divide-stone-100">
+                {(siteContent.attractionTickets||[]).filter(t=>t.visible).map(ticket=>(
+                  <article className="p-4 sm:grid sm:grid-cols-[minmax(0,1.25fr)_minmax(145px,0.7fr)_minmax(165px,0.8fr)_minmax(0,1.7fr)] sm:gap-3 text-left" key={ticket.id}>
+                    <h3 className="font-black text-sm text-stone-900">{ticket.name}</h3>
+                    <div className="mt-2 sm:mt-0">
+                      <span className="text-[10px] text-stone-400 sm:hidden block">Người lớn</span>
+                      <p className="font-extrabold text-sm text-emerald-800">{ticket.adultPrice || 'Đang cập nhật'}</p>
+                    </div>
+                    <div className="mt-2 sm:mt-0">
+                      <span className="text-[10px] text-stone-400 sm:hidden block">Trẻ em</span>
+                      <p className="text-xs font-semibold text-stone-700">{ticket.childPrice || 'Theo chính sách tại điểm'}</p>
+                    </div>
+                    <div className="mt-2 sm:mt-0">
+                      <p className="text-xs text-stone-600 leading-relaxed">{ticket.note}</p>
+                      {ticket.sourceUrl && <a href={ticket.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold text-emerald-800 underline underline-offset-2">
+                        Kiểm tra nguồn giá <ArrowRight className="w-3 h-3" />
+                      </a>}
+                    </div>
+                  </article>
+                ))}
+                {!(siteContent.attractionTickets||[]).some(t=>t.visible) && (
+                  <p className="p-6 text-center text-sm text-stone-600">Bảng giá đang được cập nhật từ các điểm tham quan.</p>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-stone-600 leading-relaxed bg-amber-50 border border-amber-100 p-3 rounded-xl">
+              Giá có thể thay đổi theo ngày thường, cuối tuần, ngày lễ, chiều cao và chương trình của khu du lịch.
+              Mộc Châu Travel chỉ tổng hợp thông tin để tham khảo, không thu tiền hay nhận đặt vé tham quan trực tuyến.
+              Trước khi đi, vui lòng kiểm tra nguồn giá của từng địa điểm.
+            </p>
           </section>
         )}
 
