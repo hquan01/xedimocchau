@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  GoogleAuthProvider, RecaptchaVerifier, ConfirmationResult,
-  createUserWithEmailAndPassword, getIdTokenResult, sendPasswordResetEmail,
-  signInWithEmailAndPassword, signInWithPhoneNumber, signInWithPopup, updateProfile,
+  GoogleAuthProvider, createUserWithEmailAndPassword, getIdTokenResult,
+  reload, sendEmailVerification, sendPasswordResetEmail, signInWithCustomToken,
+  signInWithEmailAndPassword, signInWithPopup, updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { X, UserRound, TicketPercent, ShieldCheck, Mail, Smartphone, ArrowLeft } from 'lucide-react';
@@ -27,26 +27,33 @@ const normalizePhone = (s: string) => {
 };
 
 /** Only Firebase Auth verifies identities; Admin permissions must come from server-issued claims. */
+
+async function postPhoneAuth<T>(route: string, payload: Record<string,string>, idToken?: string): Promise<T> {
+  const res = await fetch('/api/auth/phone/' + route, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(idToken ? {Authorization: 'Bearer ' + idToken}: {}) },
+    body: JSON.stringify(payload)
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || 'Chức năng đăng nhập bằng SĐT chưa sẵn sàng. Bạn có thể dùng email để đăng nhập.');
+  return body as T;
+}
+
 export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>('login');
-  const [method, setMethod] = useState<LoginMethod>('email');
+  const [method, setMethod] = useState<LoginMethod>('phone');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
+  const [pendingVerification, setPendingVerification] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-      setConfirmation(null);
-      setOtp('');
+      setPendingVerification(false);
       setError('');
     }
   }, [isOpen]);
@@ -56,17 +63,16 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
     setMethod(value);
     setError('');
     setNotice('');
-    setConfirmation(null);
-    setOtp('');
+    setPendingVerification(false);
   };
   const errorMessage = (e: any) => {
     const code = String(e?.code || '');
     if (code.includes('operation-not-allowed')) return 'Phương thức này chưa được bật trong Firebase Authentication. Hãy bật Email/Password hoặc Phone trong Firebase Console.';
     if (code.includes('invalid-credential') || code.includes('wrong-password')) return 'Email hoặc mật khẩu không đúng. Nếu đây là tài khoản cũ, hãy dùng Khôi phục mật khẩu.';
     if (code.includes('email-already-in-use')) return 'Email này đã có tài khoản. Hãy đăng nhập.';
-    if (code.includes('invalid-verification-code')) return 'Mã xác thực SMS không đúng hoặc đã hết hạn.';
+    if (code.includes('weak-password')) return 'Mật khẩu cần đủ mạnh, tối thiểu 8 ký tự.';
     if (code.includes('too-many-requests')) return 'Đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.';
-    if (code.includes('unauthorized-domain') || code.includes('captcha-check-failed') || code.includes('invalid-app-credential')) return 'Không thể xác minh reCAPTCHA. Kiểm tra tên miền cho phép và cấu hình đăng nhập bằng số điện thoại trong Firebase.';
+
     if (code.includes('popup-closed-by-user')) return 'Bạn đã đóng cửa sổ Google. Vui lòng thử lại.';
     return e?.message || 'Không thể đăng nhập. Vui lòng thử lại.';
   };
