@@ -45,6 +45,7 @@ import {
   saveUserToFirebase,
   saveConfigToFirebase,
   saveNotificationToFirebase,
+  updateBookingStatusWithRewards,
   deleteBookingFromFirebase,
   getDeviceId
 } from "./lib/firebaseUtils";
@@ -420,7 +421,7 @@ export default function App() {
   const handleCancelBooking = async (id: string) => {
     const bk = bookings.find(b => b.id === id);
     if (bk) {
-       await updateBookingStatusInFirebase(id, { ...bk, status: "cancelled" });
+       await updateBookingStatusWithRewards(id,"cancelled");
     }
   };
 
@@ -440,24 +441,9 @@ export default function App() {
     }
     await updateBookingStatusInFirebase(id, bookingToUpdate);
 
-    // Save used coupon and deducted points logic to current user
-    if (currentUser && currentUser.role === "customer") {
-      let requiresUpdate = false;
-      const userUpdates = { ...currentUser };
-      
-      if (bk.couponCode && !userUpdates.usedCoupons?.includes(bk.couponCode)) {
-         userUpdates.usedCoupons = [...(userUpdates.usedCoupons || []), bk.couponCode];
-         requiresUpdate = true;
-      }
-      
-      // if points were deducted, we need to ensure the user object stores it (we already deducted it visually, but verify)
-      // Actually we passed userUpdates to setCurrentUser when "Đặt Ngay" is pressed, but they are not saved to Firebase until we do it explicitly.
-      // We will save UserToFirebase to ensure usedCoupons is saved.
-      if (requiresUpdate) {
-         setCurrentUser(userUpdates);
-         await saveUserToFirebase(userUpdates.id!, userUpdates);
-      }
-    }
+    // Voucher and point usage were atomically reserved when the order was
+    // created. Do not overwrite the server-synced balance from a stale client.
+
   };
 
   const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all", pickup?: string, dropoff?: string) => {
@@ -673,11 +659,7 @@ export default function App() {
               locations={locations}
               limousineConfig={limousineConfig}
               sharedCarConfig={sharedCarConfig}
-              onDeductPoints={(deducted) => {
-                if (!currentUser || !currentUser.id) return;
-                const nextPoints = Math.max(0, currentUser.points - deducted);
-                saveUserToFirebase(currentUser.id, { points: nextPoints });
-              }}
+              onDeductPoints={() => { /* Wallet is updated by an atomic Firestore transaction. */ }}
             />
           )}
 
@@ -692,11 +674,7 @@ export default function App() {
               currentUser={currentUser}
               bookings={bookings}
               coupons={coupons}
-              onDeductPoints={(deducted) => {
-                if (!currentUser || !currentUser.id) return;
-                const nextPoints = Math.max(0, currentUser.points - deducted);
-                saveUserToFirebase(currentUser.id, { points: nextPoints });
-              }}
+              onDeductPoints={() => { /* Wallet is updated by an atomic Firestore transaction. */ }}
             />
           )}
 
@@ -731,11 +709,7 @@ export default function App() {
               onOpenPayment={setActivePaymentBooking}
               onCancelBooking={handleCancelBooking}
               onDeleteBooking={handleDeleteBooking}
-              onDeductPoints={(deducted) => {
-                if (!currentUser || !currentUser.id) return;
-                const nextPoints = Math.max(0, currentUser.points - deducted);
-                saveUserToFirebase(currentUser.id, { points: nextPoints });
-              }}
+              onDeductPoints={() => { /* Wallet is updated by an atomic Firestore transaction. */ }}
               onOpenAuth={() => setIsAuthOpen(true)}
             />
           )}
@@ -819,10 +793,10 @@ export default function App() {
                 const bk = targetList.find(b => b.id === bookingId) || bookings.find(b => b.id === bookingId);
                 if (bk) {
                   const updatedBk = { ...bk, status };
-                  await updateBookingStatusInFirebase(bookingId, updatedBk);
+                  await updateBookingStatusWithRewards(bookingId,status);
 
                   // Send confirmation notification to customer when status becomes success or completed
-                  if (status === "success" || status === "completed") {
+                  if ((status === "success" || status === "completed") && bk.status !== "success" && bk.status !== "completed") {
                     const { saveNotificationToFirebase } = await import("./lib/firebaseUtils");
                     const seatInfo = (bk.seatNumbers && bk.seatNumbers.length > 0) 
                       ? `Ghế: ${bk.seatNumbers.join(', ')}` 
