@@ -3144,7 +3144,7 @@ export default function OperatorPanel({
       )}
       {panelTab === "coupons" && (
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 sm:p-8" id="coupons_manager_section">
-          <CouponManagement coupons={coupons} onUpdateCoupons={onUpdateCoupons} />
+          <CouponManagement coupons={coupons} users={users} onUpdateCoupons={onUpdateCoupons} />
         </div>
       )}
       {panelTab === "locations" && (
