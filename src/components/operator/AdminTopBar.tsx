@@ -72,10 +72,7 @@ export default function AdminTopBar({
           </button>
         )}
 
-        <div className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold font-mono">
-          <Shield className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Admin PIN: 2025</span>
-        </div>
+
       </div>
     </header>
   );
