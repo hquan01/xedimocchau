@@ -7,10 +7,11 @@ import {useEffect,useState} from 'react';
 export interface HomeTile {id:string; title:string; subtitle:string; icon:string; target:string; visible:boolean}
 export interface HeroSlide {id:string; imageUrl:string; title:string; description:string; target:string; visible:boolean}
 export interface FeaturedStory {id:string; title:string; description:string; imageUrl:string; label:string; target:string; visible:boolean}
+export interface AttractionTicket {id:string; name:string; adultPrice:string; childPrice:string; note:string; sourceUrl:string; visible:boolean}
 export interface SiteContent {
   siteName:string; tagline:string; logoUrl:string; heroImageUrl:string; heroTitle:string; heroDescription:string;
   hotline:string; zaloUrl:string; messengerUrl:string;
-  tiles:HomeTile[]; stories:FeaturedStory[]; heroSlides?:HeroSlide[];
+  tiles:HomeTile[]; stories:FeaturedStory[]; heroSlides?:HeroSlide[]; attractionTickets?:AttractionTicket[];
 }
 export const defaultSiteContent: SiteContent = {
   siteName:'MỘC CHÂU TRAVEL', tagline:'Cẩm nang & Dịch vụ du lịch Mộc Châu',
@@ -29,7 +30,17 @@ export const defaultSiteContent: SiteContent = {
     {id:'motorbike',title:'Thuê xe máy',subtitle:'Khám phá tự do',icon:'bike',target:'motorbike',visible:true},
     {id:'stay',title:'Lưu trú',subtitle:'Homestay · Khách sạn',icon:'home',target:'services',visible:true},
     {id:'food',title:'Ăn uống',subtitle:'Đặc sản · Nhà hàng',icon:'utensils',target:'services',visible:true},
-    {id:'tour',title:'Tour & Combo',subtitle:'Trải nghiệm trọn gói',icon:'ticket',target:'services',visible:true},
+    {id:'tour',title:'Giá vé tham quan',subtitle:'Điểm du lịch Mộc Châu',icon:'ticket',target:'ticket-prices',visible:true},
+  ],
+  // Price ranges are editorial references, not an online ticket-selling service.
+  // Reviewed against public ticket pages in November 2026; recheck before travel.
+  attractionTickets:[
+    {id:'dai-yem',name:'Thác Dải Yếm',adultPrice:'80.000đ',childPrice:'30.000đ (cao 1m–1,3m)',note:'Vé tham quan thác; cầu kính Tình Yêu tính riêng. Trẻ dưới 1m miễn phí theo bảng giá tham khảo.',sourceUrl:'https://mocchaumoc.com/thac-dai-yem-cau-kinh-tinh-yeu/',visible:true},
+    {id:'tinh-yeu',name:'Cầu kính Tình Yêu',adultPrice:'100.000đ',childPrice:'50.000đ (theo chiều cao)',note:'Nằm trong khu Thác Dải Yếm; vé riêng, không đồng nghĩa đã gồm vé thác.',sourceUrl:'https://mocchaumoc.com/thac-dai-yem-cau-kinh-tinh-yeu/',visible:true},
+    {id:'ban-ang',name:'Rừng thông Bản Áng (Phoenix)',adultPrice:'80.000đ',childPrice:'Miễn phí dưới 1m',note:'Giá tham khảo cho vé tham quan; các dịch vụ trải nghiệm khác có thể thu phí riêng.',sourceUrl:'https://mocchaumoc.com/phoenix-rung-thong-ban-ang/',visible:true},
+    {id:'happy-land',name:'Happy Land Mộc Châu',adultPrice:'100.000đ',childPrice:'Kiểm tra theo chiều cao',note:'Gói tham quan cơ bản đang được giới thiệu kèm một số trò chơi; chính sách trẻ em cần xác nhận tại điểm.',sourceUrl:'https://mocchaumoc.com/mua-ve/',visible:true},
+    {id:'nang-tien',name:'Thác Nàng Tiên',adultPrice:'30.000đ',childPrice:'Liên hệ điểm tham quan',note:'Giá tham khảo; kiểm tra điều kiện thời tiết và giờ mở cửa trước khi đi.',sourceUrl:'https://mocchaumoc.com/mua-ve/',visible:true},
+    {id:'bach-long',name:'Cầu kính Bạch Long – Mộc Châu Island',adultPrice:'650.000đ (Thứ 6–CN và ngày lễ)',childPrice:'350.000đ (cao 1m–1,4m)',note:'Theo bảng giá vé cuối tuần/ngày lễ của đơn vị vận hành; ngày thường và các combo có thể khác.',sourceUrl:'https://mocchauisland.com/en/orderTicket?ticket_type_id=4',visible:true}
   ],
   heroSlides:[
     {id:'flower',imageUrl:'/mocchau-flower-v5.jpg',title:'Mùa hoa Mộc Châu',description:'Tìm mùa hoa và thời điểm ngắm cảnh phù hợp',target:'moc_chau_today',visible:true},
@@ -49,7 +60,7 @@ export function useSiteContent(){
   useEffect(()=>onSnapshot(doc(db,'site_content','public'),snap=>{
     if(!snap.exists()) return;
     const raw=snap.data() as Partial<SiteContent>;
-    setContent({...defaultSiteContent,...raw,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides});
+    setContent({...defaultSiteContent,...raw,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides,attractionTickets:Array.isArray(raw.attractionTickets)?raw.attractionTickets:defaultSiteContent.attractionTickets});
     setError('');
   },e=>{console.warn('Public content defaults used',e);setError('Không tải được cấu hình; đang sử dụng nội dung mặc định.')}),[]);
   return {content,error};
@@ -60,7 +71,7 @@ export async function publishSiteContent(content:SiteContent){
   const token=await user.getIdTokenResult(true);
   if(!hasOperatorAccess(token)) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase (custom claim).');
   const secure=(s:string)=>s.startsWith('/')||/^https:\/\//i.test(s);
-  if(!secure(content.logoUrl)||!secure(content.heroImageUrl)||content.stories.some(x=>x.imageUrl&&!secure(x.imageUrl))||content.heroSlides?.some(x=>x.imageUrl&&!secure(x.imageUrl)))throw new Error('Đường dẫn ảnh chỉ được dùng HTTPS hoặc đường dẫn nội bộ.');
+  if(!secure(content.logoUrl)||!secure(content.heroImageUrl)||content.stories.some(x=>x.imageUrl&&!secure(x.imageUrl))||content.heroSlides?.some(x=>x.imageUrl&&!secure(x.imageUrl))||content.attractionTickets?.some(x=>x.sourceUrl&&!/^https:\/\//i.test(x.sourceUrl)))throw new Error('Đường dẫn ảnh chỉ được dùng HTTPS hoặc đường dẫn nội bộ.');
   await setDoc(doc(db,'site_content','public'),{...content,updatedAt:serverTimestamp(),updatedBy:user.uid});
 }
 export async function uploadSiteImage(file:File){
