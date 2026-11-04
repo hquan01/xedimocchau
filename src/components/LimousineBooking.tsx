@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
 import { Seat, LimousineTrip, LimousineConfig, LocationPoint } from "../types";
 import { Compass, Users, Check, Phone, Mail, User, Info, MapPin, Armchair, ShieldCheck, CreditCard, Award, Tag, ArrowLeftRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -192,8 +193,12 @@ export default function LimousineBooking({
 
   const handleApplyCoupon = () => {
     setCouponError("");
+    if (!eligibleForNextBookingReward(currentUser)) {
+      setCouponError("Voucher chỉ được dùng từ lần đặt vé thứ hai, sau khi vé đầu tiên được xác nhận.");
+      return;
+    }
     if (!couponCodeInput.trim()) return;
-    const found = coupons.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false);
+    const found = coupons.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false && c.isPublished === true);
     if (found) {
        if (currentUser && currentUser.usedCoupons?.includes(found.code.toUpperCase())) {
           setCouponError("Bạn đã sử dụng mã giảm giá này rồi.");
@@ -205,8 +210,8 @@ export default function LimousineBooking({
     }
   };
 
-  const usablePoints = currentUser ? Math.min(1000, Math.floor(currentUser.points / 50) * 50) : 0;
-  const isEligibleForPointsDeduction = usablePoints >= 50 && currentUser?.role === "customer";
+  const usablePoints = redeemablePoints(currentUser);
+  const isEligibleForPointsDeduction = usablePoints >= 1 && currentUser?.role === "customer";
 
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -360,11 +365,11 @@ export default function LimousineBooking({
       let pointsDeducted = 0;
       let pointsDiscountAmount = 0;
       if (usePoints && isEligibleForPointsDeduction) {
-         pointsDiscountAmount = usablePoints * 1000;
+         pointsDiscountAmount = usablePoints * POINT_VALUE_VND;
          pointsDeducted = usablePoints; 
          if (pointsDiscountAmount > originalTotalPrice) {
             pointsDiscountAmount = originalTotalPrice;
-            pointsDeducted = Math.ceil(originalTotalPrice / 1000);
+            pointsDeducted = Math.ceil(originalTotalPrice / POINT_VALUE_VND);
          }
       }
 
@@ -952,7 +957,7 @@ export default function LimousineBooking({
                       </label>
                       {usePoints && (
                         <p className="text-[11px] text-amber-800 pl-6">
-                          Dùng <strong>{usablePoints} điểm</strong> để giảm ngay <strong>{(usablePoints * 1000).toLocaleString()}đ</strong> vào giá vé.
+                          Dùng <strong>{usablePoints} điểm</strong> để giảm ngay <strong>{(usablePoints * POINT_VALUE_VND).toLocaleString()}đ</strong> vào giá vé.
                         </p>
                       )}
                     </div>
