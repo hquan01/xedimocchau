@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Seat, SharedCarConfig, LocationPoint } from "../types";
-import { Users, User, Phone, Mail, MapPin, Armchair, ChevronRight, Check, Compass, Info, ShieldCheck, Award, Tag } from "lucide-react";
+import { Users, User, Phone, Mail, MapPin, Armchair, ChevronRight, Check, Compass, Info, ShieldCheck, Award, Tag, ArrowLeftRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface SharedCarBookingProps {
@@ -488,7 +488,21 @@ export default function SharedCarBooking({
               {provinceOptions}
             </select>
           </div>
-          <div className="text-stone-400 font-sans">➔</div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const prevFrom = from;
+              const prevTo = to;
+              setFrom(prevTo);
+              setTo(prevFrom);
+              setSelectedTrip(null);
+            }}
+            className="p-2 bg-emerald-50 hover:bg-emerald-100 text-[#1b4332] rounded-xl border border-emerald-200 transition-all cursor-pointer flex items-center justify-center"
+            title="Đảo chiều tuyến đường"
+          >
+            <ArrowLeftRight className="w-4 h-4" />
+          </button>
 
           <div className="flex items-center space-x-2 bg-white px-3 py-2 border border-stone-200 rounded-lg">
             <span className="text-xs text-stone-400 font-bold">Đến:</span>

@@ -307,7 +307,7 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
                           {isLimo ? (
                             <div className="col-span-2 pt-1.5 border-t border-stone-200/50">
                               <span className="block text-[9px] text-stone-400 uppercase font-bold">Số ghế đón nhận</span>
-                              <span className="font-extrabold text-emerald-700 font-mono text-xs">{bk.seatNumbers?.join(", ")}</span>
+                              <span className="font-extrabold text-emerald-700 font-mono text-xs">{bk.seatNumbers?.map(s => s.replace(/\s*\(Nhà xe sắp xếp\)/gi, '')).join(", ")}</span>
                             </div>
                           ) : bk.type === 'shared_car' ? (
                             <div className="col-span-2 pt-1.5 border-t border-stone-200/50">

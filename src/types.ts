@@ -234,3 +234,41 @@ export interface Coupon {
   isActive?: boolean;
   isPublished?: boolean;
 }
+
+export interface ZaloGroup {
+  id: string;
+  name: string;
+  topic: string;
+  description: string;
+  zaloUrl: string;
+  iconEmoji: string;
+  imageUrl?: string;
+  memberCountNote?: string;
+  order: number;
+  isActive: boolean;
+  isDeleted?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CommunityQuestion {
+  id: string;
+  authorId?: string;
+  authorName: string;
+  authorPhone?: string;
+  authorRole?: string;
+  topic: string;
+  title: string;
+  content: string;
+  timestamp: string;
+  likes: number;
+  status: 'published' | 'pending' | 'reported' | 'hidden';
+  reportCount?: number;
+  comments: {
+    id: string;
+    authorName: string;
+    content: string;
+    timestamp: string;
+  }[];
+}
+

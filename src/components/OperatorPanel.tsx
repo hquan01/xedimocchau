@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification, Driver } from "../types";
-import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator, CalendarDays, ArrowUpDown, Layers, Bus, TrendingUp, Car, PhoneCall, UserCheck } from "lucide-react";
+import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification, Driver, ZaloGroup } from "../types";
+import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator, CalendarDays, ArrowUpDown, Layers, Bus, TrendingUp, Car, PhoneCall, UserCheck, MessageSquare } from "lucide-react";
 import { motion } from "motion/react";
 import { getOfficialSchedulesForRoute } from "./LimousineBooking";
 import { getSharedCarSchedules } from "./SharedCarBooking";
@@ -15,6 +15,22 @@ import ArticleManagement from "./operator/ArticleManagement";
 import ScheduleManagement from "./operator/ScheduleManagement";
 import ReviewManagement from "./operator/ReviewManagement";
 import DriverManagement from "./operator/DriverManagement";
+import ZaloCommunityManagement from "./operator/ZaloCommunityManagement";
+import AdminSidebar from "./operator/AdminSidebar";
+import MobileAdminDrawer from "./operator/MobileAdminDrawer";
+import AdminTopBar from "./operator/AdminTopBar";
+import RestaurantManagement from "./operator/RestaurantManagement";
+import FlowerSeasonManagement from "./operator/FlowerSeasonManagement";
+import AIAssistantManagement from "./operator/AIAssistantManagement";
+import LiveWeatherManagement from "./operator/LiveWeatherManagement";
+import PartnerManagement from "./operator/PartnerManagement";
+import CommissionDebtManagement from "./operator/CommissionDebtManagement";
+import GrowthAnalytics from "./operator/GrowthAnalytics";
+import SecurityConfigManagement from "./operator/SecurityConfigManagement";
+import TaxiFleetManagement from "./operator/TaxiFleetManagement";
+import MotorbikeManagement from "./operator/MotorbikeManagement";
+import ServiceInquiryManagement from "./operator/ServiceInquiryManagement";
+import SiteContentStudio from "./operator/SiteContentStudio";
 
 // Preset driver fleet for fast selection and autocomplete
 export const DEFAULT_DRIVERS = INITIAL_DRIVERS;
@@ -119,6 +135,8 @@ interface OperatorPanelProps {
   onSendNotification: (title: string, message: string) => void;
   drivers?: Driver[];
   onUpdateDrivers?: (updated: Driver[]) => void;
+  zaloGroups?: ZaloGroup[];
+  onUpdateZaloGroups?: (updated: ZaloGroup[]) => void;
 }
 
 const INITIAL_SEATS_TEMPLATE: Seat[] = [
@@ -168,12 +186,34 @@ export default function OperatorPanel({
   articles,
   onUpdateArticles,
   drivers = INITIAL_DRIVERS,
-  onUpdateDrivers = () => {}
+  onUpdateDrivers = () => {},
+  zaloGroups = [],
+  onUpdateZaloGroups = () => {}
 }: OperatorPanelProps) {
-  // Navigation tabs inside Operator view
-  const [panelTab, setPanelTab] = useState<"bookings" | "seatLock" | "customers" | "overview" | "travelServices" | "pricing" | "coupons" | "locations" | "content" | "schedules" | "reviews" | "drivers">("bookings");
+  // Navigation tabs & 16 Modules inside Operator 2.0
+  const [activeModuleId, setActiveModuleId] = useState<string>("overview");
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [panelTab, setPanelTab] = useState<"bookings" | "seatLock" | "customers" | "overview" | "travelServices" | "pricing" | "coupons" | "locations" | "content" | "schedules" | "reviews" | "drivers" | "zaloCommunity">("overview");
   const [activeContentTab, setActiveContentTab] = useState<"destinations" | "articles">("destinations");
   const [userToDelete, setUserToDelete] = useState<any>(null);
+
+  const handleSelectModule = (modId: string) => {
+    setActiveModuleId(modId);
+    if (modId === "limousine_bookings") setPanelTab("bookings");
+    else if (modId === "limousine_seatlock") setPanelTab("seatLock");
+    else if (modId === "limousine_customers") setPanelTab("customers");
+    else if (modId === "overview") setPanelTab("overview");
+    else if (modId === "limousine_schedules") setPanelTab("schedules");
+    else if (modId === "limousine_pricing") setPanelTab("pricing");
+    else if (modId === "limousine_drivers") setPanelTab("drivers");
+    else if (modId === "limousine_locations") setPanelTab("locations");
+    else if (modId === "limousine_coupons") setPanelTab("coupons");
+    else if (modId === "accommodations_combos") setPanelTab("travelServices");
+    else if (modId === "destinations") { setPanelTab("content"); setActiveContentTab("destinations"); }
+    else if (modId === "articles_guide") { setPanelTab("content"); setActiveContentTab("articles"); }
+    else if (modId === "customer_reviews") setPanelTab("reviews");
+    else if (modId === "community_zalo") setPanelTab("zaloCommunity");
+  };
 
   // Selection states for bulk actions
   const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([]);
@@ -795,189 +835,268 @@ export default function OperatorPanel({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 font-sans" id="operator_dashboard_container">
-      {/* Upper header */}
-      <div className="bg-gradient-to-r from-stone-900 via-emerald-950 to-[#1b4332] rounded-3xl p-4 sm:p-6 lg:p-8 text-white shadow-xl mb-6 border border-emerald-900 overflow-hidden">
-        <div className="flex flex-col gap-5 sm:gap-6 w-full">
-          <div className="flex items-center space-x-3 sm:space-x-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 bg-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center border border-white/20">
-              <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                <span className="text-[10px] sm:text-xs bg-emerald-600/80 text-emerald-100 font-bold px-2 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  Trạm Điều Hành
-                </span>
-                <span className="text-white/60 text-[10px] sm:text-xs truncate">• Limousine Mộc Châu</span>
-              </div>
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight mt-0.5 sm:mt-1 text-stone-100 truncate">Hệ Thống Phân Hệ Quản Trị Chuyên Nghiệp</h2>
-            </div>
-          </div>
-          
-          <div className="flex gap-2 overflow-x-auto w-full pb-2 scroll-smooth snap-x">
-            <button
-              onClick={() => setPanelTab("bookings")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 snap-start whitespace-nowrap ${
-                panelTab === "bookings"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Đặt chỗ
-            </button>
-            <button
-              onClick={() => setPanelTab("seatLock")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 snap-start whitespace-nowrap ${
-                panelTab === "seatLock"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Khóa ghế
-            </button>
-            <button
-              onClick={() => setPanelTab("customers")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 snap-start whitespace-nowrap ${
-                panelTab === "customers"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Khách hàng
-            </button>
-            <button
-              onClick={() => setPanelTab("overview")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "overview"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Tổng quan
-            </button>
-            <button
-              onClick={() => setPanelTab("pricing")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "pricing"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Giá vé
-            </button>
-            <button
-              onClick={() => setPanelTab("schedules")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "schedules"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Lịch trình
-            </button>
-            <button
-              onClick={() => setPanelTab("drivers")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "drivers"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              🚗 Lái xe ({drivers.length})
-            </button>
-            <button
-              onClick={() => setPanelTab("coupons")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "coupons"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Mã giảm giá
-            </button>
-            <button
-              onClick={() => setPanelTab("locations")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "locations"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Điểm đón/trả
-            </button>
-            <button
-              onClick={() => setPanelTab("travelServices")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "travelServices"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Khách sạn & Combo
-            </button>
-            <button
-              onClick={() => setPanelTab("content")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "content"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Quản lý Nội dung
-            </button>
-            <button
-              onClick={() => setPanelTab("reviews")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-                panelTab === "reviews"
-                  ? "bg-white text-stone-900 shadow-lg font-extrabold"
-                  : "bg-white/10 hover:bg-white/15 text-white"
-              }`}
-            >
-              Quản lý Đánh giá
-            </button>
-          </div>
-        </div>
-
-        {/* Mini stats cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-6 sm:mt-8">
-          <div className="p-4 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-xs flex flex-col justify-between">
-            <p className="text-white/60 text-[11px] font-medium">Doanh thu vé thành công</p>
-            <h4 className="text-xl sm:text-2xl font-black text-amber-300 mt-1 truncate">
-              {totalRevenue.toLocaleString()}đ
-            </h4>
-            <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden shrink-0">
-              <div className="bg-amber-400 h-full w-2/3 rounded-full" />
-            </div>
-          </div>
-          <div className="p-4 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-xs flex flex-col justify-between">
-            <p className="text-white/60 text-[11px] font-medium">Yêu cầu chưa xác nhận</p>
-            <h4 className="text-xl sm:text-2xl font-black text-emerald-300 mt-1 truncate">
-              {pendingBookingsCount} đơn mới
-            </h4>
-            <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden shrink-0">
-              <div className="bg-emerald-400 h-full w-1/3 rounded-full" />
-            </div>
-          </div>
-          <div className="p-4 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-xs flex flex-col justify-between">
-            <p className="text-white/60 text-[11px] font-medium">Số ghế online đã duyệt</p>
-            <h4 className="text-xl sm:text-2xl font-black text-stone-100 mt-1 truncate">
-              {activeBookedSeatsCount} ghế xếp
-            </h4>
-            <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden shrink-0">
-              <div className="bg-white h-full w-1/2 rounded-full" />
-            </div>
-          </div>
-          <div className="p-4 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-xs flex flex-col justify-between">
-            <p className="text-white/60 text-[11px] font-medium">Số ghế bị khóa offline</p>
-            <h4 className="text-xl sm:text-2xl font-black text-[#85e3b2] mt-1 truncate">
-              {blockedSeats.length} ghế khóa
-            </h4>
-            <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden shrink-0">
-              <div className="bg-teal-300 h-full w-3/4 rounded-full" />
-            </div>
-          </div>
-        </div>
+    <div className="flex bg-stone-100 min-h-screen text-stone-900 font-sans text-left" id="operator_dashboard_container">
+      {/* 1. Desktop Sidebar */}
+      <div className="hidden md:flex">
+        <AdminSidebar
+          activeModuleId={activeModuleId}
+          onSelectModule={handleSelectModule}
+          pendingBookingsCount={pendingBookingsCount}
+        />
       </div>
+
+      {/* 2. Mobile Navigation Drawer (< md) */}
+      <MobileAdminDrawer
+        isOpen={isMobileDrawerOpen}
+        onClose={() => setIsMobileDrawerOpen(false)}
+        activeModuleId={activeModuleId}
+        onSelectModule={handleSelectModule}
+        pendingBookingsCount={pendingBookingsCount}
+      />
+
+      {/* 3. Main Workspace Canvas */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+        <AdminTopBar
+          activeModuleId={activeModuleId}
+          onOpenMobileDrawer={() => setIsMobileDrawerOpen(true)}
+          pendingBookingsCount={pendingBookingsCount}
+          onRefresh={() => window.location.reload()}
+          onSelectModule={handleSelectModule}
+        />
+
+        <main className="p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+          {/* Sub Navigation banner on mobile for quick feedback */}
+          <div className="md:hidden flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-stone-200 shadow-2xs">
+            <span className="text-xs font-bold text-stone-600 truncate">
+              Phân hệ: <strong className="text-emerald-800">{activeModuleId}</strong>
+            </span>
+            <button
+              onClick={() => setIsMobileDrawerOpen(true)}
+              className="text-xs text-emerald-800 font-extrabold hover:underline cursor-pointer"
+            >
+              Đổi phân hệ ➔
+            </button>
+          </div>
+
+          {/* Module 1: Tổng quan điều hành (Overview KPI & Route filling) */}
+          {(activeModuleId === "overview" || panelTab === "overview") && (
+            <div className="space-y-6">
+              {/* Executive Stat Banner */}
+              <div className="bg-gradient-to-r from-stone-900 via-emerald-950 to-[#1b4332] rounded-3xl p-5 sm:p-8 text-white shadow-xl border border-emerald-900 overflow-hidden">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
+                      <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] bg-emerald-600/80 text-emerald-100 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Điều Hành Trực Tuyến
+                        </span>
+                        <span className="text-white/60 text-[10px]">• Mộc Châu Travel 2.0</span>
+                      </div>
+                      <h2 className="text-lg sm:text-xl font-black text-white mt-0.5">Tổng Quan Vận Hành & Doanh Số</h2>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSelectModule("limousine_bookings")}
+                      className="px-3.5 py-2 bg-white text-stone-900 rounded-xl text-xs font-bold hover:bg-stone-100 transition-colors cursor-pointer shadow-sm"
+                    >
+                      Quản lý đơn đặt ({bookings.length})
+                    </button>
+                    <button
+                      onClick={() => handleSelectModule("limousine_seatlock")}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                    >
+                      Sơ đồ khóa ghế
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 Mini Stat cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col justify-between">
+                    <p className="text-white/60 text-[11px] font-medium">Doanh thu vé thành công</p>
+                    <h4 className="text-xl sm:text-2xl font-black text-amber-300 mt-1 font-mono">
+                      {totalRevenue.toLocaleString()}đ
+                    </h4>
+                    <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-amber-400 h-full w-2/3 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col justify-between">
+                    <p className="text-white/60 text-[11px] font-medium">Yêu cầu chưa xác nhận</p>
+                    <h4 className="text-xl sm:text-2xl font-black text-emerald-300 mt-1 font-mono">
+                      {pendingBookingsCount} đơn mới
+                    </h4>
+                    <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-emerald-400 h-full w-1/3 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col justify-between">
+                    <p className="text-white/60 text-[11px] font-medium">Số ghế online đã duyệt</p>
+                    <h4 className="text-xl sm:text-2xl font-black text-stone-100 mt-1 font-mono">
+                      {activeBookedSeatsCount} ghế xếp
+                    </h4>
+                    <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-white h-full w-1/2 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col justify-between">
+                    <p className="text-white/60 text-[11px] font-medium">Số ghế bị khóa offline</p>
+                    <h4 className="text-xl sm:text-2xl font-black text-teal-300 mt-1 font-mono">
+                      {blockedSeats.length} ghế khóa
+                    </h4>
+                    <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-teal-300 h-full w-3/4 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* REMINDER & BENTO SUMMARY */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 shadow-xs">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-emerald-600 rounded-lg text-white">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-emerald-950 text-sm uppercase tracking-tight">NHẮC NHỞ HÀNH TRÌNH HÔM NAY</h3>
+                    <p className="text-[10px] text-emerald-700 font-bold">Ngày {new Date().toLocaleDateString('vi-VN')}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h4 className="text-[11px] font-black text-emerald-900 border-b border-emerald-100 pb-1 flex items-center gap-1.5">
+                      <ArrowRight className="w-3 h-3" /> CHUYẾN XE XUẤT PHÁT
+                    </h4>
+                    {Object.keys(tripGroups).length > 0 ? (
+                      Object.values(tripGroups).map((trip, idx) => (
+                        <div key={idx} className="bg-white/70 p-3 rounded-xl border border-emerald-100 text-xs text-stone-800 flex justify-between items-center">
+                          <span>Hôm nay có <strong className="text-emerald-700">{trip.count} khách</strong> chuyến <strong className="text-emerald-900">{trip.route}</strong></span>
+                          <span className="font-mono bg-emerald-600 text-white px-2 py-0.5 rounded-md font-bold">{trip.time}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-stone-400 italic py-2">Hôm nay chưa có chuyến limousine nào khởi hành.</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-[11px] font-black text-amber-900 border-b border-amber-100 pb-1 flex items-center gap-1.5">
+                      <Star className="w-3 h-3" /> ĐẶT PHÒNG & COMBO
+                    </h4>
+                    {todayCombos.length > 0 ? (
+                      todayCombos.map((combo, idx) => (
+                        <div key={idx} className="bg-white/70 p-3 rounded-xl border border-amber-100 text-xs text-stone-800">
+                          Hôm nay có <strong className="text-amber-700">{combo.passengerName}</strong> đặt combo <strong className="text-amber-900">{combo.accommodationName}</strong> ({combo.roomQuantity} phòng) lúc <strong className="text-stone-900 font-mono italic">{combo.departureTime || "Sáng"}</strong>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-stone-400 italic py-2">Hôm nay chưa có lượt khách đặt combo.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bento view */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4" id="bento_route_visualizers">
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 flex flex-col justify-between shadow-xs">
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-black uppercase text-stone-500 tracking-wider">Hà Nội ➔ Mộc Châu</span>
+                      <span className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg">
+                        <Bus className="w-4 h-4" />
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-stone-900 font-mono">{hnMcCount} đơn vé</div>
+                    <p className="text-[11px] text-stone-400 mt-1">Khách khởi hành lên cao nguyên</p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-stone-100 flex justify-between text-xs font-bold text-emerald-800">
+                    <button onClick={() => { setTypeFilter("limousine"); handleSelectModule("limousine_bookings"); }} className="hover:underline cursor-pointer">
+                      Xem danh sách chuyến →
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 flex flex-col justify-between shadow-xs">
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-black uppercase text-stone-500 tracking-wider">Mộc Châu ➔ Hà Nội</span>
+                      <span className="p-1.5 bg-teal-50 text-teal-700 rounded-lg">
+                        <Bus className="w-4 h-4" />
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-stone-900 font-mono">{mcHnCount} đơn vé</div>
+                    <p className="text-[11px] text-stone-400 mt-1">Khách về lại thủ đô</p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-stone-100 flex justify-between text-xs font-bold text-teal-800">
+                    <button onClick={() => { setTypeFilter("limousine"); handleSelectModule("limousine_bookings"); }} className="hover:underline cursor-pointer">
+                      Xem danh sách chuyến →
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 flex flex-col justify-between shadow-xs">
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-black uppercase text-stone-500 tracking-wider">Combo Du Lịch</span>
+                      <span className="p-1.5 bg-amber-50 text-amber-700 rounded-lg">
+                        <Star className="w-4 h-4" />
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-stone-900 font-mono">{comboCount} gói</div>
+                    <p className="text-[11px] text-stone-400 mt-1">Vé xe Limousine + Phòng Homestay</p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-stone-100 flex justify-between text-xs font-bold text-amber-800">
+                    <button onClick={() => { setTypeFilter("combo"); handleSelectModule("limousine_bookings"); }} className="hover:underline cursor-pointer">
+                      Xem danh sách combo →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trip Overview Table */}
+              <div className="bg-white rounded-2xl shadow-xs border border-stone-200 p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                  <h3 className="text-base font-black text-stone-900">Chi Tiết Tải Trọng Từng Khung Giờ Chạy</h3>
+                  <input
+                    type="date"
+                    value={lockDate}
+                    onChange={(e) => setLockDate(e.target.value)}
+                    className="px-4 py-2 bg-stone-50 rounded-xl text-xs font-bold border border-stone-200 focus:outline-none"
+                  />
+                </div>
+
+                {[
+                  { label: "Chiều HN - Mộc Châu", route: "Hà Nội - Mộc Châu" },
+                  { label: "Chiều Mộc Châu - HN", route: "Mộc Châu - Hà Nội" }
+                ].map((direction, idx) => (
+                  <div key={`dir-row-${direction.route || idx}-${idx}`} className="mb-6">
+                    <h4 className="text-xs font-black text-stone-700 uppercase tracking-wider mb-3 border-b border-stone-100 pb-2">{direction.label}</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                      {getOfficialSchedulesForRoute(direction.route.split(' - ')[0], direction.route.split(' - ')[1]).map((time, tIdx) => {
+                        const bookedCount = bookings.filter(b => b.type === "limousine" && (b.status === "success" || b.status === "completed") && b.departureTime === time && b.travelDate === lockDate && (b.routeSelection === direction.route || b.routeSelection?.replace(' ➔ ', ' - ') === direction.route)).reduce((sum, b) => sum + (b.seatNumbers?.length || 0), 0);
+                        const blockedCount = blockedSeats.filter(b => b.tripId === `trip_custom_${time.replace(':', '_')}` && b.travelDate === lockDate).length;
+                        const total = 9;
+                        const isFull = bookedCount + blockedCount >= total;
+                        return (
+                          <div key={`limo-grid-${direction.route}-${time}-${tIdx}`} className={`p-3 rounded-xl border text-center transition-all ${isFull ? 'bg-red-50 border-red-200 text-red-900' : 'bg-stone-50 border-stone-200 text-stone-800'}`}>
+                            <p className="text-[11px] font-mono font-bold">{time}</p>
+                            <p className="text-xs font-black font-mono mt-0.5">{bookedCount + blockedCount} / {total} ghế</p>
+                            <span className="text-[9px] text-stone-400 block mt-0.5">{isFull ? "Hết chỗ" : "Còn chỗ"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
       {panelTab === "bookings" && (
         <div className="mb-6 space-y-4">
@@ -1282,8 +1401,140 @@ export default function OperatorPanel({
               <p className="text-sm font-semibold">Không tìm thấy yêu cầu đặt chỗ nào thỏa mãn bộ lọc!</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px]">
+            <>
+              {/* MOBILE CARD VIEW: Designed specifically for smartphones */}
+              <div className="md:hidden p-3 space-y-3 bg-stone-50/70" id="operator_bookings_mobile_list">
+                {sortedBookings.map((bk, idx) => {
+                  const deposit = bk.depositAmount || 0;
+                  const remaining = Math.max(0, bk.totalPrice - deposit);
+                  const isSuccess = bk.status === "success";
+                  const isCompleted = bk.status === "completed";
+                  const isCancelled = bk.status === "cancelled";
+                  const isPending = bk.status === "pending";
+
+                  return (
+                    <div 
+                      key={`mob-bk-${bk.id || idx}`}
+                      className="bg-white rounded-2xl p-4 border border-stone-200/90 shadow-xs space-y-3"
+                    >
+                      {/* Top Bar: Code, Date & Status */}
+                      <div className="flex items-center justify-between text-xs pb-2 border-b border-stone-100">
+                        <div className="flex items-center space-x-1.5 font-mono">
+                          <span className="font-black text-[#1b4332]">#{(bk.id || "").toUpperCase().slice(-6)}</span>
+                          <span className="text-stone-300">·</span>
+                          <span className="text-stone-500 text-[11px] font-sans font-medium">{formatDisplayDate(bk.travelDate)} {bk.departureTime}</span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          isSuccess ? "bg-emerald-100 text-emerald-800" :
+                          isCompleted ? "bg-blue-100 text-blue-800" :
+                          isCancelled ? "bg-stone-100 text-stone-600 line-through" :
+                          "bg-amber-100 text-amber-800"
+                        }`}>
+                          {isSuccess ? "Đã duyệt" : isCompleted ? "Hoàn thành" : isCancelled ? "Đã hủy" : "Chờ xử lý"}
+                        </span>
+                      </div>
+
+                      {/* Passenger Details & Direct Call Button */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-black text-stone-900 text-sm leading-tight">{bk.passengerName}</h4>
+                          <p className="text-xs text-stone-500 font-mono mt-0.5">{bk.passengerPhone}</p>
+                        </div>
+                        <a 
+                          href={`tel:${bk.passengerPhone}`}
+                          className="px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-xl text-xs font-bold flex items-center space-x-1"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Gọi khách</span>
+                        </a>
+                      </div>
+
+                      {/* Route & Vehicle Info */}
+                      <div className="text-xs bg-stone-50 p-2.5 rounded-xl border border-stone-100 space-y-1">
+                        <div className="flex justify-between text-stone-700">
+                          <span className="font-semibold text-stone-500">Hành trình:</span>
+                          <span className="font-bold text-stone-900">{bk.routeSelection || bk.accommodationName || "Mộc Châu"}</span>
+                        </div>
+                        <div className="flex justify-between text-stone-600 text-[11px]">
+                          <span>Chỗ ngồi:</span>
+                          <span className="font-bold text-emerald-800">
+                            {bk.seatNumbers && bk.seatNumbers.length > 0 ? `Ghế: ${bk.seatNumbers.join(", ")}` : `${bk.seatCount || 1} chỗ`}
+                          </span>
+                        </div>
+                        {bk.pickupPoint && (
+                          <div className="text-[11px] text-stone-500 truncate">
+                            <span className="font-semibold text-stone-600">Đón:</span> {bk.pickupPoint}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Financial info */}
+                      <div className="flex items-center justify-between text-xs pt-1">
+                        <div>
+                          <span className="text-stone-400 text-[10px] block">Tổng tiền</span>
+                          <span className="font-black text-stone-900 font-mono text-sm">{bk.totalPrice.toLocaleString()}đ</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-stone-400 text-[10px] block">Cọc / Còn thu</span>
+                          <span className="text-xs font-mono">
+                            <span className="text-emerald-700 font-bold">{deposit.toLocaleString()}đ</span>
+                            <span className="text-stone-300 mx-1">/</span>
+                            <span className="text-red-600 font-bold">{remaining.toLocaleString()}đ</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Driver info if assigned */}
+                      {bk.driverName && (
+                        <div className="text-[11px] bg-blue-50/80 p-2 rounded-xl border border-blue-200 text-blue-900 flex items-center justify-between">
+                          <span>🚗 Lái xe: <strong>{bk.driverName}</strong> ({bk.vehiclePlate || "QT"})</span>
+                          {bk.driverPhone && (
+                            <a href={`tel:${bk.driverPhone}`} className="underline font-bold text-blue-700">Gọi TX</a>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Quick Mobile Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-stone-100">
+                        {isPending && (
+                          <button
+                            onClick={() => handleUpdateStatus(bk.id, "success")}
+                            className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1 cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Duyệt vé</span>
+                          </button>
+                        )}
+                        {isSuccess && (
+                          <button
+                            onClick={() => handleUpdateStatus(bk.id, "completed")}
+                            className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1 cursor-pointer"
+                          >
+                            <span>Hoàn thành</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleOpenDepositModal(bk)}
+                          className="py-2 px-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Ghi chú & Cọc
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus(bk.id, "cancelled")}
+                          className="py-2 px-2.5 border border-stone-200 text-stone-500 hover:text-red-600 rounded-xl text-xs transition-colors cursor-pointer"
+                          title="Hủy vé"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* DESKTOP TABLE VIEW: Visible only on md+ screens */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full min-w-[980px]">
                 <thead>
                   <tr className="bg-stone-100/80 text-left border-b border-stone-200 text-[11px] text-stone-600 font-extrabold uppercase tracking-wider">
                     <th className="py-3 px-4 text-center w-12">
@@ -2086,7 +2337,8 @@ export default function OperatorPanel({
                 </tbody>
               </table>
             </div>
-          )}
+          </>
+        )}
         </div>
       )}
 
@@ -2902,6 +3154,119 @@ export default function OperatorPanel({
           <ReviewManagement destinations={destinations} />
         </div>
       )}
+
+      {(panelTab === "zaloCommunity" || activeModuleId === "community_zalo") && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <ZaloCommunityManagement zaloGroups={zaloGroups} onUpdateZaloGroups={onUpdateZaloGroups} />
+        </div>
+      )}
+
+      {/* Module: Đơn dịch vụ du lịch (Tour, Combo & Thuê xe) */}
+      {activeModuleId === "service_orders" && <ServiceInquiryManagement />}
+      {activeModuleId === "service_orders" && (
+        <div className="bg-white rounded-2xl shadow-xs border border-stone-200 p-6 sm:p-8 space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-stone-100 pb-4">
+            <div>
+              <h3 className="text-base font-black text-stone-900">Đơn Dịch Vụ Du Lịch & Combo Trải Nghiệm</h3>
+              <p className="text-xs text-stone-500 mt-0.5">Yêu cầu đặt combo xe + homestay, phòng nghỉ dưỡng và tour trải nghiệm</p>
+            </div>
+            <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+              Tổng cộng: {bookings.filter(b => b.type === "combo" || b.type === "private_charter").length} đơn
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {bookings.filter(b => b.type === "combo" || b.type === "private_charter").length > 0 ? (
+              bookings.filter(b => b.type === "combo" || b.type === "private_charter").map((b, idx) => (
+                <div key={b.id || idx} className="p-4 rounded-2xl border border-stone-200 bg-stone-50/60 hover:bg-white transition-all flex flex-wrap justify-between items-center gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono font-bold text-emerald-800 text-xs">{b.id}</span>
+                      <span className="text-[10px] bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-full uppercase">
+                        {b.type === "combo" ? `Combo: ${b.accommodationName || "Homestay Mộc Châu"}` : "Thuê Xe Riêng"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-700 font-sans">
+                      Khách hàng: <strong>{b.passengerName}</strong> (SĐT: <a href={`tel:${b.passengerPhone}`} className="text-emerald-700 font-mono font-bold">{b.passengerPhone}</a>)
+                    </p>
+                    <p className="text-[11px] text-stone-500">
+                      Ngày khởi hành: {b.travelDate} • Giờ: {b.departureTime || "07:00"} • Điểm đón: {b.pickupPoint || "Hà Nội"}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-base font-black text-stone-900 font-mono block">{(b.totalPrice || 0).toLocaleString()} đ</span>
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full inline-block mt-1 ${
+                      b.status === "completed" || b.status === "success" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {b.status === "completed" || b.status === "success" ? "Đã xác nhận" : "Chờ điều hành"}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-12 text-center text-stone-400 text-xs italic">
+                Chưa có đơn dịch vụ combo nào.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeModuleId === "site_appearance" && <SiteContentStudio />}
+
+      {/* Module: Nhà hàng & Ẩm thực */}
+      {activeModuleId === "restaurants_culinary" && (
+        <RestaurantManagement />
+      )}
+
+      {/* Module: Mùa hoa & Trải nghiệm */}
+      {activeModuleId === "flower_seasons" && (
+        <FlowerSeasonManagement />
+      )}
+
+      {/* Module: Trợ lý AI */}
+      {activeModuleId === "ai_assistant" && (
+        <AIAssistantManagement />
+      )}
+
+      {/* Module: Thời tiết Live */}
+      {activeModuleId === "live_weather" && (
+        <LiveWeatherManagement />
+      )}
+
+      {/* Module: Mạng lưới Đối tác */}
+      {activeModuleId === "partner_network" && (
+        <PartnerManagement />
+      )}
+
+      {/* Module: Hoa hồng & Công nợ */}
+      {activeModuleId === "commissions_debt" && (
+        <CommissionDebtManagement />
+      )}
+
+      {/* Module: Thống kê & Tăng trưởng */}
+      {activeModuleId === "growth_analytics" && (
+        <GrowthAnalytics bookings={bookings} />
+      )}
+
+      {/* Module: Taxi & Xe du lịch 4-7-9-16 chỗ */}
+      {activeModuleId === "taxi_tourist_cars" && (
+        <TaxiFleetManagement />
+      )}
+
+      {/* Module: Cho thuê xe máy */}
+      {activeModuleId === "motorbike_rental" && (
+        <MotorbikeManagement />
+      )}
+
+      {/* Module: Cấu hình & Bảo mật */}
+      {activeModuleId === "security_config" && (
+        <SecurityConfigManagement />
+      )}
+
+        </main>
+      </div>
 
       {userToDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">

@@ -1,6 +1,6 @@
 {
-  "name": "Xe Đi Mộc Châu | Đặt Vé Limousine VIP & Combo 20%",
-  "description": "Dịch vụ đặt vé xe Limousine VIP Hà Nội - Mộc Châu đón trả tận nhà. Hệ thống đặt Combo du lịch phòng + xe tiết kiệm 20%, xe ghép 7 chỗ và thuê xe máy chuyên nghiệp.",
+  "name": "Mộc Châu Travel 2.0 | Nền Tảng Du Lịch & Đặt Vé QT Limousine",
+  "description": "Nền tảng du lịch thông minh Mộc Châu: Dự báo thời tiết, mùa hoa, AI trợ lý tư vấn lịch trình, cộng đồng và đặt vé xe QT Limousine VIP chính hãng.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
