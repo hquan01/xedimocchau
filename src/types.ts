@@ -155,6 +155,9 @@ export interface User {
   address?: string;
   favPickup?: string;
   favDropoff?: string;
+  avatarDataUrl?: string; // Compressed thumbnail only, never original photograph
+  gender?: 'male' | 'female' | 'other' | 'undisclosed';
+  birthDate?: string; // Optional YYYY-MM-DD, used for birthday/month and age
   passwordResetToDefault?: boolean;
   customPassword?: string;
 }
@@ -239,6 +242,14 @@ export interface Coupon {
   discountPercentage: number;
   isActive?: boolean;
   isPublished?: boolean;
+  title?: string;
+  audience?: 'all' | 'male' | 'female' | 'birthday' | 'holiday' | 'random' | 'age';
+  validFrom?: string; // YYYY-MM-DD in Vietnam
+  validUntil?: string;
+  birthdayWindow?: 'day' | 'month';
+  minAge?: number;
+  maxAge?: number;
+  assignedUserIds?: string[]; // Explicit one-time random selection by Admin
 }
 
 export interface ZaloGroup {
