@@ -187,9 +187,19 @@ export default function CustomerDashboard({
     }
   };
 
-  // Display only real +1 booking awards, not fabricated +10/+5 bonuses.
+  // Show only bonuses actually credited in Firestore. Welcome +10 is
+  // displayed only when the one-time transaction marker is present.
   const getPointsHistory = (): PointTransaction[] => {
     const history: PointTransaction[] = [];
+    if (currentUser.welcomeBonusGranted && currentUser.welcomeBonusPoints) {
+      history.push({
+        id: 'welcome_' + currentUser.id,
+        date: currentUser.welcomeBonusAt?.slice(0,10) || '—',
+        description: 'Quà chào mừng thành viên mới',
+        amount: currentUser.welcomeBonusPoints,
+        type: 'plus'
+      });
+    }
     const rewarded = Array.isArray(currentUser.rewardedBookingIds)
       ? currentUser.rewardedBookingIds : [];
     rewarded.forEach(id => {
@@ -341,6 +351,12 @@ export default function CustomerDashboard({
                 </span>
               </div>
             </div>
+
+            {currentUser.welcomeBonusGranted && (
+              <p className="text-[11px] text-emerald-800 font-bold mt-2">
+                🎁 Đã tặng 10 điểm chào mừng khi gia nhập hội viên
+              </p>
+            )}
 
             {/* Level requirements progress bar indicator */}
             <div className="w-full mt-4 text-left">
@@ -939,7 +955,8 @@ export default function CustomerDashboard({
                     Cơ chế hoạt động điểm thưởng:
                   </span>
                   <ul className="list-disc list-inside space-y-1 text-[12px] text-stone-700">
-                    <li><b>Lần đặt vé đầu:</b> Không trừ điểm hay áp mã voucher.</li>
+                    <li><b>Thành viên mới:</b> Tặng 10 điểm một lần khi đăng ký hoặc đăng nhập Google lần đầu.</li>
+                    <li><b>Lần đặt vé đầu:</b> Giữ điểm chào mừng trong ví; chưa áp mã voucher hay trừ điểm.</li>
                     <li><b>Admin xác nhận đơn:</b> +1 điểm cho vé hợp lệ, không cộng trùng.</li>
                     <li><b>Từ lần đặt vé thứ hai:</b> Có thể dùng số điểm đã tích lũy hoặc voucher đang được công bố.</li>
                     <li><b>Quy đổi:</b> 1 điểm = 1.000đ giảm trực tiếp vào vé. Vé bị hủy không được cộng điểm.</li>
@@ -1018,7 +1035,7 @@ export default function CustomerDashboard({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
-                      {pointsHistory.length===0 && <tr><td colSpan={3} className="p-4 text-center text-stone-500">Chưa có điểm từ đơn đã xác nhận.</td></tr>}
+                      {pointsHistory.length===0 && <tr><td colSpan={3} className="p-4 text-center text-stone-500">Chưa có giao dịch điểm thưởng nào được ghi nhận.</td></tr>}
                       {pointsHistory.map((tx) => (
                         <tr key={tx.id} className="hover:bg-stone-50/50">
                           <td className="p-3 font-mono text-stone-500 text-[11px] whitespace-nowrap">
