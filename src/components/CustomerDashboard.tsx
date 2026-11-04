@@ -35,6 +35,8 @@ import { updatePassword, updateProfile, updateEmail } from "firebase/auth";
 import { saveUserToFirebase } from "../lib/firebaseUtils";
 import { INITIAL_COMBOS } from "../data/combos";
 import {POINT_VALUE_VND, eligibleForNextBookingReward, previousConfirmedBookings} from "../lib/loyalty";
+import {couponDecision,couponAudienceLabel,memberAge} from "../lib/couponEligibility";
+import {normalizeVietnamPhone,rememberPhoneEmail} from "../lib/simpleAuth";
 
 interface CustomerDashboardProps {
   currentUser: User;
@@ -72,6 +74,11 @@ export default function CustomerDashboard({
   // Profile form states
   const [profileName, setProfileName] = useState(currentUser.name);
   const [profileEmail, setProfileEmail] = useState(currentUser.email || "");
+  const [profilePhone,setProfilePhone] = useState(currentUser.phone || "");
+  const [profileGender,setProfileGender] = useState<User['gender']>(currentUser.gender || 'undisclosed');
+  const [profileBirthDate,setProfileBirthDate] = useState(currentUser.birthDate || "");
+  const [profileAvatar,setProfileAvatar] = useState(currentUser.avatarDataUrl || "");
+  const [savingProfile,setSavingProfile] = useState(false);
   const [profileAddress, setProfileAddress] = useState("");
   const [profileFavPickup, setProfileFavPickup] = useState("");
   const [profileFavDropoff, setProfileFavDropoff] = useState("");
@@ -90,6 +97,10 @@ export default function CustomerDashboard({
   useEffect(() => {
     setProfileName(currentUser.name || "");
     setProfileEmail(currentUser.email || "");
+    setProfilePhone(currentUser.phone || "");
+    setProfileGender(currentUser.gender || 'undisclosed');
+    setProfileBirthDate(currentUser.birthDate || "");
+    setProfileAvatar(currentUser.avatarDataUrl || "");
     setProfileAddress(currentUser.address || "");
     setProfileFavPickup(currentUser.favPickup || "");
     setProfileFavDropoff(currentUser.favDropoff || "");
@@ -102,89 +113,79 @@ export default function CustomerDashboard({
     }, 2500);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profileName.trim()) {
-      showToast("Tên không được để trống!");
-      return;
+  const handleAvatarFile = async (file:File|undefined) => {
+    if(!file)return;
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>3*1024*1024){
+      showToast('Chỉ dùng ảnh JPG/PNG/WebP nhỏ hơn 3MB.');return;
     }
-
-    // Check if user is also wanting to update password
-    if (newPassword) {
-      if (newPassword.length < 6) {
-        showToast("Mật khẩu mới phải từ 6 ký tự trở lên! 🔑");
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        showToast("Mật khẩu xác nhận không trùng khớp! 🔑");
-        return;
-      }
-    }
-
-    // 1. Update core fields in user object
-    const updatedUser: User = {
-      ...currentUser,
-      name: profileName,
-      email: profileEmail,
-      address: profileAddress,
-      favPickup: profileFavPickup,
-      favDropoff: profileFavDropoff,
-    };
-
-    // Never copy the new password into a Firestore profile. Only Firebase Auth
-    // may receive it through updatePassword() below.
-
-    onUpdateUser(updatedUser);
-
-    // If the active session is a mock session, update it in localStorage
-    const cachedAdmin = localStorage.getItem("mock_admin_session");
-    if (cachedAdmin) {
-      try {
-        const parsed = JSON.parse(cachedAdmin);
-        if (parsed.id === currentUser.id) {
-          localStorage.setItem(
-            "mock_admin_session",
-            JSON.stringify(updatedUser),
-          );
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    // Save to Firestore
-    saveUserToFirebase(currentUser.id, updatedUser).catch(console.error);
-
-    // Sync auth changes
-    if (auth.currentUser) {
-      const promises: Promise<any>[] = [];
-      if (profileName !== auth.currentUser.displayName) {
-        promises.push(
-          updateProfile(auth.currentUser, { displayName: profileName }),
-        );
-      }
-      if (profileEmail !== auth.currentUser.email && profileEmail) {
-        promises.push(updateEmail(auth.currentUser, profileEmail));
-      }
-      if (newPassword) {
-        promises.push(updatePassword(auth.currentUser, newPassword));
-      }
-
-      Promise.all(promises)
-        .then(() => {
-          setNewPassword("");
-          setConfirmPassword("");
-          showToast(
-            "Đã lưu thông tin tài khoản và cập nhật dữ liệu thành công! ✨",
-          );
-        })
-        .catch((e) => {
-          console.error(e);
-          showToast("Lưu thông tin thất bại: " + e.message);
+    try{
+      const url=URL.createObjectURL(file);
+      try{
+        const img=new Image();
+        await new Promise<void>((resolve,reject)=>{
+          img.onload=()=>resolve();img.onerror=()=>reject(new Error('Ảnh không hợp lệ'));img.src=url;
         });
-    } else {
-      showToast("Đã lưu thông tin tài khoản (Ngoại vi) thành công! ✨");
+        const canvas=document.createElement('canvas');
+        canvas.width=180;canvas.height=180;
+        const ctx=canvas.getContext('2d');
+        if(!ctx)throw new Error('Không thể xử lý ảnh');
+        const size=Math.min(img.naturalWidth,img.naturalHeight);
+        ctx.drawImage(img,(img.naturalWidth-size)/2,(img.naturalHeight-size)/2,size,size,0,0,180,180);
+        const result=canvas.toDataURL('image/jpeg',0.72);
+        if(result.length>85_000)throw new Error('Ảnh quá lớn sau khi nén.');
+        setProfileAvatar(result);
+      }finally{URL.revokeObjectURL(url);}
+    }catch(error:any){showToast(error.message||'Không đọc được ảnh đại diện.');}
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(savingProfile)return;
+    if(!profileName.trim()){showToast('Vui lòng nhập họ tên.');return;}
+    if(profilePhone.trim() && !normalizeVietnamPhone(profilePhone.trim())){
+      showToast('Số điện thoại liên hệ chưa đúng định dạng Việt Nam.');return;
     }
+    if(profileBirthDate){
+      const date=Date.parse(profileBirthDate);
+      const age=memberAge({birthDate:profileBirthDate});
+      if(!Number.isFinite(date)||age===null){
+        showToast('Vui lòng kiểm tra ngày sinh hợp lệ.');return;
+      }
+    }
+    if(newPassword && (newPassword.length<8 || newPassword!==confirmPassword)){
+      showToast('Mật khẩu mới cần ít nhất 8 ký tự và nhập lại trùng khớp.');return;
+    }
+    if(!auth.currentUser || auth.currentUser.uid!==currentUser.id){
+      showToast('Vui lòng đăng nhập Firebase để cập nhật hồ sơ.');return;
+    }
+
+    setSavingProfile(true);
+    const account=auth.currentUser;
+    const updatedFields:Partial<User>={
+      name:profileName.trim(),phone:profilePhone.trim(),
+      gender:profileGender,birthDate:profileBirthDate,
+      avatarDataUrl:profileAvatar,
+      address:profileAddress.trim(),
+      favPickup:profileFavPickup.trim(),favDropoff:profileFavDropoff.trim()
+    };
+    try{
+      // Never send balance, earned points, roles or password to this profile
+      // editor. Only change allowlisted fields to avoid overwriting wallet state.
+      await saveUserToFirebase(currentUser.id,updatedFields);
+      if(profileName.trim()!==account.displayName)
+        await updateProfile(account,{displayName:profileName.trim()});
+      if(profileEmail!==account.email && profileEmail)
+        await updateEmail(account,profileEmail);
+      if(newPassword)await updatePassword(account,newPassword);
+      if(profilePhone.trim() && account.emailVerified && account.email)
+        rememberPhoneEmail(profilePhone.trim(),account.email);
+      onUpdateUser({...currentUser,...updatedFields,email:account.email||currentUser.email});
+      setNewPassword('');setConfirmPassword('');
+      showToast('Đã lưu hồ sơ thành viên lên hệ thống.');
+    }catch(error:any){
+      console.error('Profile update failed:',error);
+      showToast('Không lưu được đầy đủ: '+(error?.message||'Vui lòng thử lại.'));
+    }finally{setSavingProfile(false);}
   };
 
   // Show only bonuses actually credited in Firestore. Welcome +10 is
@@ -277,7 +278,9 @@ export default function CustomerDashboard({
   };
 
   // Published coupons from system
-  const activeCoupons = coupons.filter((c) => c.isActive !== false && c.isPublished);
+  const activeCoupons = coupons.filter(c =>
+    couponDecision(c,currentUser,{checkOrder:false}).eligible
+  );
 
   return (
     <div
@@ -324,6 +327,10 @@ export default function CustomerDashboard({
               {currentUser.phone}
             </p>
 
+            {(currentUser.avatarDataUrl || auth.currentUser?.photoURL) && (
+              <img src={currentUser.avatarDataUrl || auth.currentUser?.photoURL || undefined}
+                alt="Ảnh đại diện hội viên" className="w-20 h-20 rounded-full object-cover border-2 border-emerald-200 mx-auto mt-3"/>
+            )}
             {/* Membership Tier badge */}
             <span
               className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide mt-3 border ${tierColor}`}
@@ -484,17 +491,14 @@ export default function CustomerDashboard({
                   </div>
 
                   <div className="space-y-1.5 text-left">
-                    <label className="block text-xs font-extrabold text-stone-400 uppercase tracking-wide">
-                      Số điện thoại đăng ký (Cố định bảo mật)
+                    <label className="block text-xs font-extrabold text-[#1b4332] uppercase tracking-wide">
+                      Số điện thoại liên hệ
                     </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full px-3.5 py-2.5 bg-stone-100 border border-stone-200 rounded-xl text-xs font-mono text-stone-500 cursor-not-allowed"
-                        value={currentUser.phone}
-                        disabled
-                      />
-                    </div>
+                    <input type="tel" inputMode="tel" autoComplete="tel"
+                      className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:border-emerald-500"
+                      value={profilePhone} onChange={e=>setProfilePhone(e.target.value)}
+                      placeholder="09xxxxxxxx" maxLength={18}/>
+                    <p className="text-[10px] text-stone-500">Đổi SĐT liên hệ không xác minh quyền sở hữu. Đăng nhập SĐT trên thiết bị mới cần liên kết email.</p>
                   </div>
                 </div>
 
@@ -526,6 +530,41 @@ export default function CustomerDashboard({
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 space-y-3">
+                  <h4 className="text-sm font-black text-[#1b4332]">Ảnh đại diện & thông tin cá nhân</h4>
+                  <div className="flex flex-wrap items-center gap-4">
+                    {profileAvatar || auth.currentUser?.photoURL ? (
+                      <img src={profileAvatar || auth.currentUser?.photoURL || undefined}
+                        alt="Ảnh đại diện đang chọn" className="w-20 h-20 rounded-full object-cover border-2 border-emerald-200"/>
+                    ) : <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center"><UserIcon className="w-9 h-9 text-emerald-700"/></div>}
+                    <div className="flex flex-col gap-2">
+                      <label className="inline-flex items-center rounded-xl bg-white border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-900 cursor-pointer">
+                        Chọn ảnh đại diện
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                          onChange={e=>{void handleAvatarFile(e.target.files?.[0]);e.target.value='';}}/>
+                      </label>
+                      <button type="button" className="text-xs text-red-600 text-left" onClick={()=>setProfileAvatar('')}>Xóa ảnh đã tải lên</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="text-xs font-bold text-stone-800">Giới tính (không bắt buộc)
+                      <select value={profileGender} onChange={e=>setProfileGender(e.target.value as User['gender'])}
+                        className="block w-full mt-1 p-3 rounded-xl border border-stone-200 bg-white">
+                        <option value="undisclosed">Không muốn cung cấp</option>
+                        <option value="male">Nam</option>
+                        <option value="female">Nữ</option>
+                        <option value="other">Khác</option>
+                      </select>
+                    </label>
+                    <label className="text-xs font-bold text-stone-800">Ngày tháng năm sinh (không bắt buộc)
+                      <input type="date" value={profileBirthDate} max={new Date().toISOString().slice(0,10)}
+                        onChange={e=>setProfileBirthDate(e.target.value)}
+                        className="block w-full mt-1 p-3 rounded-xl border border-stone-200 bg-white"/>
+                    </label>
+                  </div>
+                  <p className="text-xs text-stone-600">Tuổi: {memberAge({birthDate:profileBirthDate})??'Chưa cập nhật'}. Ngày sinh được dùng để xét voucher sinh nhật; giới tính là thông tin tự khai, chỉ dùng để lọc chương trình ưu đãi.</p>
+                  <p className="text-[11px] text-amber-800">Lưu ý riêng tư: hồ sơ Firebase hiện chưa được giới hạn quyền đọc đúng mức. Không điền thông tin nhạy cảm cho đến khi quản trị viên hoàn tất cấu hình quyền truy cập.</p>
+                </div>
                 <div className="h-px bg-stone-100 my-2" />
 
                 <div className="border border-dashed border-emerald-200 bg-emerald-50/20 p-4 rounded-2xl space-y-3">
@@ -607,11 +646,11 @@ export default function CustomerDashboard({
 
                 <div className="pt-2 flex justify-end">
                   <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-[#1b4332] hover:bg-emerald-800 text-white text-xs font-bold rounded-xl flex items-center space-x-1 shadow transition-all"
+                    type="submit" disabled={savingProfile}
+                    className="px-5 py-2.5 bg-[#1b4332] hover:bg-emerald-800 text-white text-xs font-bold rounded-xl flex items-center space-x-1 shadow transition-all disabled:opacity-50"
                   >
                     <Save className="w-4 h-4" />
-                    <span>Lưu thông tin thành viên</span>
+                    <span>{savingProfile?'Đang lưu...':'Lưu thông tin thành viên'}</span>
                   </button>
                 </div>
               </form>
