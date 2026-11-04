@@ -216,6 +216,35 @@ export const updateBookingStatusWithRewards = async (
   if(index>=0){current[index]={...current[index],status};setLocalList("bookings",current);}
 };
 
+/**
+ * Repair legacy member balances for bookings that were already marked
+ * confirmed before the new point policy was deployed. Only a booking linked
+ * to the authenticated Firebase UID qualifies; phone numbers alone do not
+ * establish ownership. One transaction = at most one point per booking.
+ */
+export const reconcileConfirmedMemberBooking = async (bookingId:string):Promise<void> => {
+  const uid=auth.currentUser?.uid;
+  if(!uid)return;
+  const bookingRef=doc(db,"bookings",bookingId);
+  const profileRef=doc(db,"users",uid);
+  await runTransaction(db,async tx=>{
+    const bookingDoc=await tx.get(bookingRef);
+    const profileDoc=await tx.get(profileRef);
+    if(!bookingDoc.exists() || !profileDoc.exists())return;
+    const booking=bookingDoc.data() as Booking;
+    if(booking.userId!==uid || (booking.status!=="success" && booking.status!=="completed"))return;
+    const profile=profileDoc.data() as any;
+    const rewarded:string[]=Array.isArray(profile.rewardedBookingIds)?profile.rewardedBookingIds:[];
+    if(rewarded.includes(bookingId))return;
+    const next=[...rewarded,bookingId];
+    tx.set(profileRef,{
+      rewardedBookingIds:next,
+      completedBookingsCount:next.length,
+      points:Math.max(0,Math.floor(Number(profile.points||0)))+POINTS_PER_CONFIRMED_BOOKING
+    },{merge:true});
+  });
+};
+
 export const deleteBookingFromFirebase = async (bookingId: string) => {
   const current = getLocalList<Booking>("bookings", []);
   const nextList = current.filter(b => b.id !== bookingId);
