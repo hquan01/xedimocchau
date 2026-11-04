@@ -158,8 +158,8 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
     event.preventDefault(); setLoading(true); setError(''); setNotice('');
     try {
       if (mode === 'register') {
-        setLoading(false);
-        return submitEmail(event);
+        await submitEmail(event);
+        return;
       }
       const number = normalizePhone(phone);
       if (!number) throw new Error('Vui lòng nhập số điện thoại Việt Nam hợp lệ.');
@@ -191,38 +191,27 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         <TicketPercent className="w-5 h-5 text-emerald-700 shrink-0"/>
         <p className="text-xs text-emerald-950">Thành viên có thể sử dụng voucher <strong>khi có chương trình đủ điều kiện.</strong></p>
       </div>
-      {mode !== 'forgot' && <div className="grid grid-cols-2 gap-2 mb-4" role="group" aria-label="Chọn cách đăng nhập">
-        <button type="button" onClick={()=>changeMethod('phone')} className={`rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 ${method==='phone'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600'}`}><Smartphone className="w-4 h-4"/> Số điện thoại</button>
-        <button type="button" onClick={()=>changeMethod('email')} className={`rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 ${method==='email'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600'}`}><Mail className="w-4 h-4"/> Email</button>
-      </div>}
-      {method === 'phone' && mode !== 'forgot' ? <>
-        {!confirmation ? <form onSubmit={sendCode} className="space-y-3">
-          {mode==='register'&&<label className="block text-xs font-bold">Họ và tên *<input required value={name} onChange={e=>setName(e.target.value)} maxLength={100} autoComplete="name" className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="Tên của bạn"/></label>}
-          <label className="block text-xs font-bold">Số điện thoại *<input type="tel" required inputMode="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="09xxxxxxxx"/></label>
-          <button type="submit" disabled={loading} className="w-full bg-[#1b4332] text-white rounded-xl p-3.5 text-sm font-bold disabled:opacity-50">{loading?'Đang gửi...':'Nhận mã SMS'}</button>
-        </form> : <form onSubmit={verifyCode} className="space-y-3">
-          <p className="text-xs text-stone-600">Đã yêu cầu SMS tới {phone}. Nhập mã xác nhận 6 chữ số:</p>
-          <input aria-label="Mã xác thực SMS" inputMode="numeric" maxLength={6} pattern="[0-9]{6}" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,''))} autoComplete="one-time-code" className="w-full p-3 border rounded-xl tracking-[0.3em] text-center text-xl" placeholder="000000" required/>
-          <button type="submit" disabled={loading||otp.length!==6} className="w-full bg-[#1b4332] text-white rounded-xl p-3.5 text-sm font-bold disabled:opacity-50">{loading?'Đang xác minh...':'Xác nhận và đăng nhập'}</button>
-          <button type="button" className="text-xs text-emerald-800 font-bold flex items-center gap-1" onClick={()=>{setConfirmation(null);setOtp('');setNotice('')}}><ArrowLeft className="w-4 h-4"/> Đổi số điện thoại</button>
-        </form>}
-        <div id="mocchau-phone-recaptcha"/>
-        <p className="mt-3 text-xs text-stone-500">Xác thực bằng OTP của Firebase. Cần bật Phone Authentication, cấu hình reCAPTCHA và tên miền được phép.</p>
-      </> : <form onSubmit={submitEmail} className="space-y-3">
-        {mode==='register'&&<><label className="block text-xs font-bold">Họ và tên *<input required maxLength={100} autoComplete="name" value={name} onChange={e=>setName(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm"/></label>
-        <label className="block text-xs font-bold">Số điện thoại liên hệ (không dùng để đăng nhập email)<input inputMode="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="09xxxxxxxx"/></label></>}
-        <label className="block text-xs font-bold">Email *<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="email@example.com"/></label>
-        {mode!=='forgot'&&<label className="block text-xs font-bold">Mật khẩu *<input required minLength={mode==='register'?8:1} type="password" autoComplete={mode==='register'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="••••••••"/></label>}
-        <button type="submit" disabled={loading} className="w-full bg-[#1b4332] text-white rounded-xl p-3.5 text-sm font-bold disabled:opacity-50">{loading?'Đang xử lý...':mode==='register'?'Tạo tài khoản':mode==='forgot'?'Gửi email đặt lại mật khẩu':'Đăng nhập'}</button>
-      </form>}
+      <div className="grid grid-cols-2 gap-2 mb-4" role="group" aria-label="Chọn cách đăng nhập">
+        <button type="button" onClick={()=>changeMethod('phone')} className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 " + (method==='phone'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600')}><Smartphone className="w-4 h-4"/> Số điện thoại</button>
+        <button type="button" onClick={()=>changeMethod('email')} className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 " + (method==='email'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600')}><Mail className="w-4 h-4"/> Email</button>
+      </div>
+      <form onSubmit={method==='phone' ? submitPhone : submitEmail} className="space-y-3">
+        {mode==='register'&&<label className="block text-xs font-bold">Họ và tên *<input required value={name} onChange={e=>setName(e.target.value)} maxLength={100} autoComplete="name" className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="Tên của bạn"/></label>}
+        {(method==='phone'||mode==='register')&&<label className="block text-xs font-bold">Số điện thoại {mode==='register'?'đăng nhập':''} *<input type="tel" required inputMode="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="09xxxxxxxx"/></label>}
+        {(method==='email'||mode==='register')&&<label className="block text-xs font-bold">{mode==='register'?'Email để xác minh và lấy lại mật khẩu':'Email'} *<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="email@example.com"/></label>}
+        {mode!=='forgot'&&<label className="block text-xs font-bold">Mật khẩu *<input required minLength={mode==='register'?8:1} type="password" autoComplete={mode==='register'?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="Ít nhất 8 ký tự khi đăng ký"/></label>}
+        <button type="submit" disabled={loading||(mode==='register'&&pendingVerification)} className="w-full bg-[#1b4332] text-white rounded-xl p-3.5 text-sm font-bold disabled:opacity-50">{loading?'Đang xử lý...':mode==='register'?(pendingVerification?'Đã gửi email xác minh':'Tạo tài khoản'):mode==='forgot'?'Gửi hướng dẫn đặt lại mật khẩu':'Đăng nhập'}</button>
+      </form>
+      {mode==='register'&&pendingVerification&&<button type="button" onClick={verifyEmail} disabled={loading} className="w-full mt-3 border-2 border-emerald-700 text-emerald-900 p-3 rounded-xl text-sm font-bold disabled:opacity-50">Tôi đã xác minh email</button>}
+      <p className="mt-2 text-xs text-stone-500">{mode==='forgot'?'Nhập SĐT đã liên kết hoặc email đã đăng ký. Hệ thống gửi liên kết đặt lại mật khẩu qua email, không dùng SMS.':mode==='register'?'Bạn cần xác minh email một lần trước khi đăng nhập bằng số điện thoại.':'Dùng số điện thoại + mật khẩu hoặc email + mật khẩu, không gửi SMS.'}</p>
       {error&&<p role="alert" className="mt-3 bg-red-50 text-red-800 p-3 rounded-xl text-xs">{error}</p>}
       {notice&&<p role="status" className="mt-3 bg-emerald-50 text-emerald-900 p-3 rounded-xl text-xs">{notice}</p>}
       {mode!=='forgot'&&<button disabled={loading} onClick={signInGoogle} className="w-full border rounded-xl p-3 text-sm font-bold mt-3 hover:bg-stone-50">Tiếp tục với Google</button>}
       <div className="flex flex-wrap gap-3 justify-center mt-4 text-xs font-bold text-emerald-700">
-        <button onClick={()=>{setMode(mode==='register'?'login':'register');setConfirmation(null);setError('');setNotice('')}}>{mode==='register'?'Đã có tài khoản? Đăng nhập':'Chưa có tài khoản? Đăng ký'}</button>
-        <button onClick={()=>{setMode(mode==='forgot'?'login':'forgot');setMethod('email');setError('');setNotice('')}}>{mode==='forgot'?'Quay lại đăng nhập':'Quên mật khẩu?'}</button>
+        <button onClick={()=>{setMode(mode==='register'?'login':'register');setPendingVerification(false);setError('');setNotice('')}}>{mode==='register'?'Đã có tài khoản? Đăng nhập':'Chưa có tài khoản? Đăng ký'}</button>
+        <button onClick={()=>{setMode(mode==='forgot'?'login':'forgot');setPendingVerification(false);setError('');setNotice('')}}>{mode==='forgot'?'Quay lại đăng nhập':'Quên mật khẩu?'}</button>
       </div>
-      <p className="mt-3 text-[11px] text-stone-600">Nếu đã có tài khoản bằng email, hãy đăng nhập bằng email để giữ lịch sử và voucher. Đăng nhập số điện thoại chưa tự liên kết với tài khoản email trước đó.</p>
+      <p className="mt-3 text-[11px] text-stone-600">Nếu đã có tài khoản email cũ, hãy đăng nhập bằng email trước để kích hoạt SĐT trên cùng UID. Mật khẩu và tài khoản quản trị không được đặt mặc định.</p>
       <p className="mt-2 flex items-start gap-2 text-[11px] text-stone-500"><ShieldCheck className="w-4 h-4 shrink-0"/> Quyền quản trị cần được cấp bằng Firebase custom claims. Không dùng mật khẩu Admin cố định trên giao diện.</p>
     </div>
   </div>;
