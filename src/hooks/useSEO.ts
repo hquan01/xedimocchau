@@ -2,21 +2,21 @@ import { useEffect } from 'react';
 
 export function useSEO(activeTab: string) {
   useEffect(() => {
-    let title = "Xe Đi Mộc Châu | Đặt Vé Limousine VIP & Combo Du Lịch Giá Tốt";
-    let description = "Dịch vụ đặt vé xe Limousine VIP Hà Nội - Mộc Châu đón trả tận nhà. Hệ thống đặt Combo du lịch phòng + xe tiết kiệm 20%, xe ghép 7 chỗ và thuê xe máy chuyên nghiệp.";
+    let title = "Mộc Châu Travel | QT Limousine Hà Nội – Mộc Châu";
+    let description = "Đặt xe QT Limousine Hà Nội – Mộc Châu, xem giờ chạy, giá vé và chọn ghế. Khám phá điểm tham quan, thời tiết, ẩm thực và cẩm nang du lịch Mộc Châu.";
     
     switch (activeTab) {
       case 'limousine':
-        title = "Đặt Vé Xe Limousine VIP Hà Nội ➔ Mộc Châu | Giữ Chỗ 100%";
-        description = "Đặt trực tuyến xe Limousine VIP thương gia 9 chỗ tuyến Hà Nội đi Mộc Châu. Đón trả tận nhà, giữ chỗ chính xác 100%, không phụ thu vô lý.";
+        title = "Đặt Xe QT Limousine Hà Nội – Mộc Châu | Mộc Châu Travel";
+        description = "Xem lịch xe QT Limousine Hà Nội – Mộc Châu, chọn tuyến, ngày đi, giờ xuất phát và số ghế trên website Mộc Châu Travel.";
         break;
       case 'combo':
-        title = "Siêu Combo Xe Limousine + Khách Sạn Mộc Châu Giảm 20%";
-        description = "Trọn gói Combo xe Limousine khứ hồi kèm phòng khách sạn/Bunggalow cao cấp tại Mộc Châu. Tiết kiệm đến 20%, hỗ trợ hủy đổi linh hoạt.";
+        title = "Combo Xe Limousine & Lưu Trú Mộc Châu | Mộc Châu Travel";
+        description = "Tham khảo combo xe QT Limousine kết hợp khách sạn, homestay và dịch vụ du lịch Mộc Châu. Chi phí tùy lịch đi và lựa chọn cụ thể.";
         break;
       case 'shared':
         title = "Xe Ghép SUV 7 Chỗ Hà Nội ➔ Mộc Châu Đón Trả Tận Nhà";
-        description = "Dịch vụ xe ghép SUV 7 chỗ (Innova, Xpander) nhanh chóng, tiện lợi, giá rẻ chỉ từ 350.000đ/ghế. Đón tận cổng nhà tại Hà Nội.";
+        description = "Tìm chuyến xe ghép Hà Nội – Mộc Châu, xem khung giờ, chỗ trống và mức giá được công bố khi chọn lịch trình.";
         break;
       case 'private':
         title = "Thuê Xe Riêng Hợp Đồng 4 - 7 - 16 Chỗ Đi Mộc Châu Trọn Gói";
@@ -27,8 +27,8 @@ export function useSEO(activeTab: string) {
         description = "Tổng hợp kinh nghiệm du lịch Mộc Châu từ A-Z: thời điểm đẹp nhất săn mây, mùa hoa mận trắng, các địa điểm check-in hot và đặc sản ẩm thực.";
         break;
       case 'explore':
-        title = "Khám Phá Các Địa Điểm Check-in Đẹp Nhất Mộc Châu";
-        description = "Khám phá danh sách các điểm đến tuyệt đẹp tại cao nguyên Mộc Châu: Đồi chè trái tim, Thác Dải Yếm, Rừng thông Bản Áng, Thung lũng mận Nà Ka.";
+        title = "Mộc Châu Travel | QT Limousine Hà Nội – Mộc Châu";
+        description = "Đặt xe QT Limousine Hà Nội – Mộc Châu, xem giờ chạy, giá vé và chọn ghế. Khám phá điểm tham quan, thời tiết, ẩm thực và cẩm nang du lịch Mộc Châu.";
         break;
       case 'dashboard':
         title = "Trang Cá Nhân & Quản Lý Đặt Vé Của Tôi | Xe Đi Mộc Châu";
@@ -51,8 +51,8 @@ export function useSEO(activeTab: string) {
         description = "Định vị GPS tìm điểm tham quan, nhà hàng ẩm thực bản địa và dịch vụ di chuyển gần bạn nhất tại cao nguyên Mộc Châu.";
         break;
       case 'moc_chau_today':
-        title = "Mộc Châu Hôm Nay Có Gì? • Thời Tiết Thực Tế & Mùa Hoa Đang Nở";
-        description = "Dữ liệu thời tiết trực tuyến, cập nhật hoa mận, mận chín, lễ hội địa phương được xác thực từ thực tế.";
+        title = "Thời Tiết Mộc Châu & Lịch Mùa Hoa | Mộc Châu Travel";
+        description = "Xem dự báo thời tiết Mộc Châu từ nguồn khí tượng trực tuyến và tham khảo các mùa hoa, điểm tham quan theo thời điểm.";
         break;
       default:
         break;
@@ -66,18 +66,8 @@ export function useSEO(activeTab: string) {
       metaDesc.setAttribute('content', description);
     }
 
-    // Update OpenGraph tags
-    let ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) ogTitle.setAttribute('content', title);
-
-    let ogDesc = document.querySelector('meta[property="og:description"]');
-    if (ogDesc) ogDesc.setAttribute('content', description);
-
-    let twitterTitle = document.querySelector('meta[property="twitter:title"]');
-    if (twitterTitle) twitterTitle.setAttribute('content', title);
-
-    let twitterDesc = document.querySelector('meta[property="twitter:description"]');
-    if (twitterDesc) twitterDesc.setAttribute('content', description);
-
+    // Social previews remain fixed to the homepage metadata from index.html.
+    // React route tabs share the same URL, and link-preview crawlers usually do
+    // not run JavaScript; changing og:* dynamically makes shared cards unstable.
   }, [activeTab]);
 }
