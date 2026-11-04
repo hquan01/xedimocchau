@@ -3,7 +3,7 @@ import {submitServiceInquiry} from "../lib/serviceRequests";
 import { 
   Bus, Car, Bike, Hotel, Star, DollarSign, Sparkles, MapPin, Phone, 
   Search, CheckCircle2, ChevronRight, ShieldCheck, Clock, CalendarDays, 
-  MessageSquare, User, Filter, ArrowRight, Award, Tag, Heart
+  MessageSquare, User, Filter, ArrowRight, Award, Tag, Heart, UtensilsCrossed, Coffee, BookOpen, Flame
 } from "lucide-react";
 import { Accommodation, TourCombo, Destination, LocationPoint, User as UserType } from "../types";
 
@@ -30,12 +30,13 @@ export default function ServicesHubView({
 }: ServicesHubViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<"all" | "transport" | "motorbike" | "accommodation" | "combo" | "restaurant" | "tour">("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [foodFilter, setFoodFilter] = useState<"all" | "restaurant" | "cafe" | "grill" | "snack">("all");
   const serviceSearchItems = [
     { category:'transport' as const, name:'Xe QT Limousine & Taxi 4–7–9–16 chỗ', keywords:'limousine taxi o to xe dua don' },
     { category:'motorbike' as const, name:'Thuê xe máy Mộc Châu', keywords:'xe may xe so xe tay ga' },
     { category:'accommodation' as const, name:'Homestay & Khách sạn', keywords:'homestay khach san luu tru nha nghi' },
     { category:'combo' as const, name:'Combo xe và phòng', keywords:'combo phong khach san' },
-    { category:'restaurant' as const, name:'Nhà hàng & Đặc sản', keywords:'an uong nha hang dac san' },
+    { category:'restaurant' as const, name:'Ẩm thực: địa điểm & món ngon', keywords:'an uong nha hang quan an cafe ca phe dac san be chao mon ngon' },
     { category:'tour' as const, name:'Tour & Trải nghiệm', keywords:'tour tham quan trai nghiem' },
   ];
   const simplify=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d');
@@ -123,7 +124,7 @@ export default function ServicesHubView({
             className="sm:hidden block w-full rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-900 font-bold text-sm px-3 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500">
             <option value="all">Tất cả dịch vụ</option><option value="transport">Xe Limousine & Taxi</option>
             <option value="motorbike">Thuê xe máy</option><option value="accommodation">Lưu trú & Homestay</option>
-            <option value="combo">Combo xe + phòng</option><option value="restaurant">Nhà hàng & Đặc sản</option>
+            <option value="combo">Combo xe + phòng</option><option value="restaurant">Ẩm thực & Đặc sản</option>
             <option value="tour">Tour & Vé tham quan</option>
           </select>
           <div className="hidden sm:flex space-x-2 overflow-x-auto custom-tab-scrollbar pb-1.5 pt-0.5">
@@ -133,7 +134,7 @@ export default function ServicesHubView({
               { id: "motorbike", label: "Thuê Xe Máy", icon: Bike },
               { id: "accommodation", label: "Lưu Trú & Homestay", icon: Hotel },
               { id: "combo", label: "Combo Xe + Phòng", icon: Star },
-              { id: "restaurant", label: "Nhà Hàng & Đặc Sản", icon: DollarSign },
+              { id: "restaurant", label: "Ẩm Thực & Đặc Sản", icon: UtensilsCrossed },
               { id: "tour", label: "Tour & Vé Tham Quan", icon: MapPin }
             ].map((cat) => {
               const Icon = cat.icon;
@@ -434,63 +435,114 @@ export default function ServicesHubView({
           </div>
         )}
 
-        {/* SECTION 4: NHÀ HÀNG & ẨM THỰC */}
+        {/* SECTION 4: ẨM THỰC - ĐỊA ĐIỂM VÀ ĐẶC SẢN LÀ HAI MỤC RIÊNG */}
         {(selectedCategory === "all" || selectedCategory === "restaurant") && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-2">
-              <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-amber-600" />
-                <span>Nhà Hàng & Ẩm Thực Đặc Sản Mộc Châu</span>
-              </h2>
+          <section className="space-y-4" id="mocchau_food_guide" aria-label="Khám phá ẩm thực Mộc Châu">
+            <div className="border-b border-stone-200 pb-3">
+              <div className="flex items-center gap-2">
+                <UtensilsCrossed className="w-5 h-5 text-amber-700" />
+                <h2 className="text-lg sm:text-xl font-black text-stone-900">Ăn gì ở Mộc Châu?</h2>
+              </div>
+              <p className="text-xs sm:text-sm mt-1 text-stone-600">Một bên khám phá nhà hàng, quán ăn, quán cà phê; một bên tìm hiểu những món ngon và đặc sản của cao nguyên.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                {
-                  name: "Nhà hàng Bê Chao 64 Mộc Châu",
-                  type: "Đặc sản Tây Bắc",
-                  price: "150.000đ - 300.000đ / người",
-                  desc: "Món bê chao mềm thơm ngậy, cá suối chiên giòn, lẩu nấm và rau rừng tươi sạch.",
-                  location: "Tiểu khu Chiềng Đi, Mộc Châu"
-                },
-                {
-                  name: "Nhà hàng Đông Hải Mộc Châu",
-                  type: "Cơm đoàn & Gia đình",
-                  price: "120.000đ - 250.000đ / người",
-                  desc: "Gà đồi nướng mắc khén, xôi ngũ sắc, trâu gác bếp và lợn mán nướng than hoa.",
-                  location: "Trần Huy Liệu, TT. Mộc Châu"
-                },
-                {
-                  name: "Quán Cafe View Đồi Chè Mộc Sương",
-                  type: "Cà phê & Check-in",
-                  price: "35.000đ - 65.000đ / ly",
-                  desc: "Thưởng thức chè ô long thơm ngát, sinh tố mận tươi và ngắm bình minh trên đồi chè.",
-                  location: "Thung lũng đồi chè Tân Lập"
-                }
-              ].map((res, i) => (
-                <div key={i} className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md">
-                      {res.type}
-                    </span>
-                    <h3 className="font-extrabold text-stone-900 text-sm mt-1">{res.name}</h3>
-                    <p className="text-xs text-stone-500 line-clamp-2">{res.desc}</p>
-                    <p className="text-[11px] text-emerald-800 font-bold">💰 {res.price}</p>
-                    <p className="text-[10px] text-stone-400">📍 {res.location}</p>
-                  </div>
-
-                  <div className="pt-3 mt-3 border-t border-stone-100">
-                    <a
-                      href="tel:0971050324"
-                      className="block w-full py-2 bg-stone-100 hover:bg-emerald-50 text-stone-800 hover:text-emerald-800 rounded-xl text-xs font-bold text-center transition-colors"
-                    >
-                      Gọi Đặt Bàn Giảm 10%
-                    </a>
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(290px,0.8fr)] gap-4 sm:gap-5 items-start">
+              {/* LEFT: DIRECTORY - chỉ giới thiệu, không có đặt bàn, không cam kết giảm giá */}
+              <div className="bg-white border border-stone-200 rounded-2xl p-3 sm:p-5 shadow-sm space-y-4">
+                <div className="flex items-start gap-2">
+                  <Coffee className="w-5 h-5 shrink-0 text-emerald-700 mt-0.5" />
+                  <div>
+                    <h3 className="font-black text-base text-stone-900">Nhà hàng, quán ăn & quán cà phê</h3>
+                    <p className="text-xs text-stone-500">Tìm địa điểm phù hợp, xem thông tin giới thiệu và khu vực.</p>
                   </div>
                 </div>
-              ))}
+                <div role="group" aria-label="Lọc loại địa điểm ăn uống" className="flex flex-wrap gap-2">
+                  {[
+                    {id:"all",label:"Tất cả"},
+                    {id:"restaurant",label:"Nhà hàng · quán ăn"},
+                    {id:"cafe",label:"Quán cà phê"},
+                    {id:"grill",label:"Lẩu & nướng"},
+                    {id:"snack",label:"Ăn vặt"}
+                  ].map(item=><button key={item.id} type="button" aria-pressed={foodFilter===item.id} onClick={()=>setFoodFilter(item.id as typeof foodFilter)}
+                    className={"rounded-full px-3 py-2 text-xs font-bold border transition-colors "+(foodFilter===item.id?"bg-emerald-700 border-emerald-700 text-white":"bg-white border-stone-200 text-stone-700 hover:bg-emerald-50")}>
+                    {item.label}
+                  </button>)}
+                </div>
+                {(() => {
+                  const foodPlaces = [
+                    {
+                      id:"be-chao-64",category:"restaurant",label:"Nhà hàng · đặc sản",
+                      name:"Nhà hàng Bê Chao 64 Mộc Châu",price:"150.000–300.000đ/người",
+                      desc:"Gợi ý các món bê chao, cá suối và rau rừng trong thực đơn ẩm thực vùng cao.",
+                      location:"Khu vực Chiềng Đi, Mộc Châu"
+                    },
+                    {
+                      id:"dong-hai",category:"restaurant",label:"Nhà hàng · cơm gia đình",
+                      name:"Nhà hàng Đông Hải Mộc Châu",price:"120.000–250.000đ/người",
+                      desc:"Gợi ý điểm ăn cơm gia đình, đoàn khách và khám phá các món mang hương vị Tây Bắc.",
+                      location:"Khu vực Trần Huy Liệu, Mộc Châu"
+                    },
+                    {
+                      id:"moc-suong-cafe",category:"cafe",label:"Cà phê · ngắm cảnh",
+                      name:"Quán Cafe View Đồi Chè Mộc Sương",price:"35.000–65.000đ/ly",
+                      desc:"Gợi ý trải nghiệm thưởng trà, cà phê và ngắm cảnh đồi chè.",
+                      location:"Khu vực đồi chè Tân Lập"
+                    }
+                  ] as const;
+                  const visible = foodFilter==="all" ? foodPlaces : foodPlaces.filter(place=>place.category===foodFilter);
+                  return visible.length ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {visible.map(place=><article key={place.id} className="border border-stone-200 bg-stone-50/70 rounded-2xl p-4 flex flex-col gap-2">
+                        <span className="text-[10px] font-extrabold text-emerald-800 uppercase">{place.label}</span>
+                        <h4 className="font-black text-sm text-stone-900">{place.name}</h4>
+                        <p className="text-xs text-stone-600 leading-relaxed">{place.desc}</p>
+                        <p className="mt-auto pt-2 text-xs text-emerald-900 font-bold">📍 {place.location}</p>
+                        <p className="text-[11px] text-stone-600">Giá tham khảo: {place.price}</p>
+                      </article>)}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-6 text-center">
+                      <p className="font-bold text-sm text-stone-700">Đang cập nhật địa điểm thuộc danh mục này</p>
+                      <p className="text-xs text-stone-500 mt-1">Danh sách sẽ được bổ sung khi có thông tin phù hợp.</p>
+                    </div>
+                  );
+                })()}
+                <p className="text-[11px] text-stone-500 leading-relaxed border-t border-stone-100 pt-3">
+                  Thông tin địa điểm và mức giá chỉ mang tính gợi ý, có thể thay đổi. Mộc Châu Travel không nhận đặt bàn hoặc cam kết giảm giá tại các cơ sở này.
+                </p>
+              </div>
+
+              {/* RIGHT: CUISINE GUIDE - không gắn món ăn với một nhà hàng cụ thể */}
+              <div className="bg-gradient-to-b from-amber-50 to-white border border-amber-200 rounded-2xl p-3 sm:p-5 shadow-sm space-y-4">
+                <div className="flex items-start gap-2">
+                  <BookOpen className="w-5 h-5 shrink-0 text-amber-700 mt-0.5"/>
+                  <div>
+                    <h3 className="font-black text-base text-stone-900">Món ngon & đặc sản Mộc Châu</h3>
+                    <p className="text-xs text-stone-600">Gợi ý tìm hiểu văn hóa ẩm thực địa phương.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+                  {[
+                    {name:"Bê chao Mộc Châu",tag:"Món mặn",detail:"Thịt bê non được tẩm ướp, chao nhanh trong dầu nóng; thường dùng nóng cùng rau thơm và gia vị."},
+                    {name:"Cá suối Mộc Châu",tag:"Đặc sản vùng núi",detail:"Cá suối nhỏ thường được chiên giòn hoặc nướng, ăn cùng rau và các loại gia vị địa phương."},
+                    {name:"Thịt trâu gác bếp",tag:"Món khô",detail:"Thịt trâu tẩm gia vị Tây Bắc, hun khói và sấy khô; hương vị đậm, thích hợp mua làm quà."},
+                    {name:"Xôi ngũ sắc",tag:"Ẩm thực truyền thống",detail:"Xôi nếp nhiều màu, gắn với văn hóa ẩm thực của các cộng đồng dân tộc vùng Tây Bắc."},
+                    {name:"Sữa và sữa chua Mộc Châu",tag:"Đặc sản cao nguyên",detail:"Các sản phẩm chế biến từ sữa bò, đặc trưng của vùng cao nguyên có nghề chăn nuôi bò sữa."},
+                    {name:"Chè Mộc Châu",tag:"Đồ uống & quà",detail:"Trà làm từ vùng nguyên liệu chè Mộc Châu; có thể trải nghiệm thưởng trà hoặc mua về làm quà."}
+                  ].map(dish=><article key={dish.name} className="rounded-xl border border-amber-100 bg-white p-3">
+                    <div className="flex gap-2 items-start">
+                      <Flame className="w-4 h-4 text-amber-600 shrink-0 mt-0.5"/>
+                      <div>
+                        <span className="block text-[10px] font-extrabold text-amber-700 uppercase">{dish.tag}</span>
+                        <h4 className="font-black text-sm text-stone-900 mt-0.5">{dish.name}</h4>
+                        <p className="text-xs text-stone-600 leading-relaxed mt-1">{dish.detail}</p>
+                      </div>
+                    </div>
+                  </article>)}
+                </div>
+              </div>
             </div>
-          </div>
+          </section>
         )}
 
       </div>
