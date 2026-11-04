@@ -1,11 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import LimousineBooking from "./LimousineBooking";
 import SharedCarBooking from "./SharedCarBooking";
 import PrivateCharterBooking from "./PrivateCharterBooking";
 import { Compass, Users, User } from "lucide-react";
 
 export default function BookingSwitcher(props: any) {
-  const [subTab, setSubTab] = useState<"limousine" | "shared" | "charter">("limousine");
+  const [subTab, setSubTab] = useState<"limousine" | "shared" | "charter">(props.initialSubTab || "limousine");
+  useEffect(() => {
+    if (props.initialSubTab) setSubTab(props.initialSubTab);
+  }, [props.initialSubTab]);
 
   return (
     <div className="space-y-6">
