@@ -7,7 +7,6 @@ import type { IdTokenResult } from 'firebase/auth';
  */
 const STORAGE_KEY = 'mocchau_phone_email_device_v1';
 const OWNER_EMAIL = 'hquansl001@gmail.com';
-const OWNER_PHONE = '+84971050324';
 
 export function normalizeVietnamPhone(input: string): string | null {
   const value = input.replace(/[\s.\-()]/g, '');
@@ -20,7 +19,6 @@ export function normalizeVietnamPhone(input: string): string | null {
 export function getEmailForPhone(phone: string): string | null {
   const normalized = normalizeVietnamPhone(phone);
   if (!normalized) return null;
-  if (normalized === OWNER_PHONE) return OWNER_EMAIL;
   try {
     const saved: Record<string, string> = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     const email = saved[normalized];
@@ -34,7 +32,6 @@ export function getEmailForPhone(phone: string): string | null {
 export function rememberPhoneEmail(phone: string, email: string): void {
   const normalized = normalizeVietnamPhone(phone);
   if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
-  if (normalized === OWNER_PHONE) return; // Never override owner's verified alias
   try {
     const saved: Record<string, string> = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     saved[normalized] = email.trim().toLowerCase();

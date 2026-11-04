@@ -132,7 +132,13 @@ export default function App() {
   const [selectedCategoryItem, setSelectedCategoryItem] = useState<any | null>(null);
 
   // Quick search synchronization states
-  const [limousineSearch, setLimousineSearch] = useState<{ from: string; to: string; date: string; time: string } | null>(null);
+  // Booking must always have a valid initial search. Before, tapping the QT
+  // Limousine tile changed tabs but rendered no booking form because this was null.
+  const [limousineSearch, setLimousineSearch] = useState<{ from: string; to: string; date: string; time: string } | null>(()=>({
+    from:"Hà Nội",to:"Mộc Châu",
+    date:new Date(Date.now()+7*60*60*1000).toISOString().slice(0,10),
+    time:"all"
+  }));
   const [comboSearch, setComboSearch] = useState<{ hotelId: string; date: string; from?: string; to?: string; time?: string } | null>(null);
   const [confirmedPopupNotif, setConfirmedPopupNotif] = useState<AppNotification | null>(null);
   const [operatorBookingAlert, setOperatorBookingAlert] = useState<AppNotification | null>(null);
@@ -479,7 +485,8 @@ export default function App() {
       }
       if (!limousineSearch) {
         // Set default search parameters for convenient instant viewing
-        const todayStr = new Date().toISOString().split("T")[0];
+        // Select the VN calendar date, not UTC (which can differ near midnight).
+        const todayStr = new Date(Date.now()+7*60*60*1000).toISOString().slice(0,10);
         setLimousineSearch({
           from: "Hà Nội",
           to: "Mộc Châu",
@@ -508,6 +515,10 @@ export default function App() {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }, 100);
     }
+  };
+
+  const openLimousineBooking = () => {
+    handleSelectService("limousine", "limousine");
   };
 
   const handleSignOut = async () => {
@@ -620,7 +631,7 @@ export default function App() {
       />
 
       {/* Hero Banner only shown on home tabs */}
-      {(activeTab === "limousine" || activeTab === "combo") ? (
+      {(activeTab === "combo" || (activeTab === "limousine" && !limousineSearch)) ? (
         <Hero
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -689,7 +700,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === "explore" && <ExploreLanding setActiveTab={setActiveTab} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
+          {activeTab === "explore" && <ExploreLanding setActiveTab={setActiveTab} onOpenLimousineBooking={openLimousineBooking} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
           {activeTab === "explore_legacy" && (
             <ExploreMocChau 
               destinations={destinations} 
@@ -1013,7 +1024,7 @@ export default function App() {
 
       {/* Floating fast support buttons */}
       <FloatingContact />
-      <AIChatWidget hideLauncher onOpenLimousine={() => setActiveTab("limousine")} onOpenAIPlanner={() => setActiveTab("ai")} />
+      <AIChatWidget hideLauncher onOpenLimousine={openLimousineBooking} onOpenAIPlanner={() => setActiveTab("ai")} />
 
       {/* Mobile Fixed Bottom Navigation Bar */}
       <BottomNavigation

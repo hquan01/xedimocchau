@@ -2,10 +2,10 @@ import React, {useEffect,useState} from 'react';
 import {CloudSun,Sparkles,Flower2,BookOpen,MapPin,Flame,Bus,Car,Bike,House,UtensilsCrossed,Ticket,ArrowRight,Heart,ChevronRight,ChevronLeft,MessageCircle} from 'lucide-react';
 import {useSiteContent,HomeTile,FeaturedStory} from '../lib/siteContent';
 
-interface Props {setActiveTab:(tab:string)=>void;openMotorbike:()=>void;openAuth:()=>void;isSignedIn:boolean}
+interface Props {setActiveTab:(tab:string)=>void;onOpenLimousineBooking:()=>void;openMotorbike:()=>void;openAuth:()=>void;isSignedIn:boolean}
 const icons:Record<string,React.ComponentType<any>>={'cloud-sun':CloudSun,sparkles:Sparkles,flower:Flower2,'book-open':BookOpen,'map-pin':MapPin,flame:Flame,bus:Bus,car:Car,bike:Bike,home:House,utensils:UtensilsCrossed,ticket:Ticket};
 
-export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSignedIn}:Props){
+export default function ExploreLanding({setActiveTab,onOpenLimousineBooking,openMotorbike,openAuth,isSignedIn}:Props){
   const {content}=useSiteContent();
   const [slideIndex,setSlideIndex]=useState(0);
   const heroSlides=[
@@ -15,6 +15,9 @@ export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSi
   const currentSlide=heroSlides[slideIndex % heroSlides.length];
   useEffect(()=>{const timer=window.setInterval(()=>setSlideIndex(i=>i+1),6500);return()=>window.clearInterval(timer)},[heroSlides.length]);
   const navigate=(target:string)=>{
+    // The QT Limousine tile must open the actual booking form, never just the
+    // generic route-search Hero. Also works with saved/custom home tile config.
+    if(target==='limousine'){onOpenLimousineBooking();return;}
     if(target==='hot'){document.getElementById('hot_stories')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
     if(target==='motorbike'){openMotorbike();return;}
     if(target==='ai'){window.dispatchEvent(new Event('mocchau:open-ai'));return;}
@@ -27,6 +30,7 @@ export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSi
     setActiveTab(target); window.scrollTo({top:0,behavior:'smooth'});
   };
   const navigateTile = (tile:HomeTile) => {
+    if(tile.id==='limousine') {onOpenLimousineBooking();return;}
     if(tile.target==='ticket-prices') {navigate('ticket-prices');return;}
     const serviceCategory:Record<string,string>={
       taxi:'transport',stay:'accommodation',food:'restaurant',
