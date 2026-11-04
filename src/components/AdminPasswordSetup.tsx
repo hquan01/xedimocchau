@@ -25,7 +25,7 @@ export default function AdminPasswordSetup() {
     if(!user) return;
     getIdTokenResult(user,true).then(token=>{
       if(!valid) return;
-      setOwnerVerified(isVerifiedOwnerToken(token));
+      setOwnerVerified(isVerifiedOwnerToken(token, user.email));
       setHasPassword(user.providerData.some(p=>p.providerId==='password'));
     }).catch(()=>setOwnerVerified(false));
     return ()=>{valid=false};
@@ -40,7 +40,7 @@ export default function AdminPasswordSetup() {
     setBusy(true);
     try {
       const user=auth.currentUser;
-      if(!user?.email || !isVerifiedOwnerToken(await getIdTokenResult(user,true)))
+      if(!user?.email || !isVerifiedOwnerToken(await getIdTokenResult(user,true), user.email))
         throw new Error('Cần đăng nhập Google bằng tài khoản quản lý đã xác minh.');
       rememberPhoneEmail(normalized,user.email);
       setLinkedPhone(true);
@@ -58,7 +58,7 @@ export default function AdminPasswordSetup() {
       const user = auth.currentUser;
       if(!user?.email) throw new Error('Hãy đăng nhập với Google của chủ website trước.');
       const token = await getIdTokenResult(user,true);
-      if(!isVerifiedOwnerToken(token))throw new Error('Không đúng tài khoản chủ website đã xác minh.');
+      if(!isVerifiedOwnerToken(token, user.email))throw new Error('Không đúng tài khoản chủ website đã xác minh.');
       await linkWithCredential(user,EmailAuthProvider.credential(user.email,password));
       await reload(user);
       setHasPassword(true);

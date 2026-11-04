@@ -47,7 +47,7 @@ export function useFirebaseSync() {
       }
       try {
         const token = await firebaseUser.getIdTokenResult();
-        const isAdmin = hasOperatorAccess(token);
+        const isAdmin = hasOperatorAccess(token, firebaseUser.email || undefined);
         if (!isAdmin) {
           try {
             // Also runs on refresh for an already-signed-in first-time Google
@@ -66,7 +66,11 @@ export function useFirebaseSync() {
             setCurrentUser({id:firebaseUser.uid,email:firebaseUser.email||'',name:firebaseUser.displayName||'Thành viên',phone:firebaseUser.phoneNumber||'',points:0,role:isAdmin?'operator':'customer'});
           }
           setAuthReady(true);
-        }, error=>{console.error('Could not load profile',error);setCurrentUser(null);setAuthReady(true)});
+        }, error => {
+          console.warn('Could not load profile from Firestore (using fallback):', error);
+          setCurrentUser({id:firebaseUser.uid,email:firebaseUser.email||'',name:firebaseUser.displayName||'Thành viên',phone:firebaseUser.phoneNumber||'',points:0,role:isAdmin?'operator':'customer'});
+          setAuthReady(true);
+        });
       } catch (error) {console.error('Auth claim lookup failed',error);setCurrentUser(null);setAuthReady(true)}
     });
     return () => {unsubAuth();unsubscribeProfile()};
@@ -100,7 +104,17 @@ export function useFirebaseSync() {
           // Show only bookings from this device
           setBookings(fetchedBookings.filter(b => (b as any).deviceId === deviceId));
         }
-      }, (error) => handleFirestoreError(error, OperationType.LIST, "bookings"));
+      }, (error) => {
+        console.warn("Bookings snapshot error, using local fallback:", error);
+        const localList = getLocalList<Booking>("bookings", []);
+        setAllBookings(localList);
+        const deviceId = getDeviceId();
+        if (currentUser?.role === 'operator') {
+          setBookings(localList);
+        } else {
+          setBookings(localList.filter(b => (b as any).deviceId === deviceId));
+        }
+      });
 
       unsubCombosCol = onSnapshot(collection(db, "tour_combos"), (snap) => {
         if (snap.empty) {
@@ -114,6 +128,9 @@ export function useFirebaseSync() {
         } else {
           setCombos(snap.docs.map(d => d.data() as TourCombo));
         }
+      }, (error) => {
+        console.warn("Tour combos error, using local defaults:", error);
+        setCombos(getLocalList<TourCombo>("combos", INITIAL_COMBOS));
       });
 
       unsubAccCol = onSnapshot(collection(db, "accommodations"), (snap) => {
@@ -128,6 +145,9 @@ export function useFirebaseSync() {
         } else {
           setAccommodations(snap.docs.map(d => d.data() as Accommodation));
         }
+      }, (error) => {
+        console.warn("Accommodations error, using local defaults:", error);
+        setAccommodations(getLocalList<Accommodation>("accommodations", INITIAL_ACCOMMODATIONS));
       });
 
       unsubArticlesCol = onSnapshot(collection(db, "guide_articles"), (snap) => {
@@ -142,6 +162,9 @@ export function useFirebaseSync() {
         } else {
           setArticles(snap.docs.map(d => d.data() as GuideArticle));
         }
+      }, (error) => {
+        console.warn("Guide articles error, using local defaults:", error);
+        setArticles(getLocalList<GuideArticle>("articles", INITIAL_ARTICLES));
       });
 
       unsubCouponsCol = onSnapshot(collection(db, "coupons"), (snap) => {
@@ -156,6 +179,9 @@ export function useFirebaseSync() {
         } else {
           setCoupons(snap.docs.map(d => d.data() as Coupon));
         }
+      }, (error) => {
+        console.warn("Coupons error, using local defaults:", error);
+        setCoupons(getLocalList<Coupon>("coupons", INITIAL_COUPONS));
       });
 
       unsubDestinationsCol = onSnapshot(collection(db, "destinations"), (snap) => {
@@ -170,12 +196,18 @@ export function useFirebaseSync() {
         } else {
           setDestinations(snap.docs.map(d => d.data() as Destination));
         }
+      }, (error) => {
+        console.warn("Destinations error, using local defaults:", error);
+        setDestinations(getLocalList<Destination>("destinations", INITIAL_DESTINATIONS));
       });
       
       if (currentUser?.role === 'operator' && auth.currentUser) {
          const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
            setUsers(snap.docs.map(d => d.data() as User));
-         }, (error) => handleFirestoreError(error, OperationType.LIST, "users"));
+         }, (error) => {
+           console.warn("Users list error, using local cache:", error);
+           setUsers(getLocalList<User>("users", []));
+         });
          
          const originalUnsubBookings = unsubBookings;
          unsubBookings = () => { originalUnsubBookings(); unsubUsers(); };
@@ -184,7 +216,10 @@ export function useFirebaseSync() {
       // Blocked seats - public for reading to see availability
       unsubBlocked = onSnapshot(collection(db, "blocked_seats"), (snap) => {
          setBlockedSeats(snap.docs.map(d => d.data() as BlockedSeat));
-      }, (error) => handleFirestoreError(error, OperationType.LIST, "blocked_seats"));
+      }, (error) => {
+         console.warn("Blocked seats error, using local cache:", error);
+         setBlockedSeats(getLocalList<BlockedSeat>("blocked_seats", []));
+      });
 
       // Configurations - public read from configs collection for global static params
       unsubConfigs = onSnapshot(collection(db, "configs"), (snap) => {
@@ -210,7 +245,21 @@ export function useFirebaseSync() {
              });
            }
          }
-      }, (error) => handleFirestoreError(error, OperationType.LIST, "configs"));
+      }, (error) => {
+         console.warn("Configs error, using local fallbacks:", error);
+         try {
+           const configsStr = localStorage.getItem("xemc_configs");
+           if (configsStr) {
+             const parsed = JSON.parse(configsStr);
+             if (parsed.limousineConfig) setLimousineConfig(parsed.limousineConfig);
+             if (parsed.sharedCarConfig) setSharedCarConfig(parsed.sharedCarConfig);
+             if (parsed.locations) setLocations(parsed.locations);
+             if (parsed.drivers) setDrivers(parsed.drivers);
+           }
+         } catch (e) {
+           // ignore
+         }
+      });
 
       // Notifications
       unsubNotifications = onSnapshot(collection(db, "notifications"), (snap) => {
@@ -226,7 +275,10 @@ export function useFirebaseSync() {
             );
 
         setNotifications(filtered.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-      }, (error) => handleFirestoreError(error, OperationType.LIST, "notifications"));
+      }, (error) => {
+        console.warn("Notifications error, using local cache:", error);
+        setNotifications(getLocalList<AppNotification>("notifications", []));
+      });
 
       // Zalo Groups - public read for community
       unsubZaloGroups = onSnapshot(collection(db, "zalo_groups"), (snap) => {

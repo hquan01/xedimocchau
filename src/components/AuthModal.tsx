@@ -86,7 +86,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
   };
   const finish = async (account: any, preferredName?: string, preferredPhone?: string) => {
     const token = await getIdTokenResult(account, true);
-    const isAdmin = hasOperatorAccess(token);
+    const isAdmin = hasOperatorAccess(token, account.email);
     // The initial +10 must be committed together with the new member profile,
     // not added to a stale UI counter or rewritten at every Google login.
     const { profile } = await ensureMemberWelcomeBonus(account, {
