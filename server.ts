@@ -74,9 +74,10 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
     const precipitation = current.precipitation;
     const weatherCode = current.weather_code;
     const wmo = WMO_WEATHER_MAP[weatherCode] || { text: "Có mây", icon: "Cloud", isRain: false };
-    const rainProbabilityToday = Array.isArray(daily.precipitation_probability_max) &&
-        typeof daily.precipitation_probability_max[0] === "number"
-        ? daily.precipitation_probability_max[0] : undefined;
+    const rainProbabilityToday = daily.precipitation_probability_max?.[0];
+    if (!Number.isFinite(rainProbabilityToday)) {
+      throw new Error("Weather provider did not supply rain probability");
+    }
 
     // Parse Hourly (next 12 slots)
     const hourlyList: any[] = [];
@@ -130,7 +131,7 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
       }
     }
 
-    const travelAdvice = generateTravelAdvice(temp, apparentTemp, rainProbabilityToday ?? 0, wmo.isRain, weatherCode);
+    const travelAdvice = generateTravelAdvice(temp, apparentTemp, rainProbabilityToday, wmo.isRain, weatherCode);
     const nowIso = new Date().toISOString();
     const result: WeatherData = {
       success: true,
