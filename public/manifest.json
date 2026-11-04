@@ -1,11 +1,11 @@
 {
-  "name": "Xe Đi Mộc Châu",
-  "short_name": "XeMocChau",
+  "name": "Mộc Châu Travel – QT Limousine",
+  "short_name": "Mộc Châu Travel",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1b4332",
-  "description": "Đặt vé xe Limousine VIP Hà Nội - Mộc Châu đón trả tận nhà. Combo du lịch cực ưu đãi.",
+  "description": "Đặt xe QT Limousine Hà Nội – Mộc Châu, xem giờ chạy, giá vé, điểm tham quan và cẩm nang du lịch Mộc Châu.",
   "icons": [
     {
       "src": "/apple-touch-icon.png",
