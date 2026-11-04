@@ -204,13 +204,13 @@ export default function ServicesHubView({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Card 1: QT Limousine VIP 9 chỗ */}
               {(selectedCategory === "all" || selectedCategory === "transport") && (
-                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
+                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group min-w-0 max-w-full overflow-hidden">
                   <div className="space-y-3">
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-wrap justify-between items-start gap-2 min-w-0">
                       <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300">
                         ⭐ XE ĐÓN TRẢ TẬN NƠI VIP
                       </span>
-                      <span className="font-mono font-black text-emerald-800 text-sm">Xem giá khi đặt</span>
+                      <span className="font-sans font-black text-emerald-800 text-xs sm:text-sm break-words">Xem giá khi đặt</span>
                     </div>
 
                     <h3 className="font-black text-stone-900 text-base group-hover:text-emerald-800 transition-colors">
@@ -247,13 +247,13 @@ export default function ServicesHubView({
 
               {/* Card 2: Taxi & Xe Du Lịch 4 - 7 - 16 chỗ */}
               {(selectedCategory === "all" || selectedCategory === "transport") && (
-                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
+                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group min-w-0 max-w-full overflow-hidden">
                   <div className="space-y-3">
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-wrap justify-between items-start gap-2 min-w-0">
                       <span className="text-[10px] font-black uppercase text-teal-900 bg-teal-100 px-2.5 py-1 rounded-full border border-teal-300">
                         🚕 TAXI & XE HỢP ĐỒNG
                       </span>
-                      <span className="font-mono font-black text-emerald-800 text-sm">Liên hệ báo giá</span>
+                      <span className="font-sans font-black text-emerald-800 text-xs sm:text-sm break-words">Liên hệ báo giá</span>
                     </div>
 
                     <h3 className="font-black text-stone-900 text-base group-hover:text-emerald-800 transition-colors">
@@ -291,13 +291,13 @@ export default function ServicesHubView({
 
               {/* Card 3: Thuê Xe Máy (Giao tận nơi) */}
               {(selectedCategory === "all" || selectedCategory === "motorbike") && (
-                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
+                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group min-w-0 max-w-full overflow-hidden">
                   <div className="space-y-3">
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-wrap justify-between items-start gap-2 min-w-0">
                       <span className="text-[10px] font-black uppercase text-indigo-900 bg-indigo-100 px-2.5 py-1 rounded-full border border-indigo-300">
                         🛵 GIAO XE TẬN NƠI FREE
                       </span>
-                      <span className="font-mono font-black text-emerald-800 text-sm">Nhận báo giá theo ngày</span>
+                      <span className="font-sans font-black text-emerald-800 text-xs sm:text-sm break-words">Nhận báo giá theo ngày</span>
                     </div>
 
                     <h3 className="font-black text-stone-900 text-base group-hover:text-emerald-800 transition-colors">
@@ -390,7 +390,7 @@ export default function ServicesHubView({
                   <div className="p-4 pt-0 border-t border-stone-100 flex items-center justify-between mt-2">
                     <div>
                       <span className="text-[10px] text-stone-400 uppercase font-bold block">Giá từ</span>
-                      <span className="font-mono font-black text-emerald-800 text-sm">
+                      <span className="font-sans font-black text-emerald-800 text-xs sm:text-sm break-words">
                         {acc.roomTypes?.[0]?.pricePerNight ? `${acc.roomTypes[0].pricePerNight.toLocaleString('vi-VN')}đ / đêm` : 'Liên hệ để biết giá'}
                       </span>
                     </div>
@@ -421,7 +421,7 @@ export default function ServicesHubView({
               {combos.slice(0, 2).map((combo) => (
                 <div key={combo.id} className="bg-gradient-to-br from-white to-emerald-50/40 rounded-3xl p-5 border border-emerald-200 hover:shadow-xl transition-all flex flex-col justify-between">
                   <div className="space-y-3">
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-wrap justify-between items-start gap-2 min-w-0">
                       <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-full">
                         🔥 COMBO TIẾT KIỆM 20%
                       </span>
