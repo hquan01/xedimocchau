@@ -4,7 +4,7 @@ import { Compass, Check, Phone, ShieldCheck, Mail, Star, Users, MapPin, Calendar
 import { motion, AnimatePresence } from "motion/react";
 
 interface ComboBookingProps {
-  onAddBooking: (booking: any) => void;
+  onAddBooking: (booking: any) => Promise<void>;
   searchParams: { hotelId: string; date: string; from?: string; to?: string; time?: string } | null;
   onOpenPayment: (booking: any) => void;
   currentUser: User | null;
@@ -202,7 +202,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
     return baseComboPriceForGroup + extraNightsSurcharge;
   };
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -320,9 +320,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
     const finalPrice = Math.max(0, originalTotalPrice - totalDiscount);
 
     // Deduct points from active user wallet
-    if (pointsDeducted > 0) {
-      onDeductPoints(pointsDeducted);
-    }
+    // Points are deducted only after successful Firestore booking submission.
 
     const bookingData = {
       id: "bk_" + Math.random().toString(36).substr(2, 9),
@@ -351,18 +349,23 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
       isReturningCustomer
     };
 
-    onAddBooking(bookingData);
-    onOpenPayment(bookingData);
-
-    // Reset fields
-    setSelectedCombo(null);
-    setSelectedAcc(null);
-    setPassengerName("");
-    setPassengerPhone("");
-    setPassengerEmail("");
-    setNotes("");
-    setSpamAnswer("");
-    setIsSubmitting(false);
+    try {
+      await onAddBooking(bookingData);
+      if (pointsDeducted > 0) onDeductPoints(pointsDeducted);
+      onOpenPayment(bookingData);
+      setSelectedCombo(null);
+      setSelectedAcc(null);
+      setPassengerName("");
+      setPassengerPhone("");
+      setPassengerEmail("");
+      setNotes("");
+      setSpamAnswer("");
+    } catch (err) {
+      console.error("Could not save combo booking:", err);
+      setErrorMsg("Không gửi được đơn Combo lên hệ thống. Vui lòng thử lại; chưa có vé nào được xác nhận.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
