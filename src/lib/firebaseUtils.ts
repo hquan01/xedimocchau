@@ -1,6 +1,8 @@
 import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy, runTransaction } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
 import {POINTS_PER_CONFIRMED_BOOKING, previousConfirmedBookings} from "./loyalty";
+import {couponDecision} from "./couponEligibility";
+import type {Coupon,User} from "../types";
 import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review, ZaloGroup, CommunityQuestion } from "../types";
 
 // Let's get things from localStorage
@@ -90,6 +92,7 @@ export const saveBookingToFirebase = async (booking: Booking) => {
       const bookingRef=doc(db,"bookings",booking.id);
       const spendingPoints=Math.max(0,Math.floor(Number(booking.pointsDeducted||0)));
       const couponCode=typeof booking.couponCode==="string" ? booking.couponCode.trim().toUpperCase() : "";
+      if(couponCode && !booking.couponId)throw new Error("Mã ưu đãi không có thông tin kiểm tra. Vui lòng nhập lại mã.");
       if(spendingPoints>0 || couponCode) {
         const uid=auth.currentUser?.uid;
         if(!uid || !booking.userId || uid!==booking.userId) {
@@ -97,10 +100,23 @@ export const saveBookingToFirebase = async (booking: Booking) => {
         }
         const profileRef=doc(db,"users",uid);
         await runTransaction(db,async tx=>{
-          const [profileDoc,existingBooking]=await Promise.all([tx.get(profileRef),tx.get(bookingRef)]);
+          const couponRef=couponCode ? doc(db,"coupons",booking.couponId!) : null;
+          const [profileDoc,existingBooking,couponDoc]=await Promise.all([
+            tx.get(profileRef),tx.get(bookingRef),
+            couponRef ? tx.get(couponRef) : Promise.resolve(null)
+          ]);
           if(existingBooking.exists())throw new Error("Mã đặt vé này đã tồn tại.");
           if(!profileDoc.exists())throw new Error("Chưa tìm thấy ví điểm thành viên.");
-          const profile=profileDoc.data() as any;
+          const profile=profileDoc.data() as User;
+          if(couponCode){
+            if(!couponDoc?.exists())throw new Error("Mã voucher không còn tồn tại.");
+            const voucher=couponDoc.data() as Coupon;
+            if(voucher.code.toUpperCase()!==couponCode)throw new Error("Mã voucher không khớp.");
+            const decision=couponDecision(voucher,{...profile,id:uid,role:'customer'});
+            if(!decision.eligible)throw new Error(decision.reason);
+            if(voucher.discountPercentage<=0||voucher.discountPercentage>100)
+              throw new Error("Mức giảm của voucher không hợp lệ.");
+          }
           if(previousConfirmedBookings({...profile,id:uid,role:'customer'})<1)
             throw new Error("Điểm và voucher chỉ áp dụng từ lần đặt vé thứ hai, sau khi vé đầu đã được xác nhận.");
           const points=Math.max(0,Math.floor(Number(profile.points||0)));
