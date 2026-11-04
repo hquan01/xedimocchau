@@ -479,7 +479,8 @@ export default function App() {
       }
       if (!limousineSearch) {
         // Set default search parameters for convenient instant viewing
-        const todayStr = new Date().toISOString().split("T")[0];
+        // Select the VN calendar date, not UTC (which can differ near midnight).
+        const todayStr = new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Ho_Chi_Minh'});
         setLimousineSearch({
           from: "Hà Nội",
           to: "Mộc Châu",
@@ -508,6 +509,10 @@ export default function App() {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }, 100);
     }
+  };
+
+  const openLimousineBooking = () => {
+    handleSelectService("limousine", "limousine");
   };
 
   const handleSignOut = async () => {
@@ -620,7 +625,7 @@ export default function App() {
       />
 
       {/* Hero Banner only shown on home tabs */}
-      {(activeTab === "limousine" || activeTab === "combo") ? (
+      {(activeTab === "combo" || (activeTab === "limousine" && !limousineSearch)) ? (
         <Hero
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -689,7 +694,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === "explore" && <ExploreLanding setActiveTab={setActiveTab} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
+          {activeTab === "explore" && <ExploreLanding setActiveTab={setActiveTab} onOpenLimousineBooking={openLimousineBooking} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
           {activeTab === "explore_legacy" && (
             <ExploreMocChau 
               destinations={destinations} 
