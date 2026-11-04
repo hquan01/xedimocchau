@@ -189,7 +189,7 @@ export default function MobileAdminDrawer({
         {/* Mobile footer */}
         <div className="p-3 border-t border-stone-800 text-[11px] text-stone-400 flex justify-between items-center bg-stone-950/80">
           <span>● Đang kết nối Firestore</span>
-          <span className="font-mono text-emerald-400 font-bold">PIN: 2025</span>
+          <span className="text-emerald-400 font-bold">Chọn từng phân hệ</span>
         </div>
       </div>
     </div>

@@ -193,26 +193,36 @@ export default function OperatorPanel({
   // Navigation tabs & 16 Modules inside Operator 2.0
   const [activeModuleId, setActiveModuleId] = useState<string>("overview");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
-  const [panelTab, setPanelTab] = useState<"bookings" | "seatLock" | "customers" | "overview" | "travelServices" | "pricing" | "coupons" | "locations" | "content" | "schedules" | "reviews" | "drivers" | "zaloCommunity">("overview");
+  const workspaceRef = React.useRef<HTMLDivElement>(null);
+  // The visible workspace is DERIVED from the selected sidebar module.
+  // Keeping an independent panelTab previously rendered stale modules
+  // (e.g. seat charts underneath the restaurant editor).
+  const modulePanels = {
+    overview:"overview",
+    limousine_bookings:"bookings",
+    limousine_seatlock:"seatLock",
+    limousine_customers:"customers",
+    limousine_schedules:"schedules",
+    limousine_pricing:"pricing",
+    limousine_drivers:"drivers",
+    limousine_locations:"locations",
+    limousine_coupons:"coupons",
+    accommodations_combos:"travelServices",
+    destinations:"content",
+    articles_guide:"content",
+    customer_reviews:"reviews",
+    community_zalo:"zaloCommunity"
+  } as const;
+  const panelTab = modulePanels[activeModuleId as keyof typeof modulePanels] ?? null;
   const [activeContentTab, setActiveContentTab] = useState<"destinations" | "articles">("destinations");
   const [userToDelete, setUserToDelete] = useState<any>(null);
 
   const handleSelectModule = (modId: string) => {
     setActiveModuleId(modId);
-    if (modId === "limousine_bookings") setPanelTab("bookings");
-    else if (modId === "limousine_seatlock") setPanelTab("seatLock");
-    else if (modId === "limousine_customers") setPanelTab("customers");
-    else if (modId === "overview") setPanelTab("overview");
-    else if (modId === "limousine_schedules") setPanelTab("schedules");
-    else if (modId === "limousine_pricing") setPanelTab("pricing");
-    else if (modId === "limousine_drivers") setPanelTab("drivers");
-    else if (modId === "limousine_locations") setPanelTab("locations");
-    else if (modId === "limousine_coupons") setPanelTab("coupons");
-    else if (modId === "accommodations_combos") setPanelTab("travelServices");
-    else if (modId === "destinations") { setPanelTab("content"); setActiveContentTab("destinations"); }
-    else if (modId === "articles_guide") { setPanelTab("content"); setActiveContentTab("articles"); }
-    else if (modId === "customer_reviews") setPanelTab("reviews");
-    else if (modId === "community_zalo") setPanelTab("zaloCommunity");
+    if (modId === "destinations") setActiveContentTab("destinations");
+    if (modId === "articles_guide") setActiveContentTab("articles");
+    // Each selection begins at the heading of its own workspace.
+    workspaceRef.current?.scrollTo({top:0,behavior:"auto"});
   };
 
   // Selection states for bulk actions
@@ -855,7 +865,7 @@ export default function OperatorPanel({
       />
 
       {/* 3. Main Workspace Canvas */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+      <div ref={workspaceRef} className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overscroll-contain">
         <AdminTopBar
           activeModuleId={activeModuleId}
           onOpenMobileDrawer={() => setIsMobileDrawerOpen(true)}

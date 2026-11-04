@@ -33,12 +33,16 @@ export default function ServicesHubView({
     // Homepage "Giá vé tham quan" tile opens this tab directly.
     try {
       const selected = sessionStorage.getItem("mocchau_services_open_category");
-      sessionStorage.removeItem("mocchau_services_open_category");
-      if (selected === "tour") return "tour";
+      // Keep value until mount: React StrictMode may evaluate state initialization twice.
+      if (selected === "tour" || selected === "restaurant" || selected === "accommodation" ||
+          selected === "transport" || selected === "combo" || selected === "motorbike") return selected;
     } catch {}
-    return "all";
+    return "transport";
   });
   const {content: siteContent} = useSiteContent();
+  React.useEffect(() => {
+    try { sessionStorage.removeItem("mocchau_services_open_category"); } catch {}
+  }, []);
   const [searchTerm, setSearchTerm] = useState("");
   const [foodFilter, setFoodFilter] = useState<"all" | "restaurant" | "cafe" | "grill" | "snack">("all");
   const serviceSearchItems = [

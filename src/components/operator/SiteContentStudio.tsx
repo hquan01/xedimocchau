@@ -10,6 +10,15 @@ function Uploader({onFile}: {onFile:(url:string)=>void}) {
 export default function SiteContentStudio(){
   const {content:server,error:loadError}=useSiteContent();
   const [draft,setDraft]=useState<SiteContent>(server);
+  const [editorSection,setEditorSection]=useState<'identity'|'slides'|'tiles'|'stories'|'tickets'|'contacts'>('identity');
+  const editorTabs = [
+    {id:'identity',label:'Logo & banner chính'},
+    {id:'slides',label:'Banner chuyển tiếp'},
+    {id:'tiles',label:'Danh mục trang chủ'},
+    {id:'stories',label:'Bài HOT & điểm đến'},
+    {id:'tickets',label:'Giá vé tham quan'},
+    {id:'contacts',label:'Thông tin liên hệ'}
+  ] as const;
   const [dirty,setDirty]=useState(false),[publishing,setPublishing]=useState(false),[message,setMessage]=useState('');
   useEffect(()=>{if(!dirty)setDraft(server)},[server,dirty]);
   const edit=(patch:Partial<SiteContent>)=>{setDraft(s=>({...s,...patch}));setDirty(true)};
@@ -25,14 +34,33 @@ export default function SiteContentStudio(){
   const move=(key:'tiles'|'stories'|'heroSlides',i:number,offset:number)=>{const copy=[...(draft[key]||[])];const k=i+offset;if(k<0||k>=copy.length)return;[copy[i],copy[k]]=[copy[k],copy[i]];edit({[key]:copy})};
   const publish=async()=>{setPublishing(true);setMessage('');try{await publishSiteContent(draft);setDirty(false);setMessage('Đã xuất bản thành công. Trang khách sẽ nhận cấu hình mới từ Firestore.')}catch(err:any){setMessage('Không thể xuất bản: '+err.message)}finally{setPublishing(false)}};
   const inputClass='w-full rounded-xl border border-stone-200 bg-white p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300';
-  return <div className="bg-white rounded-2xl border border-stone-200 p-4 sm:p-6 space-y-5 text-left">
+  return <div className="bg-white rounded-2xl border border-stone-200 p-4 sm:p-6 pb-32 sm:pb-36 space-y-5 text-left">
     <div><h2 className="text-lg font-black text-[#1b4332]">Chỉnh sửa giao diện & Nội dung trang chủ</h2><p className="text-xs text-stone-500 mt-1">Logo · Banner · 12 danh mục · Bài HOT · Thông tin liên hệ. Chỉnh trên bản nháp rồi bấm Xuất bản.</p></div>
     {loadError&&<p className="bg-amber-50 rounded-xl p-3 text-xs text-amber-900">{loadError}</p>}
     {message&&<p role="status" className="rounded-xl p-3 bg-emerald-50 text-emerald-900 text-xs">{message}</p>}
+    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-2" role="tablist" aria-label="Chọn phần nội dung cần chỉnh sửa">
+      <div className="flex overflow-x-auto gap-2 sm:flex-wrap pb-1">
+        {editorTabs.map(tab=>(
+          <button type="button" key={tab.id} role="tab"
+            aria-selected={editorSection===tab.id}
+            onClick={()=>setEditorSection(tab.id)}
+            className={"shrink-0 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-colors "+
+              (editorSection===tab.id?"bg-[#1b4332] text-white shadow-sm":"bg-white text-stone-700 border border-stone-200 hover:bg-emerald-50")}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <p className="px-2 pt-2 text-[11px] text-stone-500">
+        Chỉ hiển thị nội dung đang chọn. Các chỉnh sửa ở mục khác vẫn giữ trong bản nháp cho đến khi Xuất bản.
+      </p>
+    </div>
+    {editorSection === 'identity' && (
     <section className="space-y-3"><h3 className="font-extrabold">Nhận diện & banner</h3>
       {[['siteName','Tên thương hiệu'],['tagline','Mô tả thương hiệu'],['heroTitle','Tiêu đề banner'],['heroDescription','Mô tả banner']].map(([k,label])=><label key={k} className="block text-xs font-bold">{label}<input className={`${inputClass} mt-1`} value={(draft as any)[k]} onChange={e=>edit({[k]:e.target.value})}/></label>)}
       {([['logoUrl','Logo'],['heroImageUrl','Banner chính']] as const).map(([k,label])=><div key={k} className="rounded-xl bg-stone-50 p-3 space-y-2"><p className="font-bold text-xs">{label}</p><img alt={label} src={draft[k]} className="w-full max-h-44 object-contain rounded-xl"/><input value={draft[k]} className={inputClass} onChange={e=>edit({[k]:e.target.value})}/><Uploader onFile={url=>edit({[k]:url})}/></div>)}
     </section>
+    )}
+    {editorSection === 'slides' && (
     <section className="space-y-3">
       <div className="flex justify-between items-center gap-2"><h3 className="font-extrabold">Các banner chuyển tiếp</h3>
         <button className="text-emerald-800 text-xs font-bold inline-flex gap-1" onClick={()=>edit({heroSlides:[...(draft.heroSlides||[]),{id:`slide-${Date.now()}`,imageUrl:'',title:'Banner mới',description:'',target:'explore',visible:false}]})}><Plus className="w-4 h-4"/>Thêm banner</button></div>
@@ -50,12 +78,18 @@ export default function SiteContentStudio(){
         <Uploader onFile={url=>edit({heroSlides:(draft.heroSlides||[]).map(x=>x.id===slide.id?{...x,imageUrl:url}:x)})}/>
       </div>)}
     </section>
+    )}
+    {editorSection === 'tiles' && (
     <section className="space-y-3"><div className="flex justify-between items-center"><h3 className="font-extrabold">Danh mục trang chủ</h3><button onClick={()=>edit({tiles:[...draft.tiles,{id:`new-${Date.now()}`,title:'Danh mục mới',subtitle:'Mô tả',icon:'map-pin',target:'services',visible:false}]})} className="text-emerald-800 text-xs font-bold flex gap-1"><Plus className="w-4 h-4"/> Thêm mục</button></div>
       {draft.tiles.map((x,i)=><div key={x.id} className="border rounded-xl p-3 space-y-2"><div className="flex justify-between items-center"><strong className="text-xs">{i+1}. {x.title}</strong><div className="flex gap-2"><button aria-label="Lên" onClick={()=>move('tiles',i,-1)}><ArrowUp className="w-4 h-4"/></button><button aria-label="Xuống" onClick={()=>move('tiles',i,1)}><ArrowDown className="w-4 h-4"/></button><button aria-label="Ẩn hiện" onClick={()=>updateTile(x.id,{visible:!x.visible})}>{x.visible?<Eye className="w-4 h-4 text-emerald-700"/>:<EyeOff className="w-4 h-4"/>}</button><button aria-label="Xóa" onClick={()=>edit({tiles:draft.tiles.filter(t=>t.id!==x.id)})}><Trash2 className="w-4 h-4 text-red-600"/></button></div></div><div className="grid grid-cols-2 gap-2"><input aria-label="Tên danh mục" className={inputClass} value={x.title} onChange={e=>updateTile(x.id,{title:e.target.value})}/><input aria-label="Mô tả" className={inputClass} value={x.subtitle} onChange={e=>updateTile(x.id,{subtitle:e.target.value})}/><input aria-label="Icon" className={inputClass} value={x.icon} onChange={e=>updateTile(x.id,{icon:e.target.value})}/><select aria-label="Trang đến" className={inputClass} value={x.target} onChange={e=>updateTile(x.id,{target:e.target.value})}>{['explore_legacy','moc_chau_today','guide','ai','limousine','trip','community','services','motorbike','hot','combo'].map(t=><option key={t} value={t}>{t}</option>)}</select></div></div>)}
     </section>
+    )}
+    {editorSection === 'stories' && (
     <section className="space-y-3"><div className="flex justify-between items-center"><h3 className="font-extrabold">Bài viết & điểm đến nổi bật</h3><button onClick={()=>edit({stories:[...draft.stories,{id:`hot-${Date.now()}`,title:'Bài nổi bật',description:'Mô tả ngắn',imageUrl:'',label:'Mới',target:'guide',visible:false}]})} className="text-emerald-800 text-xs font-bold flex gap-1"><Plus className="w-4 h-4"/> Thêm bài</button></div>
       {draft.stories.map((s,i)=><div className="border p-3 rounded-xl space-y-2" key={s.id}><div className="flex justify-between items-center"><strong className="text-xs">{i+1}. {s.title}</strong><div className="flex gap-2"><button aria-label="Lên" onClick={()=>move('stories',i,-1)}><ArrowUp className="w-4 h-4"/></button><button aria-label="Xuống" onClick={()=>move('stories',i,1)}><ArrowDown className="w-4 h-4"/></button><button aria-label="Ẩn hiện" onClick={()=>updateStory(s.id,{visible:!s.visible})}>{s.visible?<Eye className="w-4 h-4 text-emerald-700"/>:<EyeOff className="w-4 h-4"/>}</button><button aria-label="Xóa" onClick={()=>edit({stories:draft.stories.filter(t=>t.id!==s.id)})}><Trash2 className="w-4 h-4 text-red-600"/></button></div></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-2"><input className={inputClass} value={s.title} onChange={e=>updateStory(s.id,{title:e.target.value})}/><input className={inputClass} value={s.label} onChange={e=>updateStory(s.id,{label:e.target.value})}/><input className={inputClass} value={s.description} onChange={e=>updateStory(s.id,{description:e.target.value})}/><select aria-label="Liên kết bài" className={inputClass} value={s.target} onChange={e=>updateStory(s.id,{target:e.target.value})}>{['guide','explore_legacy','moc_chau_today','services','community'].map(t=><option key={t} value={t}>{t}</option>)}</select></div><img src={s.imageUrl} alt="Ảnh bài viết" className="rounded-xl object-cover h-32 w-full"/><input aria-label="URL ảnh" className={inputClass} value={s.imageUrl} onChange={e=>updateStory(s.id,{imageUrl:e.target.value})}/><Uploader onFile={url=>updateStory(s.id,{imageUrl:url})}/></div>)}
     </section>
+    )}
+    {editorSection === 'tickets' && (
     <section className="space-y-3">
       <div className="flex justify-between items-center gap-2">
         <div><h3 className="font-extrabold">Bảng giá vé tham quan Mộc Châu</h3><p className="text-xs text-stone-500 mt-1">Thêm, sửa, ẩn hoặc cập nhật giá theo nguồn công khai. Đây là giá tham khảo, chưa nhận đặt vé.</p></div>
@@ -82,7 +116,19 @@ export default function SiteContentStudio(){
         <label className="block text-xs font-bold">Nguồn kiểm tra giá (HTTPS)<input className={inputClass} type="url" value={ticket.sourceUrl} onChange={e=>updateTicket(ticket.id,{sourceUrl:e.target.value})} placeholder="https://..."/></label>
       </div>)}
     </section>
+    )}
+    {editorSection === 'contacts' && (
     <section className="space-y-2"><h3 className="font-extrabold">Kênh liên hệ</h3>{([['hotline','Hotline'],['zaloUrl','Zalo'],['messengerUrl','Messenger']] as const).map(([k,label])=><label className="block text-xs font-bold" key={k}>{label}<input className={`${inputClass} mt-1`} value={draft[k]} onChange={e=>edit({[k]:e.target.value})}/></label>)}</section>
-    <div className="sticky bottom-16 sm:bottom-4 rounded-2xl bg-white/95 backdrop-blur-md p-3 shadow-xl border flex justify-between items-center gap-2"><span className="text-xs text-stone-600">{dirty?'Có thay đổi chưa xuất bản':'Đang đồng bộ bản đã lưu'}</span><button disabled={publishing||!dirty} onClick={publish} className="bg-[#1b4332] text-white rounded-xl px-5 py-3 font-black text-sm disabled:opacity-40 flex gap-2"><Save className="w-4 h-4"/>{publishing?'Đang lưu...':'Xuất bản'}</button></div>
+    )}
+    <div className="fixed bottom-0 right-0 left-0 md:left-64 z-[65] bg-white/95 backdrop-blur-md px-4 sm:px-7 py-3 shadow-[0_-6px_24px_rgba(0,0,0,0.12)] border-t border-emerald-100 flex justify-between items-center gap-3" style={{paddingBottom:'max(0.75rem, env(safe-area-inset-bottom))'}}>
+      <div className="min-w-0">
+        <p className="text-xs font-black text-[#1b4332]">Xuất bản nội dung website</p>
+        <p className="text-[11px] text-stone-600 truncate">{dirty?'Bạn có thay đổi chưa xuất bản':'Bản nháp đang đồng bộ, chưa có thay đổi'}</p>
+      </div>
+      <button type="button" disabled={publishing||!dirty} onClick={publish}
+        className="shrink-0 bg-[#1b4332] text-white rounded-xl px-5 py-3 font-black text-sm disabled:opacity-40 inline-flex items-center justify-center gap-2 min-h-[44px]">
+        <Save className="w-4 h-4"/>{publishing?'Đang lưu...':'Xuất bản'}
+      </button>
+    </div>
   </div>;
 }
