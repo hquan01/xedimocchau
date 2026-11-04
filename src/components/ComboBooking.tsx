@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
+import {couponDecision} from "../lib/couponEligibility";
 import { Accommodation, TourCombo, User, LocationPoint } from "../types";
 import { Compass, Check, Phone, ShieldCheck, Mail, Star, Users, MapPin, CalendarDays, Ticket, ArrowRight, Sparkles, Building, Award, X, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -92,6 +93,9 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
     const found = coupons?.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false && c.isPublished === true);
     
     if (found) {
+      const eligibility=couponDecision(found,currentUser);
+      if(!eligibility.eligible){setCouponError(eligibility.reason);setAppliedCoupon(null);return;}
+
        // Check if this coupon is already used by currentUser
        if (currentUser && currentUser.usedCoupons?.includes(found.code.toUpperCase())) {
           setCouponError("Bạn đã sử dụng mã giảm giá này rồi.");
@@ -341,6 +345,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
       totalPrice: finalPrice,
       originalPrice: originalTotalPrice, 
       couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        couponId: appliedCoupon?.id,
       pointsDeducted: pointsDeducted > 0 ? pointsDeducted : undefined,
       discountAmount: totalDiscount > 0 ? totalDiscount : undefined,
       status: "pending",
