@@ -34,9 +34,10 @@ export default function ServicesHubView({
     try {
       const selected = sessionStorage.getItem("mocchau_services_open_category");
       sessionStorage.removeItem("mocchau_services_open_category");
-      if (selected === "tour") return "tour";
+      if (selected === "tour" || selected === "restaurant" || selected === "accommodation" ||
+          selected === "transport" || selected === "combo" || selected === "motorbike") return selected;
     } catch {}
-    return "all";
+    return "transport";
   });
   const {content: siteContent} = useSiteContent();
   const [searchTerm, setSearchTerm] = useState("");
