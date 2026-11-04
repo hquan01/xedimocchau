@@ -85,7 +85,14 @@ export default function SharedCarBooking({
   // Query parameters
   const [from, setFrom] = useState(searchParams?.from || "Hà Nội");
   const [to, setTo] = useState(searchParams?.to || "Mộc Châu");
-  const [date, setDate] = useState(searchParams?.date || "2026-05-25");
+  const getVietnamToday = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [date, setDate] = useState(() => {
+    const todayVN = getVietnamToday();
+    if (searchParams?.date && searchParams.date >= todayVN) {
+      return searchParams.date;
+    }
+    return todayVN;
+  });
   const [selectedTimeFilter, setSelectedTimeFilter] = useState(
     searchParams?.time && searchParams.time !== "all" && searchParams.time !== "morning" && searchParams.time !== "afternoon"
       ? searchParams.time
@@ -535,7 +542,7 @@ export default function SharedCarBooking({
             <input
               type="date"
               value={date}
-              min="2026-05-20"
+              min={getVietnamToday()}
               onChange={(e) => setDate(e.target.value)}
               className="text-sm font-semibold text-[#1b4332] bg-transparent focus:outline-none cursor-pointer font-sans"
             />

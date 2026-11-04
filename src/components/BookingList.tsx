@@ -443,7 +443,9 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
                               : bk.status === "completed"
                               ? "bg-blue-50 text-blue-800 border border-blue-200"
                               : bk.status === "pending"
-                              ? "bg-amber-50 text-amber-800 border border-amber-200"
+                              ? bk.paymentReported
+                                ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                : "bg-amber-50 text-amber-800 border border-amber-200"
                               : "bg-red-50 text-red-800 border border-red-200"
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
@@ -458,7 +460,9 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
                             <span>
                               {bk.status === "success" ? "Đã xác nhận" : 
                                bk.status === "completed" ? "Đã hoàn thành" : 
-                               bk.status === "pending" ? "Chờ chuyển khoản" : "Đã hủy"}
+                               bk.status === "pending"
+                                 ? (bk.paymentReported ? "Đã báo cọc 50% (Chờ nhà xe duyệt)" : "Chờ chuyển cọc 50%")
+                                 : "Đã hủy"}
                             </span>
                           </span>
                         </div>

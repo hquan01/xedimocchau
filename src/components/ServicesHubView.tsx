@@ -61,7 +61,7 @@ export default function ServicesHubView({
   const [taxiSeats, setTaxiSeats] = useState<4 | 7 | 9 | 16>(7);
   const [taxiPickup, setTaxiPickup] = useState("Khách sạn / Homestay Mộc Châu");
   const [taxiDropoff, setTaxiDropoff] = useState("Điểm tham quan Mộc Châu");
-  const [taxiDate, setTaxiDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [taxiDate, setTaxiDate] = useState(() => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().substring(0, 10));
   const [taxiTime, setTaxiTime] = useState("08:00");
   const [taxiPhone, setTaxiPhone] = useState(currentUser?.phone || "");
   const [taxiName, setTaxiName] = useState(currentUser?.name || "");

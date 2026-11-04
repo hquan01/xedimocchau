@@ -83,6 +83,8 @@ export interface Booking {
   pointsDeducted?: number;
   pointsRefunded?: boolean; // Prevent double refunds when a reservation is cancelled.
   discountAmount?: number;
+  paymentReported?: boolean; // Khách đã bấm "Tôi đã chuyển khoản cọc 50%"
+  paymentReportedAt?: string; // Thời điểm khách bấm báo đã chuyển cọc
   
   // Limousine specific
   seatNumbers?: string[];

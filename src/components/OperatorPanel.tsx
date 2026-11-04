@@ -1434,14 +1434,21 @@ export default function OperatorPanel({
                           <span className="text-stone-300">·</span>
                           <span className="text-stone-500 text-[11px] font-sans font-medium">{formatDisplayDate(bk.travelDate)} {bk.departureTime}</span>
                         </div>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                          isSuccess ? "bg-emerald-100 text-emerald-800" :
-                          isCompleted ? "bg-blue-100 text-blue-800" :
-                          isCancelled ? "bg-stone-100 text-stone-600 line-through" :
-                          "bg-amber-100 text-amber-800"
-                        }`}>
-                          {isSuccess ? "Đã duyệt" : isCompleted ? "Hoàn thành" : isCancelled ? "Đã hủy" : "Chờ xử lý"}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {bk.paymentReported && isPending && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white font-black text-[9px] uppercase tracking-wider animate-pulse">
+                              ⚡ Đã báo cọc 50%
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            isSuccess ? "bg-emerald-100 text-emerald-800" :
+                            isCompleted ? "bg-blue-100 text-blue-800" :
+                            isCancelled ? "bg-stone-100 text-stone-600 line-through" :
+                            "bg-amber-100 text-amber-800"
+                          }`}>
+                            {isSuccess ? "Đã duyệt" : isCompleted ? "Hoàn thành" : isCancelled ? "Đã hủy" : "Chờ xử lý"}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Passenger Details & Direct Call Button */}
@@ -1884,9 +1891,16 @@ export default function OperatorPanel({
                                   </td>
                                   <td className="py-3.5 px-6">
                                     {bk.status === "pending" && (
-                                      <span className="px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px]">
-                                        Đang Chờ
-                                      </span>
+                                      <div className="space-y-1">
+                                        <span className="px-2 py-0.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px] block text-center">
+                                          Đang Chờ
+                                        </span>
+                                        {bk.paymentReported && (
+                                          <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded font-black text-[9px] block text-center shadow-xs animate-pulse">
+                                            ⚡ Khách báo cọc 50%
+                                          </span>
+                                        )}
+                                      </div>
                                     )}
                                     {bk.status === "success" && (
                                       <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
@@ -2226,9 +2240,16 @@ export default function OperatorPanel({
                           </td>
                           <td className="py-3.5 px-6">
                             {bk.status === "pending" && (
-                              <span className="px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px]">
-                                Đang Chờ
-                              </span>
+                              <div className="space-y-1">
+                                <span className="px-2 py-0.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-bold text-[10px] block text-center">
+                                  Đang Chờ
+                                </span>
+                                {bk.paymentReported && (
+                                  <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded font-black text-[9px] block text-center shadow-xs animate-pulse">
+                                    ⚡ Khách báo cọc 50%
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {bk.status === "success" && (
                               <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">

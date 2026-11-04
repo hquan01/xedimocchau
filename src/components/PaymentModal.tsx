@@ -10,14 +10,14 @@ import {
   Printer,
   AlertCircle,
   RefreshCw,
-  Tag,
+  Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface PaymentModalProps {
   booking: Booking | null;
   onClose: (wasSuccessful?: boolean) => void;
-  onConfirmSuccess: (id: string, newTotal?: number) => void;
+  onConfirmSuccess?: (id: string, newTotal?: number) => void;
   coupons?: Coupon[];
 }
 
@@ -29,8 +29,8 @@ export default function PaymentModal({
 }: PaymentModalProps) {
   const [copiedAccount, setCopiedAccount] = useState(false);
   const [copiedContent, setCopiedContent] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [successPaid, setSuccessPaid] = useState(false);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   if (!booking) return null;
 
@@ -53,16 +53,29 @@ export default function PaymentModal({
     setTimeout(() => setCopiedContent(false), 2000);
   };
 
-  const verifyPayment = () => {
-    setIsVerifying(true);
-    // Simulate real bank transfer webhook verify wait
-    setTimeout(() => {
-      setIsVerifying(false);
-      setSuccessPaid(true);
-      if (booking?.id) {
+  const handleReportTransferred = async () => {
+    if (!booking?.id || isSubmittingReport) return;
+    setIsSubmittingReport(true);
+    try {
+      const { updateStatusInFirebase } = await import("../lib/firebaseUtils");
+      await updateStatusInFirebase(
+        booking.id,
+        {
+          paymentReported: true,
+          paymentReportedAt: new Date().toISOString(),
+        },
+        "bookings"
+      );
+      if (onConfirmSuccess) {
         onConfirmSuccess(booking.id, finalPrice);
       }
-    }, 2800);
+      setReportSuccess(true);
+    } catch (err) {
+      console.error("Error reporting payment:", err);
+      setReportSuccess(true);
+    } finally {
+      setIsSubmittingReport(false);
+    }
   };
 
   const transferCode = `COC 50% ${(booking?.id || "").toUpperCase()}`;
@@ -83,7 +96,7 @@ export default function PaymentModal({
             <span>Thanh Toán Đặt Cọc 50% Xe</span>
           </h3>
           <button
-            onClick={() => onClose(successPaid)}
+            onClick={() => onClose(reportSuccess)}
             className="p-1 px-2 hover:bg-stone-50 cursor-pointer rounded-lg text-stone-400 hover:text-stone-700"
             id="close_payment_modal_btn"
           >
@@ -92,7 +105,7 @@ export default function PaymentModal({
         </div>
 
         <AnimatePresence mode="wait">
-          {!successPaid ? (
+          {!reportSuccess ? (
             <motion.div
               key="payment_form"
               initial={{ opacity: 0 }}
@@ -396,20 +409,20 @@ export default function PaymentModal({
                     <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 space-y-1 text-stone-650 leading-relaxed text-[10px]">
                       <p className="font-extrabold text-[#111] text-[10px] flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        <span>QUY TRÌNH DUYỆT VÉ TỰ ĐỘNG:</span>
+                        <span>QUY TRÌNH XÁC NHẬN CỌC 50%:</span>
                       </p>
-                      <ul className="list-decimal list-inside space-y-0.5 text-stone-500">
+                      <ul className="list-decimal list-inside space-y-1 text-stone-600">
                         <li>
-                          Bạn chuyển cọc đúng số tiền{" "}
-                          <b>{depositPrice.toLocaleString()} VNĐ</b>
+                          Quý khách chuyển cọc đúng 50%: <b>{depositPrice.toLocaleString()} VNĐ</b>
                         </li>
                         <li>
-                          Đúng nội dung <b>{transferCode}</b>
+                          Nội dung chuyển khoản chính xác: <b>{transferCode}</b>
                         </li>
                         <li>
-                          Hệ thống MB Bank Napas sẽ tự động kiểm tra và chuyển
-                          trạng thái vé của bạn sang <b>Đã Đi / OK</b> sau khi
-                          chuyển khoản thành công
+                          Sau khi chuyển tiền, bấm nút <b>"Tôi đã chuyển khoản cọc 50%"</b> phía dưới để gửi thông báo tới nhà xe.
+                        </li>
+                        <li>
+                          Admin nhà xe QT Limousine sẽ đối soát tài khoản MB Bank và phê duyệt vé chính thức. 50% còn lại thanh toán cho lái xe khi lên xe.
                         </li>
                       </ul>
                     </div>
@@ -422,110 +435,136 @@ export default function PaymentModal({
                       className="inline-flex items-center justify-center space-x-2 w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold transition-all shadow-sm mt-2.5"
                     >
                       <span>
-                        💬 Nhắn Tin & Gửi Ảnh Cọc Cho Zalo Nhà Xe (0971050324)
+                        💬 Gửi biên nhận cọc qua Zalo Nhà Xe (0971 050 324)
                       </span>
                     </a>
                   </div>
                 </div>
               </div>
 
-              {/* Verify triggers */}
+              {/* Action triggers */}
               <div className="pt-4 border-t border-stone-100/80 flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
                   onClick={() => onClose(false)}
                   className="w-full sm:w-1/3 py-3 border border-stone-200 text-stone-600 rounded-xl text-sm font-bold hover:bg-stone-50 cursor-pointer text-center"
                 >
-                  Bỏ qua thanh toán
+                  Đóng & Chuyển khoản sau
                 </button>
 
                 <button
                   type="button"
-                  onClick={verifyPayment}
+                  onClick={handleReportTransferred}
                   id="confirm_payment_btn"
-                  disabled={isVerifying}
-                  className="w-full sm:w-2/3 py-3 bg-[#1b4332] hover:bg-[#122e22] text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                  disabled={isSubmittingReport}
+                  className="w-full sm:w-2/3 py-3 bg-[#1b4332] hover:bg-[#122e22] text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-75"
                 >
-                  {isVerifying ? (
+                  {isSubmittingReport ? (
                     <RefreshCw className="w-5 h-5 animate-spin" />
                   ) : (
-                    <ShieldCheck className="w-5 h-5" />
+                    <ShieldCheck className="w-5 h-5 text-emerald-300" />
                   )}
                   <span>
-                    {isVerifying
-                      ? "Đang xác thực giao dịch..."
-                      : "Tôi Đã Chuyển Khoản Cọc 50% Thành Công"}
+                    {isSubmittingReport
+                      ? "Đang ghi nhận thông báo..."
+                      : "Tôi Đã Chuyển Khoản Cọc 50%"}
                   </span>
                 </button>
               </div>
             </motion.div>
           ) : (
             <motion.div
-              key="payment_success"
+              key="payment_reported"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-8 space-y-6 max-w-sm mx-auto"
+              className="text-center py-6 space-y-5 max-w-md mx-auto"
               id="payment_success_state"
             >
-              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-sm">
-                <Check className="w-8 h-8 text-emerald-600 stroke-[3]" />
+              <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 mx-auto shadow-sm">
+                <Clock className="w-7 h-7 text-amber-600 stroke-[2.5]" />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <h4 className="font-extrabold text-[#1b4332] text-lg">
-                  Đã Hoàn Thành Xác Nhận Cọc!
+                  Đã gửi thông báo chuyển khoản – Đang chờ nhà xe kiểm tra
                 </h4>
-                <p className="text-stone-500 text-xs leading-relaxed font-sans">
-                  Nhà xe đã ghi nhận thông tin cọc đặt giữ vị trí 50% của hành
-                  khách <b>{booking.passengerName}</b>. Chuyến đi của quý khách
-                  đã được lưu giữ chỗ thành công!
+                <p className="text-stone-600 text-xs leading-relaxed font-sans">
+                  Nhà xe QT Limousine đã tiếp nhận thông báo cọc 50% của hành khách{" "}
+                  <b>{booking.passengerName}</b>. Chúng tôi sẽ đối soát tài khoản MB Bank và phê duyệt vé trong ít phút!
                 </p>
               </div>
 
-              <div className="bg-stone-50 border border-stone-200 p-4 rounded-2xl space-y-2.5 text-xs text-stone-600 text-left">
-                <p>
-                  ✓ <b>Mã đặt chỗ:</b>{" "}
+              <div className="bg-stone-50 border border-stone-200 p-4 rounded-2xl space-y-2 text-xs text-stone-600 text-left">
+                <div className="flex justify-between border-b border-stone-200/60 pb-2">
+                  <span className="text-stone-400">Mã đặt vé:</span>
                   <span className="font-mono font-bold text-[#1b4332]">
                     #{(booking?.id || "").toUpperCase()}
                   </span>
-                </p>
-                <p>
-                  ✓ <b>Hành khách:</b> {booking.passengerName} (
-                  {booking.passengerPhone})
-                </p>
-                <p>
-                  ✓ <b>Ngày khởi hành:</b> {booking.travelDate}
-                </p>
-                {booking.seatNumbers && (
-                  <p>
-                    ✓ <b>Vị trí ghế:</b>{" "}
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-400">Hành khách:</span>
+                  <span className="font-semibold text-stone-800">
+                    {booking.passengerName} ({booking.passengerPhone})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-400">Ngày khởi hành:</span>
+                  <span className="font-semibold text-stone-800">
+                    {booking.travelDate} ({booking.departureTime || ""})
+                  </span>
+                </div>
+                {booking.seatNumbers && booking.seatNumbers.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">Vị trí ghế:</span>
                     <span className="font-mono font-bold text-emerald-700">
                       {booking.seatNumbers.map(s => s.replace(/\s*\(Nhà xe sắp xếp\)/gi, '')).join(", ")}
                     </span>
-                  </p>
+                  </div>
                 )}
                 {booking.type === "shared_car" && (
-                  <p>
-                    ✓ <b>Số ghế đặt:</b>{" "}
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">Số ghế đặt:</span>
                     <span className="font-bold text-sky-700">
                       {booking.seatCount} ghế
                     </span>
-                  </p>
+                  </div>
                 )}
+                <div className="flex justify-between border-t border-stone-200/60 pt-2">
+                  <span className="text-stone-500">Số tiền cọc 50%:</span>
+                  <span className="font-mono font-bold text-amber-700">
+                    {depositPrice.toLocaleString()} VNĐ
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px] text-stone-500">
+                  <span>Còn lại thanh toán khi lên xe:</span>
+                  <span className="font-mono font-medium">
+                    {depositPrice.toLocaleString()} VNĐ
+                  </span>
+                </div>
               </div>
 
-              <div className="text-center bg-emerald-50 text-emerald-800 text-[10px] p-2 rounded-lg font-sans leading-normal">
-                Một email xác nhận kèm biên nhận cọc và vé điện tử PDF đã được
-                tự động gửi tới email {booking.passengerEmail}. Quý khách vui
-                lòng lưu lại mã đặt chỗ và thanh toán 50% còn lại tại điểm đón!
+              <div className="text-left bg-amber-50/80 border border-amber-200 text-amber-900 text-xs p-3.5 rounded-xl font-sans leading-relaxed space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span>Quy trình xử lý:</span>
+                </p>
+                <p className="text-[11px]">
+                  1. Admin kiểm tra sao kê MB Bank (STK: <b>0971050324</b> - TRẦN HỒNG QUÂN).
+                </p>
+                <p className="text-[11px]">
+                  2. Khi nhận đủ cọc, Admin sẽ duyệt vé sang trạng thái <b>"Đã xác nhận"</b> và hệ thống sẽ cộng <b>1 điểm thưởng</b> vào tài khoản hội viên của Quý khách.
+                </p>
+                <p className="text-[11px]">
+                  3. Hotline / Zalo điều hành trực tiếp 24/7: <a href="https://zalo.me/0971050324" target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-800 underline">0971 050 324</a>
+                </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => onClose(true)}
-                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-[#1b4332] text-white rounded-xl font-bold text-sm tracking-wide shadow"
+                className="w-full py-3 bg-[#1b4332] hover:bg-[#122e22] text-white rounded-xl font-bold text-sm tracking-wide shadow cursor-pointer transition-colors"
               >
-                Nhận vé & Đóng cửa sổ
+                Xem danh sách vé & Đóng
               </button>
             </motion.div>
           )}

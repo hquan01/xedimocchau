@@ -449,20 +449,20 @@ export default function App() {
   };
 
   const handleConfirmPaymentSuccess = async (id: string, newTotal?: number) => {
-    console.log("Payment submitted for booking:", id, "New Price:", newTotal);
-    const bk = bookings.find(b => b.id === id);
+    console.log("Deposit payment reported for booking:", id, "New Price:", newTotal);
+    const bk = bookings.find(b => b.id === id) || allBookings.find(b => b.id === id);
     if (!bk) return;
     
-    // Save new price if applicable
-    const bookingToUpdate: Booking = { ...bk };
+    // Record payment report flag while strictly maintaining pending status until Admin verifies
+    const bookingToUpdate: Booking = {
+      ...bk,
+      paymentReported: true,
+      paymentReportedAt: new Date().toISOString(),
+    };
     if (newTotal) {
       bookingToUpdate.totalPrice = newTotal;
     }
     await updateBookingStatusInFirebase(id, bookingToUpdate);
-
-    // Voucher and point usage were atomically reserved when the order was
-    // created. Do not overwrite the server-synced balance from a stale client.
-
   };
 
   const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all", pickup?: string, dropoff?: string) => {

@@ -78,7 +78,14 @@ export default function LimousineBooking({
     searchParams?.to && searchParams.to !== "Hà Nội" && searchParams.to !== "Mộc Châu" ? searchParams.to : ""
   );
 
-  const [date, setDate] = useState(searchParams?.date || "2026-05-25");
+  const getVietnamToday = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [date, setDate] = useState(() => {
+    const todayVN = getVietnamToday();
+    if (searchParams?.date && searchParams.date >= todayVN) {
+      return searchParams.date;
+    }
+    return todayVN;
+  });
   const [selectedTimeFilter, setSelectedTimeFilter] = useState(
     searchParams?.time && searchParams.time !== "all" && searchParams.time !== "morning" && searchParams.time !== "afternoon"
       ? searchParams.time
@@ -530,7 +537,7 @@ export default function LimousineBooking({
             <input
               type="date"
               value={date}
-              min={new Date().toISOString().split('T')[0]}
+              min={getVietnamToday()}
               onChange={(e) => setDate(e.target.value)}
               className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold text-[#1b4332] focus:outline-none cursor-pointer"
             />
