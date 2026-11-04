@@ -876,7 +876,7 @@ export default function SharedCarBooking({
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-extrabold text-[#1b4332] flex items-center gap-1">
                               <Award className="w-4 h-4 text-emerald-600" />
-                              Phần thưởng tích lũy: Sẵn có {currentUser.points} điểm ({ (currentUser.points * 1000).toLocaleString() }đ)
+                              Phần thưởng tích lũy: Sẵn có {currentUser.points} điểm ({ (currentUser.points * POINT_VALUE_VND).toLocaleString() }đ)
                             </span>
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input
@@ -889,12 +889,12 @@ export default function SharedCarBooking({
                             </label>
                           </div>
                           <p className="text-[10px] text-stone-500">
-                            * Tích điểm: Nhận ngay 5% giá trị quy đổi tiền mặt vào ví điểm cho mỗi chuyến đi hoàn thành thành công.
+                            * Sau khi nhà xe xác nhận mỗi vé: +1 điểm. Từ đơn thứ hai có thể giảm 1.000đ cho mỗi điểm hiện có.
                           </p>
                           {usePoints && (
                             <div className="p-2 bg-white rounded-lg border border-emerald-200 flex justify-between items-center text-xs text-emerald-800 font-bold font-sans">
                               <span>Số tiền được giảm:</span>
-                              <span className="font-mono text-red-600">-{ Math.min(getSelectedSeatsPrice(), currentUser.points * 1000).toLocaleString() } VNĐ</span>
+                              <span className="font-mono text-red-600">-{ Math.min(getSelectedSeatsPrice(), currentUser.points * POINT_VALUE_VND).toLocaleString() } VNĐ</span>
                             </div>
                           )}
                         </>
@@ -906,13 +906,13 @@ export default function SharedCarBooking({
                               <span className="text-xs font-bold text-stone-600">
                                 Sử dụng điểm trực tiếp (Đang khóa 🔒)
                               </span>
-                              <span className="text-[10px] text-stone-500 block">Ví điểm khả dụng: {currentUser.points} điểm (~{(currentUser.points * 1000).toLocaleString()}đ)</span>
+                              <span className="text-[10px] text-stone-500 block">Ví điểm khả dụng: {currentUser.points} điểm (~{(currentUser.points * POINT_VALUE_VND).toLocaleString()}đ)</span>
                             </div>
                           </div>
                           <div className="bg-amber-50 border border-amber-100 p-2.5 rounded-lg text-[10px] text-amber-800 leading-normal font-sans font-medium">
-                            🚀 Tính năng áp điểm trực tiếp khấu trừ vào đơn hàng sẽ được kích hoạt từ **lần đặt vé thứ 3 trở đi** (Hiện tại lịch sử của bạn ghi nhận: <b>{userBookingsCount}/2 chuyến đã đặt</b>).
+                            Điểm và voucher áp dụng từ đơn thứ hai, sau khi vé đầu được nhà xe xác nhận.
                             <br />
-                            <span className="text-stone-500 font-normal mt-1 block"><b>Mẹo:</b> Bạn vẫn luôn có thể vào <b>Trang cá nhân ➔ Lợi ích điểm thưởng</b> để đổi điểm thành các mã Coupon cực rẻ bất kì lúc nào!</span>
+                            <span className="text-stone-600 mt-1 block">Hiện đã xác nhận: {currentUser.rewardedBookingIds?.length || currentUser.completedBookingsCount || 0} đơn.</span>
                           </div>
                         </div>
                       )}
