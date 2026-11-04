@@ -41,7 +41,8 @@ async function postPhoneAuth<T>(route: string, payload: Record<string,string>, i
 
 export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>('login');
-  const [method, setMethod] = useState<LoginMethod>('phone');
+  const [method, setMethod] = useState<LoginMethod>('email');
+  const [phoneReady, setPhoneReady] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -57,9 +58,19 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
       setError('');
     }
   }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetch('/api/auth/status', {cache:'no-store'})
+      .then(async r => r.ok ? r.json() : {phonePasswordReady: false})
+      .then(data => { if (active) setPhoneReady(data.phonePasswordReady === true); })
+      .catch(() => { if (active) setPhoneReady(false); });
+    return () => { active = false; };
+  }, [isOpen]);
   if (!isOpen) return null;
 
   const changeMethod = (value: LoginMethod) => {
+    if (value === 'phone' && !phoneReady) return;
     setMethod(value);
     setError('');
     setNotice('');
@@ -136,8 +147,13 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
           phone: phone.trim(), role: 'customer', points: 0, createdAt: new Date().toISOString()
         });
         await sendEmailVerification(result.user);
-        setPendingVerification(true);
-        setNotice('Tài khoản đã được tạo. Hãy mở email khôi phục, bấm liên kết xác minh, rồi quay lại nhấn "Tôi đã xác minh email" để bật đăng nhập bằng số điện thoại.');
+        if (phoneReady) {
+          setPendingVerification(true);
+          setNotice('Tài khoản đã được tạo. Hãy mở email khôi phục, bấm liên kết xác minh, rồi quay lại nhấn "Tôi đã xác minh email" để bật đăng nhập bằng số điện thoại.');
+        } else {
+          // Never block email accounts just because the optional server-only phone API is unavailable.
+          await finish(result.user, name.trim(), phone.trim());
+        }
       } else {
         const result = await signInWithEmailAndPassword(auth, email.trim(), password);
         if (result.user.emailVerified) {
@@ -192,7 +208,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         <p className="text-xs text-emerald-950">Thành viên có thể sử dụng voucher <strong>khi có chương trình đủ điều kiện.</strong></p>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-4" role="group" aria-label="Chọn cách đăng nhập">
-        <button type="button" onClick={()=>changeMethod('phone')} className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 " + (method==='phone'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600')}><Smartphone className="w-4 h-4"/> Số điện thoại</button>
+        <button type="button" disabled={!phoneReady} title={!phoneReady?'Chức năng SĐT sẽ mở khi máy chủ xác thực được cấu hình. Hiện có thể đăng nhập bằng email hoặc Google.':undefined} onClick={()=>changeMethod('phone')} className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed " + (method==='phone'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600')}><Smartphone className="w-4 h-4"/> Số điện thoại{!phoneReady && <span className="text-[9px] font-semibold">(sắp có)</span>}</button>
         <button type="button" onClick={()=>changeMethod('email')} className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 " + (method==='email'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600')}><Mail className="w-4 h-4"/> Email</button>
       </div>
       <form onSubmit={method==='phone' ? submitPhone : submitEmail} className="space-y-3">
@@ -203,7 +219,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         <button type="submit" disabled={loading||(mode==='register'&&pendingVerification)} className="w-full bg-[#1b4332] text-white rounded-xl p-3.5 text-sm font-bold disabled:opacity-50">{loading?'Đang xử lý...':mode==='register'?(pendingVerification?'Đã gửi email xác minh':'Tạo tài khoản'):mode==='forgot'?'Gửi hướng dẫn đặt lại mật khẩu':'Đăng nhập'}</button>
       </form>
       {mode==='register'&&pendingVerification&&<button type="button" onClick={verifyEmail} disabled={loading} className="w-full mt-3 border-2 border-emerald-700 text-emerald-900 p-3 rounded-xl text-sm font-bold disabled:opacity-50">Tôi đã xác minh email</button>}
-      <p className="mt-2 text-xs text-stone-500">{mode==='forgot'?'Nhập SĐT đã liên kết hoặc email đã đăng ký. Hệ thống gửi liên kết đặt lại mật khẩu qua email, không dùng SMS.':mode==='register'?'Bạn cần xác minh email một lần trước khi đăng nhập bằng số điện thoại.':'Dùng số điện thoại + mật khẩu hoặc email + mật khẩu, không gửi SMS.'}</p>
+      <p className="mt-2 text-xs text-stone-500">{mode==='forgot'?'Nhập SĐT đã liên kết hoặc email đã đăng ký. Hệ thống gửi liên kết đặt lại mật khẩu qua email, không dùng SMS.':mode==='register'?'Bạn cần xác minh email một lần trước khi đăng nhập bằng số điện thoại.':phoneReady?'Dùng số điện thoại + mật khẩu hoặc email + mật khẩu, không gửi SMS.':'Hiện hỗ trợ đăng nhập bằng email hoặc Google. Đăng nhập SĐT sẽ được mở khi máy chủ xác thực sẵn sàng.'}</p>
       {error&&<p role="alert" className="mt-3 bg-red-50 text-red-800 p-3 rounded-xl text-xs">{error}</p>}
       {notice&&<p role="status" className="mt-3 bg-emerald-50 text-emerald-900 p-3 rounded-xl text-xs">{notice}</p>}
       {mode!=='forgot'&&<button disabled={loading} onClick={signInGoogle} className="w-full border rounded-xl p-3 text-sm font-bold mt-3 hover:bg-stone-50">Tiếp tục với Google</button>}
