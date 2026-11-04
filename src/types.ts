@@ -80,6 +80,7 @@ export interface Booking {
   notes?: string;
   couponCode?: string;
   pointsDeducted?: number;
+  pointsRefunded?: boolean; // Prevent double refunds when a reservation is cancelled.
   discountAmount?: number;
   
   // Limousine specific
@@ -144,7 +145,9 @@ export interface User {
   name: string;
   email?: string;
   role: 'customer' | 'operator';
-  points: number; // Earned points: 1 point = 1,000 VND
+  points: number; // Available credit; 1 point = 1,000 VND after one confirmed booking
+  rewardedBookingIds?: string[]; // Unique confirmed orders, prevents duplicate +1 awards
+  completedBookingsCount?: number; // Legacy-safe count, at least rewardedBookingIds.length
   usedCoupons?: string[];
   address?: string;
   favPickup?: string;
