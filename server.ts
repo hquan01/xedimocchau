@@ -9,8 +9,8 @@ import {
   WMO_WEATHER_MAP, 
   generateTravelAdvice, 
   formatDayOfWeek, 
-  formatDateDM
-  WeatherData,
+  formatDateDM,
+  type WeatherData,
 } from "./src/lib/weatherService";
 
 // Load environment variables
