@@ -951,7 +951,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                              </div>
                              <div>
                                <p className="text-xs font-bold text-emerald-900">Sử dụng điểm tích lũy</p>
-                               <p className="text-[10px] text-emerald-700">Ví điểm: {currentUser.points.toLocaleString()} điểm ({ (currentUser.points * 1000).toLocaleString() } VNĐ)</p>
+                               <p className="text-[10px] text-emerald-700">Ví điểm: {currentUser.points.toLocaleString()} điểm ({ (currentUser.points * POINT_VALUE_VND).toLocaleString() } VNĐ)</p>
                              </div>
                            </div>
                            <button
@@ -972,13 +972,13 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                                <span className="text-xs font-bold text-stone-600">
                                  Sử dụng điểm trực tiếp (Đang khóa 🔒)
                                </span>
-                               <span className="text-[10px] text-stone-500 block">Ví điểm khả dụng: {currentUser.points} điểm (~{(currentUser.points * 1000).toLocaleString()}đ)</span>
+                               <span className="text-[10px] text-stone-500 block">Ví điểm khả dụng: {currentUser.points} điểm (~{(currentUser.points * POINT_VALUE_VND).toLocaleString()}đ)</span>
                              </div>
                            </div>
                            <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg text-[10px] text-amber-800 leading-normal font-sans font-medium">
-                             🚀 Hệ thống tự động kích hoạt tính năng trừ điểm trực tiếp vào tiền thanh toán từ <b>lần đặt vé thứ 3 trở đi</b> (Lịch sử đặt vé của bạn ghi nhận: <b>{userBookingsCount}/2 chuyến đã đặt</b>).
+                             Điểm và voucher áp dụng từ đơn thứ hai, sau khi vé đầu được nhà xe xác nhận.
                              <br />
-                             <span className="text-stone-500 font-normal mt-1 block"><b>Gợi ý:</b> Bạn vẫn có thể truy cập vào <b>Trang cá nhân ➔ Lịch sử & Đổi quà</b> để quy đổi tích lũy thành các coupon ưu đãi lớn bất cứ lúc nào!</span>
+                             <span className="text-stone-600 mt-1 block">Hiện đã xác nhận: {currentUser.rewardedBookingIds?.length || currentUser.completedBookingsCount || 0} đơn.</span>
                            </div>
                          </div>
                        )}
