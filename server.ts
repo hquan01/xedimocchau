@@ -9,9 +9,8 @@ import {
   WMO_WEATHER_MAP, 
   generateTravelAdvice, 
   formatDayOfWeek, 
-  formatDateDM, 
+  formatDateDM
   WeatherData,
-  parseDuBaoThoiTietEdu
 } from "./src/lib/weatherService";
 
 // Load environment variables
@@ -33,64 +32,51 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
     return { ...cached.data, cached: true };
   }
 
-  // 1. Primary: Fetch live meteorological data directly from https://dubaothoitiet.edu.vn/son-la/moc-chau
+  // Open-Meteo provides real weather-model values without scraping external HTML.
+  // The old HTML parser supplied hard-coded temperatures when markup changed,
+  // and the HTML fetch could stall serverless requests.
+  // High-resolution weather-model data from Open-Meteo
   try {
-    const eduUrl = "https://dubaothoitiet.edu.vn/son-la/moc-chau";
-    const eduRes = await fetch(eduUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Cache-Control": "no-cache"
-      }
-    });
-
-    if (eduRes.ok) {
-      const html = await eduRes.text();
-      const parsedData = parseDuBaoThoiTietEdu(html);
-      if (parsedData && parsedData.current && typeof parsedData.current.temperature === "number") {
-        parsedData.location = loc;
-        weatherCache.set(loc.id, {
-          data: parsedData,
-          expiresAt: now + 10 * 60 * 1000 // 10 minutes cache
-        });
-        console.log(`[Weather] Live data loaded directly from dubaothoitiet.edu.vn: ${parsedData.current.temperature}°C, ${parsedData.current.conditionText}`);
-        return parsedData;
-      }
-    } else {
-      console.warn(`[Weather] dubaothoitiet.edu.vn returned status ${eduRes.status}, switching to Open-Meteo fallback.`);
-    }
-  } catch (eduErr: any) {
-    console.warn(`[Weather] Could not fetch dubaothoitiet.edu.vn directly:`, eduErr?.message || eduErr);
-  }
-
-  // 2. Fallback: High-resolution Open-Meteo
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,cloud_cover,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max&timezone=Asia%2FBangkok`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,cloud_cover,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max&timezone=Asia%2FHo_Chi_Minh`;
     
-    const response = await fetch(url, {
-      headers: { "User-Agent": "MocChauTravel/1.0 (info@xedimocchau.com)" }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Open-Meteo responded with status ${response.status}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    let data: any;
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { "User-Agent": "MocChauTravel/1.0 (info@xedimocchau.com)" }
+      });
+      if (!response.ok) throw new Error(`Open-Meteo returned HTTP ${response.status}`);
+      data = await response.json();
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data = await response.json();
     const current = data.current || {};
     const daily = data.daily || {};
     const hourly = data.hourly || {};
+    if (typeof current.temperature_2m !== "number" || !Number.isFinite(current.temperature_2m)
+      || typeof current.apparent_temperature !== "number"
+      || typeof current.relative_humidity_2m !== "number"
+      || typeof current.wind_speed_10m !== "number"
+      || typeof current.precipitation !== "number"
+      || typeof current.weather_code !== "number"
+      || !Array.isArray(hourly.time) || !Array.isArray(hourly.temperature_2m)
+      || !Array.isArray(daily.time) || !Array.isArray(daily.temperature_2m_min)
+      || !Array.isArray(daily.temperature_2m_max)) {
+      throw new Error("Weather provider returned incomplete measurements");
+    }
 
-    const temp = Math.round(current.temperature_2m ?? 20);
-    const apparentTemp = Math.round(current.apparent_temperature ?? temp);
-    const humidity = Math.round(current.relative_humidity_2m ?? 75);
-    const windSpeed = Math.round(current.wind_speed_10m ?? 8);
-    const precipitation = current.precipitation ?? 0;
-    const weatherCode = current.weather_code ?? 0;
+    const temp = Math.round(current.temperature_2m);
+    const apparentTemp = Math.round(current.apparent_temperature);
+    const humidity = Math.round(current.relative_humidity_2m);
+    const windSpeed = Math.round(current.wind_speed_10m);
+    const precipitation = current.precipitation;
+    const weatherCode = current.weather_code;
     const wmo = WMO_WEATHER_MAP[weatherCode] || { text: "Có mây", icon: "Cloud", isRain: false };
-    const rainProbabilityToday = Array.isArray(daily.precipitation_probability_max) && daily.precipitation_probability_max.length > 0
-      ? daily.precipitation_probability_max[0]
-      : (wmo.isRain ? 75 : 15);
+    const rainProbabilityToday = Array.isArray(daily.precipitation_probability_max) &&
+        typeof daily.precipitation_probability_max[0] === "number"
+        ? daily.precipitation_probability_max[0] : undefined;
 
     // Parse Hourly (next 12 slots)
     const hourlyList: any[] = [];
@@ -100,8 +86,10 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
       if (startIndex === -1) startIndex = 0;
 
       for (let i = startIndex; i < Math.min(startIndex + 12, hourly.time.length); i++) {
+        if (!Number.isFinite(hourly.temperature_2m[i]) ||
+            !Number.isFinite(hourly.precipitation_probability?.[i])) continue;
         const timeStr = hourly.time[i];
-        const hCode = hourly.weather_code?.[i] ?? 0;
+        const hCode = hourly.weather_code?.[i];
         const hWmo = WMO_WEATHER_MAP[hCode] || { text: "Có mây", icon: "Cloud", isRain: false };
         const hourOnly = timeStr.includes("T") ? timeStr.split("T")[1].slice(0, 5) : timeStr.slice(11, 16);
 
@@ -109,7 +97,7 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
           time: timeStr,
           hourLabel: hourOnly,
           temperature: Math.round(hourly.temperature_2m[i]),
-          precipitationProbability: hourly.precipitation_probability?.[i] ?? 0,
+          precipitationProbability: hourly.precipitation_probability[i],
           weatherCode: hCode,
           conditionText: hWmo.text,
           icon: hWmo.icon
@@ -121,17 +109,19 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
     const dailyList: any[] = [];
     if (Array.isArray(daily.time)) {
       for (let i = 0; i < Math.min(7, daily.time.length); i++) {
+        if (!Number.isFinite(daily.temperature_2m_min?.[i]) ||
+            !Number.isFinite(daily.temperature_2m_max?.[i])) continue;
         const dateStr = daily.time[i];
-        const dCode = daily.weather_code?.[i] ?? 0;
+        const dCode = daily.weather_code?.[i];
         const dWmo = WMO_WEATHER_MAP[dCode] || { text: "Có mây", icon: "Cloud", isRain: false };
 
         dailyList.push({
           date: dateStr,
           dayLabel: formatDayOfWeek(dateStr, i === 0),
           dateLabel: formatDateDM(dateStr),
-          tempMin: Math.round(daily.temperature_2m_min?.[i] ?? (temp - 5)),
-          tempMax: Math.round(daily.temperature_2m_max?.[i] ?? (temp + 3)),
-          precipitationProbabilityMax: daily.precipitation_probability_max?.[i] ?? 0,
+          tempMin: Math.round(daily.temperature_2m_min[i]),
+          tempMax: Math.round(daily.temperature_2m_max[i]),
+          precipitationProbabilityMax: daily.precipitation_probability_max?.[i],
           weatherCode: dCode,
           conditionText: dWmo.text,
           icon: dWmo.icon,
@@ -140,7 +130,7 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
       }
     }
 
-    const travelAdvice = generateTravelAdvice(temp, apparentTemp, rainProbabilityToday, wmo.isRain, weatherCode);
+    const travelAdvice = generateTravelAdvice(temp, apparentTemp, rainProbabilityToday ?? 0, wmo.isRain, weatherCode);
     const nowIso = new Date().toISOString();
     const result: WeatherData = {
       success: true,
@@ -148,7 +138,8 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
       fetchedAt: nowIso,
       updatedAtTimeOnly: new Date().toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" }),
       cached: false,
-      source: `Trạm dự báo Open-Meteo (${loc.shortName} - ${loc.lat}°B, ${loc.lon}°Đ)`,
+      source: `Open-Meteo • dự báo mô hình (${loc.shortName} - ${loc.lat}°B, ${loc.lon}°Đ)`,
+      sourceUrl: "https://open-meteo.com/en/docs",
       current: {
         time: current.time || nowIso,
         temperature: temp,
@@ -216,8 +207,7 @@ async function getMocChauWeather(locationId = "moc-chau-center"): Promise<Weathe
   }
 }
 
-// Warm up weather cache on boot
-getMocChauWeather("moc-chau-center").catch(e => console.warn("[Weather] Initial warm-up failed:", e.message));
+// The cache is warmed on demand, not while importing a serverless function.
 
 // Initialize Express app
 const app = express();
