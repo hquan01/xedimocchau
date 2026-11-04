@@ -10,10 +10,10 @@ const OWNER_EMAIL = 'hquansl001@gmail.com';
 const OWNER_PHONE = '+84971050324';
 
 export function normalizeVietnamPhone(input: string): string | null {
-  const value = input.replace(/[\\s.\\-()]/g, '');
-  if (/^0[35789]\\d{8}$/.test(value)) return '+84' + value.slice(1);
-  if (/^84[35789]\\d{8}$/.test(value)) return '+' + value;
-  if (/^\\+84[35789]\\d{8}$/.test(value)) return value;
+  const value = input.replace(/[\s.\-()]/g, '');
+  if (/^0[35789]\d{8}$/.test(value)) return '+84' + value.slice(1);
+  if (/^84[35789]\d{8}$/.test(value)) return '+' + value;
+  if (/^\+84[35789]\d{8}$/.test(value)) return value;
   return null;
 }
 
@@ -24,7 +24,7 @@ export function getEmailForPhone(phone: string): string | null {
   try {
     const saved: Record<string, string> = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     const email = saved[normalized];
-    return typeof email === 'string' && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)
+    return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
       ? email : null;
   } catch {
     return null;
@@ -33,7 +33,7 @@ export function getEmailForPhone(phone: string): string | null {
 
 export function rememberPhoneEmail(phone: string, email: string): void {
   const normalized = normalizeVietnamPhone(phone);
-  if (!normalized || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return;
+  if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
   if (normalized === OWNER_PHONE) return; // Never override owner's verified alias
   try {
     const saved: Record<string, string> = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
