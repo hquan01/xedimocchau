@@ -41,19 +41,26 @@ export function rememberPhoneEmail(phone: string, email: string): void {
   }
 }
 
-/** Admin fallback uses existing verified owner account, not an editable users.role. */
-export function isVerifiedOwnerToken(token: IdTokenResult): boolean {
-  const claims = token.claims;
-  const email = String(claims.email || '').trim().toLowerCase();
-  return email === OWNER_EMAIL && claims.email_verified === true;
-}
-
-export function hasOperatorAccess(token: IdTokenResult): boolean {
-  return token.claims.admin === true ||
-    token.claims.operator === true ||
-    isVerifiedOwnerToken(token);
-}
+export const OWNER_EMAILS = ['hquansl001@gmail.com', 'nhaxe@mocchau.vn'];
 
 export function isOwnerEmail(email: string | null | undefined): boolean {
-  return email?.trim().toLowerCase() === OWNER_EMAIL;
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return OWNER_EMAILS.includes(normalized);
 }
+
+/** Admin fallback uses owner email identity (Google OAuth, password, or custom claim). */
+export function isVerifiedOwnerToken(token?: IdTokenResult | null, directEmail?: string | null): boolean {
+  if (!token && !directEmail) return false;
+  const tokenEmail = String(token?.claims?.email || '').trim().toLowerCase();
+  const rawEmail = String(directEmail || '').trim().toLowerCase();
+  return isOwnerEmail(tokenEmail) || isOwnerEmail(rawEmail);
+}
+
+export function hasOperatorAccess(token?: IdTokenResult | null, directEmail?: string | null): boolean {
+  if (token?.claims?.admin === true || token?.claims?.operator === true) return true;
+  const tokenEmail = String(token?.claims?.email || '').trim().toLowerCase();
+  const rawEmail = String(directEmail || '').trim().toLowerCase();
+  return isOwnerEmail(tokenEmail) || isOwnerEmail(rawEmail);
+}
+
