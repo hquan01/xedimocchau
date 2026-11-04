@@ -38,7 +38,7 @@ export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSi
               Mask only that narrow strip; preserve the supplied photograph and keep a
               single, fully interactive set of navigation buttons over it. */}
           {currentSlide.imageUrl === '/mocchau-hero-v5.jpg' && (
-            <div aria-hidden="true" className="absolute pointer-events-none bottom-0 left-1/2 -translate-x-1/2 w-[190px] h-12 bg-gradient-to-t from-[#113c29] via-[#113c29] to-transparent" />
+            <div aria-hidden="true" className="absolute pointer-events-none bottom-0 left-1/2 -translate-x-1/2 w-[200px] h-14" style={{background: 'linear-gradient(to top, #113c29 0%, #113c29 78%, transparent 100%)'}} />
           )}
           <div role="group" aria-label="Chọn ảnh banner" className="absolute bottom-2.5 inset-x-0 z-10 flex justify-center gap-3">
             {heroSlides.map((slide,i)=><button key={slide.id} type="button" aria-label={`Xem banner ${i+1}`} aria-current={i===slideIndex%heroSlides.length ? 'true' : undefined} onClick={()=>setSlideIndex(i)} className={`w-3 h-3 rounded-full border-2 border-white shadow-md transition-colors ${i===slideIndex%heroSlides.length?'bg-white':'bg-black/25'}`}/>) }
