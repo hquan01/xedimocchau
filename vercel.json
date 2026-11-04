@@ -1,4 +1,21 @@
 {
+  "redirects": [
+    {
+      "source": "/cam-nang-du-lich-moc-chau",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/cam-nang-du-lich-moc-chau/",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/og-image.png",
+      "destination": "/mocchau-hero-v5.jpg",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
