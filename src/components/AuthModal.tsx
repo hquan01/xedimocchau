@@ -7,6 +7,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { X, UserRound, TicketPercent, ShieldCheck, Mail, Smartphone, ArrowLeft } from 'lucide-react';
 import { auth, db } from '../firebase';
+import {getEmailForPhone,hasOperatorAccess,normalizeVietnamPhone,rememberPhoneEmail} from '../lib/simpleAuth';
 import { User } from '../types';
 
 interface AuthModalProps {
@@ -28,21 +29,10 @@ const normalizePhone = (s: string) => {
 
 /** Only Firebase Auth verifies identities; Admin permissions must come from server-issued claims. */
 
-async function postPhoneAuth<T>(route: string, payload: Record<string,string>, idToken?: string): Promise<T> {
-  const res = await fetch('/api/auth/phone/' + route, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(idToken ? {Authorization: 'Bearer ' + idToken}: {}) },
-    body: JSON.stringify(payload)
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || 'Chức năng đăng nhập bằng SĐT chưa sẵn sàng. Bạn có thể dùng email để đăng nhập.');
-  return body as T;
-}
-
 export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>('login');
   const [method, setMethod] = useState<LoginMethod>('email');
-  const [phoneReady, setPhoneReady] = useState(false);
+  const phoneReady = true; // Device-local SĐT alias; Firebase verifies all passwords.
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -58,15 +48,6 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
       setError('');
     }
   }, [isOpen]);
-  useEffect(() => {
-    if (!isOpen) return;
-    let active = true;
-    fetch('/api/auth/status', {cache:'no-store'})
-      .then(async r => r.ok ? r.json() : {phonePasswordReady: false})
-      .then(data => { if (active) setPhoneReady(data.phonePasswordReady === true); })
-      .catch(() => { if (active) setPhoneReady(false); });
-    return () => { active = false; };
-  }, [isOpen]);
   if (!isOpen) return null;
 
   const changeMethod = (value: LoginMethod) => {
@@ -78,7 +59,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
   };
   const errorMessage = (e: any) => {
     const code = String(e?.code || '');
-    if (code.includes('operation-not-allowed')) return 'Phương thức này chưa được bật trong Firebase Authentication. Hãy bật Email/Password hoặc Phone trong Firebase Console.';
+    if (code.includes('operation-not-allowed')) return 'Email/Password chưa được bật trong Firebase Authentication.';
     if (code.includes('invalid-credential') || code.includes('wrong-password')) return 'Email hoặc mật khẩu không đúng. Nếu đây là tài khoản cũ, hãy dùng Khôi phục mật khẩu.';
     if (code.includes('email-already-in-use')) return 'Email này đã có tài khoản. Hãy đăng nhập.';
     if (code.includes('weak-password')) return 'Mật khẩu cần đủ mạnh, tối thiểu 8 ký tự.';
@@ -89,7 +70,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
   };
   const finish = async (account: any, preferredName?: string, preferredPhone?: string) => {
     const token = await getIdTokenResult(account, true);
-    const isAdmin = token.claims.admin === true || token.claims.operator === true;
+    const isAdmin = hasOperatorAccess(token);
     const ref = doc(db, 'users', account.uid);
     const snapshot = await getDoc(ref);
     const old = snapshot.exists() ? snapshot.data() : {};
@@ -109,10 +90,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
     onClose();
   };
   const linkPhone = async (account: any, rawPhone: string) => {
-    const number = normalizePhone(rawPhone);
+    const number = normalizeVietnamPhone(rawPhone);
     if (!number) throw new Error('Số điện thoại Việt Nam không hợp lệ.');
-    if (!account.emailVerified) throw new Error('Hãy xác minh email trước để dùng SĐT đăng nhập và lấy lại mật khẩu.');
-    await postPhoneAuth('register', {phone: number}, await account.getIdToken(true));
+    if (!account.emailVerified || !account.email) throw new Error('Hãy xác minh email trước để dùng SĐT đăng nhập trên thiết bị này.');
+    rememberPhoneEmail(number,account.email);
   };
   const verifyEmail = async () => {
     setLoading(true); setError(''); setNotice('');
@@ -171,22 +152,23 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
     } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
   const submitPhone = async (event: React.FormEvent) => {
-    event.preventDefault(); setLoading(true); setError(''); setNotice('');
+    event.preventDefault();
+    if (mode === 'register') { await submitEmail(event); return; }
+    setLoading(true); setError(''); setNotice('');
     try {
-      if (mode === 'register') {
-        await submitEmail(event);
-        return;
-      }
-      const number = normalizePhone(phone);
+      const number = normalizeVietnamPhone(phone);
       if (!number) throw new Error('Vui lòng nhập số điện thoại Việt Nam hợp lệ.');
+      const associatedEmail = getEmailForPhone(number);
+      if (!associatedEmail) {
+        throw new Error('Thiết bị này chưa liên kết SĐT với email. Vui lòng đăng nhập bằng email một lần, sau đó sử dụng SĐT + mật khẩu.');
+      }
       if (mode === 'forgot') {
-        await postPhoneAuth('reset', {phone: number});
-        setNotice('Nếu số điện thoại đã được liên kết với email xác minh, hướng dẫn đặt lại mật khẩu sẽ được gửi về email của khách.');
+        await sendPasswordResetEmail(auth, associatedEmail);
+        setNotice('Nếu tài khoản tồn tại, Firebase đã gửi hướng dẫn đặt lại mật khẩu qua email đã đăng ký.');
       } else {
         if (!password) throw new Error('Vui lòng nhập mật khẩu.');
-        const data = await postPhoneAuth<{token: string}>('login', {phone: number, password});
-        const result = await signInWithCustomToken(auth, data.token);
-        await finish(result.user);
+        const account = await signInWithEmailAndPassword(auth, associatedEmail, password);
+        await finish(account.user);
       }
     } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
@@ -219,7 +201,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         <button type="submit" disabled={loading||(mode==='register'&&pendingVerification)} className="w-full bg-[#1b4332] text-white rounded-xl p-3.5 text-sm font-bold disabled:opacity-50">{loading?'Đang xử lý...':mode==='register'?(pendingVerification?'Đã gửi email xác minh':'Tạo tài khoản'):mode==='forgot'?'Gửi hướng dẫn đặt lại mật khẩu':'Đăng nhập'}</button>
       </form>
       {mode==='register'&&pendingVerification&&<button type="button" onClick={verifyEmail} disabled={loading} className="w-full mt-3 border-2 border-emerald-700 text-emerald-900 p-3 rounded-xl text-sm font-bold disabled:opacity-50">Tôi đã xác minh email</button>}
-      <p className="mt-2 text-xs text-stone-500">{mode==='forgot'?'Nhập SĐT đã liên kết hoặc email đã đăng ký. Hệ thống gửi liên kết đặt lại mật khẩu qua email, không dùng SMS.':mode==='register'?'Bạn cần xác minh email một lần trước khi đăng nhập bằng số điện thoại.':phoneReady?'Dùng số điện thoại + mật khẩu hoặc email + mật khẩu, không gửi SMS.':'Hiện hỗ trợ đăng nhập bằng email hoặc Google. Đăng nhập SĐT sẽ được mở khi máy chủ xác thực sẵn sàng.'}</p>
+      <p className="mt-2 text-xs text-stone-500">{mode==='forgot'?'Nhập SĐT đã liên kết hoặc email đã đăng ký. Hệ thống gửi liên kết đặt lại mật khẩu qua email, không dùng SMS.':mode==='register'?'Bạn cần xác minh email một lần để liên kết SĐT với thiết bị này. Đổi thiết bị, đăng nhập email một lần.':phoneReady?'Đăng nhập SĐT + mật khẩu trên thiết bị đã liên kết email; đổi thiết bị cần đăng nhập email một lần. Không dùng SMS.':'Hiện hỗ trợ đăng nhập bằng email hoặc Google. Đăng nhập SĐT sẽ được mở khi máy chủ xác thực sẵn sàng.'}</p>
       {error&&<p role="alert" className="mt-3 bg-red-50 text-red-800 p-3 rounded-xl text-xs">{error}</p>}
       {notice&&<p role="status" className="mt-3 bg-emerald-50 text-emerald-900 p-3 rounded-xl text-xs">{notice}</p>}
       {mode!=='forgot'&&<button disabled={loading} onClick={signInGoogle} className="w-full border rounded-xl p-3 text-sm font-bold mt-3 hover:bg-stone-50">Tiếp tục với Google</button>}
@@ -227,7 +209,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         <button onClick={()=>{setMode(mode==='register'?'login':'register');setPendingVerification(false);setError('');setNotice('')}}>{mode==='register'?'Đã có tài khoản? Đăng nhập':'Chưa có tài khoản? Đăng ký'}</button>
         <button onClick={()=>{setMode(mode==='forgot'?'login':'forgot');setPendingVerification(false);setError('');setNotice('')}}>{mode==='forgot'?'Quay lại đăng nhập':'Quên mật khẩu?'}</button>
       </div>
-      <p className="mt-3 text-[11px] text-stone-600">Nếu đã có tài khoản email cũ, hãy đăng nhập bằng email trước để kích hoạt SĐT trên cùng UID. Mật khẩu và tài khoản quản trị không được đặt mặc định.</p>
+      <p className="mt-3 text-[11px] text-stone-600">Firebase xác thực mật khẩu thật. SĐT chỉ là tên đăng nhập ghi nhớ trên thiết bị này; dùng email một lần khi đổi thiết bị. Không dùng mật khẩu cố định trong mã nguồn.</p>
       <p className="mt-2 flex items-start gap-2 text-[11px] text-stone-500"><ShieldCheck className="w-4 h-4 shrink-0"/> Quyền quản trị cần được cấp bằng Firebase custom claims. Không dùng mật khẩu Admin cố định trên giao diện.</p>
     </div>
   </div>;

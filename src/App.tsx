@@ -25,6 +25,7 @@ const BookingList = lazy(() => import("./components/BookingList"));
 const PaymentModal = lazy(() => import("./components/PaymentModal"));
 const AuthModal = lazy(() => import("./components/AuthModal"));
 const OperatorPanel = lazy(() => import("./components/OperatorPanel"));
+const AdminPasswordSetup = lazy(() => import("./components/AdminPasswordSetup"));
 const CustomerDashboard = lazy(() => import("./components/CustomerDashboard"));
 const TripPrepView = lazy(() => import("./components/TripPrepView"));
 const ExploreAroundView = lazy(() => import("./components/ExploreAroundView"));
@@ -723,6 +724,10 @@ export default function App() {
               onOpenPayment={setActivePaymentBooking}
               coupons={coupons}
             />
+          )}
+
+          {activeTab === "operator" && currentUser?.role === "operator" && (
+            <AdminPasswordSetup />
           )}
 
           {activeTab === "operator" && currentUser?.role === "operator" && (
