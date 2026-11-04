@@ -1077,9 +1077,9 @@ export default function CustomerDashboard({
                   </span>
                   <div className="h-px bg-stone-100 my-2" />
                   <ul className="space-y-1.5 text-[10px] text-stone-600 list-disc list-inside">
-                    <li>Cộng +5 điểm sau mỗi lượt di chuyển.</li>
-                    <li>Quà tặng chào mừng 10K.</li>
-                    <li>Khấu trừ trực tiếp hay tích lũy thành vé miễn phí.</li>
+                    <li>+1 điểm sau mỗi vé được nhà xe xác nhận.</li>
+                    <li>Không cộng điểm chào mừng tự động.</li>
+                    <li>Từ lần đặt vé thứ hai: 1 điểm giảm 1.000đ.</li>
                   </ul>
                 </div>
 
@@ -1106,7 +1106,7 @@ export default function CustomerDashboard({
                     <li>
                       Ưu tiên chọn ghế VIP mong muốn miễn phí khi đặt sớm.
                     </li>
-                    <li>Tặng Voucher giảm giá 10% dịp sinh nhật.</li>
+                    <li>Voucher chỉ áp dụng nếu có chương trình được công bố.</li>
                   </ul>
                 </div>
 
@@ -1133,7 +1133,7 @@ export default function CustomerDashboard({
                     <li>
                       Miễn phí khăn lạnh, đồ ăn nhẹ cao cấp trên xe limousine.
                     </li>
-                    <li>Giảm trực tiếp 100K khi mua phòng resort liên kết.</li>
+                    <li>Ưu đãi lưu trú sẽ được thông báo riêng khi có chương trình.</li>
                     <li>Đưa đón tận nơi vượt bán kính 5Km tại Mộc Châu.</li>
                   </ul>
                 </div>
@@ -1157,13 +1157,13 @@ export default function CustomerDashboard({
                   </span>
                   <div className="h-px bg-stone-100 my-2" />
                   <ul className="space-y-1.5 text-[10px] text-stone-600 list-disc list-inside">
-                    <li>Phục vụ độc quyền ưu tiên.</li>
+                    <li>Tích điểm theo đúng lịch sử đặt xe đã xác nhận.</li>
                     <li>
                       Hỗ trợ đổi chuyến, lịch khởi hành muộn/sớm MIỄN PHÍ trước
                       12 giờ.
                     </li>
                     <li>Phục vụ đón trả không phụ thu tại trung tâm Hà Nội.</li>
-                    <li>Nhận quà tặng tết & combo đặc biệt hàng năm.</li>
+                    <li>Ưu đãi theo từng chương trình được công bố.</li>
                   </ul>
                 </div>
               </div>
