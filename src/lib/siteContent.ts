@@ -1,6 +1,7 @@
 import {doc, onSnapshot, setDoc, serverTimestamp} from 'firebase/firestore';
 import {getStorage, ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {auth, db} from '../firebase';
+import {hasOperatorAccess} from './simpleAuth';
 import {useEffect,useState} from 'react';
 
 export interface HomeTile {id:string; title:string; subtitle:string; icon:string; target:string; visible:boolean}
@@ -57,7 +58,7 @@ export async function publishSiteContent(content:SiteContent){
   const user=auth.currentUser;
   if(!user) throw new Error('Bạn cần đăng nhập Firebase để xuất bản.');
   const token=await user.getIdTokenResult(true);
-  if(token.claims.admin!==true && token.claims.operator!==true) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase (custom claim).');
+  if(!hasOperatorAccess(token)) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase (custom claim).');
   const secure=(s:string)=>s.startsWith('/')||/^https:\/\//i.test(s);
   if(!secure(content.logoUrl)||!secure(content.heroImageUrl)||content.stories.some(x=>x.imageUrl&&!secure(x.imageUrl))||content.heroSlides?.some(x=>x.imageUrl&&!secure(x.imageUrl)))throw new Error('Đường dẫn ảnh chỉ được dùng HTTPS hoặc đường dẫn nội bộ.');
   await setDoc(doc(db,'site_content','public'),{...content,updatedAt:serverTimestamp(),updatedBy:user.uid});
@@ -68,7 +69,7 @@ export async function uploadSiteImage(file:File){
   const user=auth.currentUser;
   if(!user)throw new Error('Vui lòng đăng nhập Admin.');
   const token=await user.getIdTokenResult(true);
-  if(token.claims.admin!==true&&token.claims.operator!==true)throw new Error('Chưa được cấp quyền tải ảnh quản trị.');
+  if(!hasOperatorAccess(token))throw new Error('Chưa được cấp quyền tải ảnh quản trị.');
   const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-70);
   const location=ref(getStorage(),`site-media/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safeName}`);
   await uploadBytes(location,file,{contentType:file.type});
