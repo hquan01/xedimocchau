@@ -46,6 +46,7 @@ import {
   saveConfigToFirebase,
   saveNotificationToFirebase,
   updateBookingStatusWithRewards,
+  reconcileConfirmedMemberBooking,
   deleteBookingFromFirebase,
   getDeviceId
 } from "./lib/firebaseUtils";
@@ -125,6 +126,24 @@ export default function App() {
     notifications,
     setNotifications
   } = useFirebaseSync();
+
+  // Existing member orders with a Firebase userId sometimes received zero
+  // points before the reward implementation. Reconcile on login using a
+  // server-read transaction; never infer account ownership from phone only.
+  const rewardsReconciledRef=React.useRef<Set<string>>(new Set());
+  React.useEffect(()=>{
+    if(!authReady || currentUser?.role!=="customer" || !currentUser.id)return;
+    const recorded=new Set(currentUser.rewardedBookingIds||[]);
+    const eligible=allBookings.filter(b=>b.userId===currentUser.id &&
+      (b.status==="success"||b.status==="completed") && !recorded.has(b.id)).slice(0,25);
+    eligible.forEach(b=>{
+      const key=currentUser.id+":"+b.id;
+      if(rewardsReconciledRef.current.has(key))return;
+      rewardsReconciledRef.current.add(key);
+      void reconcileConfirmedMemberBooking(b.id).catch(err=>
+        console.warn("Could not reconcile earlier reward:",err));
+    });
+  },[authReady,currentUser,allBookings]);
 
   // Local storage synchronized bookings list
   const [isBookingListOpen, setIsBookingListOpen] = useState(false);
