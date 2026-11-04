@@ -99,7 +99,7 @@ async function directOpenMeteo(loc:MocChauLocation):Promise<WeatherData> {
     throw new Error('Nguồn khí tượng chưa trả đủ dự báo theo giờ/ngày.');
   }
 
-  const rainProbability = maybeNumber(daily.precipitation_probability_max?.[0]);
+  const rainProbability = requiredNumber(daily.precipitation_probability_max?.[0], 'xác suất mưa');
   const hourUV = maybeNumber(hourly.uv_index?.[start]);
   const dewPoint = maybeNumber(current.dew_point_2m);
   const localTime = new Date().toLocaleTimeString('vi-VN',{
@@ -116,7 +116,7 @@ async function directOpenMeteo(loc:MocChauLocation):Promise<WeatherData> {
       humidity:Math.round(humidity),windSpeed:Math.round(windSpeed),
       precipitation:rain,weatherCode:code,conditionText:wmo.text,
       icon:wmo.icon,isRain:wmo.isRain,
-      rainProbabilityToday:rainProbability===undefined ? 0 : Math.round(rainProbability),
+      rainProbabilityToday:Math.round(rainProbability),
       ...(hourUV===undefined?{}:{uvIndex:hourUV}),
       ...(dewPoint===undefined?{}:{dewPoint:Math.round(dewPoint)}),
       ...(typeof daily.sunrise?.[0]==='string'?{sunrise:daily.sunrise[0].slice(11,16)}:{}),
@@ -124,7 +124,7 @@ async function directOpenMeteo(loc:MocChauLocation):Promise<WeatherData> {
     },
     hourly:hourlyForecast,daily:dailyForecast,
     travelAdvice:generateTravelAdvice(Math.round(rawTemp),Math.round(apparent),
-      rainProbability===undefined?0:rainProbability,wmo.isRain,code)
+      rainProbability,wmo.isRain,code)
   };
   return resultWeather;
 }
