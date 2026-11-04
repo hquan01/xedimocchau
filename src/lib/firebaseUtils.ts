@@ -77,8 +77,9 @@ export const saveBookingToFirebase = async (booking: Booking) => {
   } else {
     current.push(booking);
   }
-  setLocalList("bookings", current);
-
+  // Keep a local copy only AFTER Firebase confirms the booking.
+  // Otherwise the customer may see a phantom reservation that the operator
+  // has never received.
   if (true) { // Try saving to Firebase regardless of auth state
     console.log("Attempting to save booking to Firebase");
     try {
@@ -86,9 +87,13 @@ export const saveBookingToFirebase = async (booking: Booking) => {
       const sanitizedBooking = JSON.parse(JSON.stringify(booking));
       sanitizedBooking.deviceId = getDeviceId();
       await setDoc(doc(db, "bookings", booking.id), sanitizedBooking);
+      setLocalList("bookings", current);
       console.log("Booking saved to Firebase successfully");
     } catch (error) {
-      console.warn("Could not sync booking to Firebase, saved locally:", error);
+      console.warn("Could not sync booking to Firebase:", error);
+      // A local draft is NOT a received booking. Do not let payment/confirmation
+      // advance silently when the operator cannot see this reservation.
+      throw new Error("Chưa gửi được đơn đặt xe lên máy chủ. Vui lòng kiểm tra kết nối rồi thử lại.");
     }
   }
 };

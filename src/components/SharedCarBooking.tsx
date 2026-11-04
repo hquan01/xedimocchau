@@ -4,7 +4,7 @@ import { Users, User, Phone, Mail, MapPin, Armchair, ChevronRight, Check, Compas
 import { motion, AnimatePresence } from "motion/react";
 
 interface SharedCarBookingProps {
-  onAddBooking: (booking: any) => void;
+  onAddBooking: (booking: any) => Promise<void>;
   searchParams: { from: string; to: string; date: string; time?: string } | null;
   onOpenPayment: (booking: any) => void;
   bookings: any[];
@@ -323,7 +323,7 @@ export default function SharedCarBooking({
     return seatCount * currentPrice;
   };
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -411,10 +411,7 @@ export default function SharedCarBooking({
 
     const totalDiscount = pointsDiscountAmount + couponDiscountAmount;
     const finalPrice = Math.max(0, originalTotalPrice - totalDiscount);
-
-    if (pointsDeducted > 0) {
-      onDeductPoints(pointsDeducted);
-    }
+    // Points are deducted only after successful Firestore booking submission.
 
     const isPickupCustomNow = pickupPoint.toLowerCase().includes("tận nhà") || pickupPoint.toLowerCase().includes("tận nơi") || pickupPoint.toLowerCase().includes("tại nhà");
     const isDropoffCustomNow = dropoffPoint.toLowerCase().includes("tận nhà") || dropoffPoint.toLowerCase().includes("tận nơi") || dropoffPoint.toLowerCase().includes("tại nhà");
@@ -443,20 +440,24 @@ export default function SharedCarBooking({
       routeSelection: `${from} ➔ ${to}`
     };
 
-    onAddBooking(bookingData);
-    onOpenPayment(bookingData);
-
-    // Clean states
-    setSelectedTrip(null);
-    setSeatCount(1);
-    setUsePoints(false);
-    setSpamAnswer("");
-    setIsSubmitting(false);
-
-    if (!currentUser) {
-      setPassengerName("");
-      setPassengerPhone("");
-      setPassengerEmail("");
+    try {
+      await onAddBooking(bookingData);
+      if (pointsDeducted > 0) onDeductPoints(pointsDeducted);
+      onOpenPayment(bookingData);
+      setSelectedTrip(null);
+      setSeatCount(1);
+      setUsePoints(false);
+      setSpamAnswer("");
+      if (!currentUser) {
+        setPassengerName("");
+        setPassengerPhone("");
+        setPassengerEmail("");
+      }
+    } catch (err) {
+      console.error("Could not save shared car booking:", err);
+      setErrorMsg("Không gửi được đơn đặt xe lên hệ thống. Vui lòng thử lại; chưa có vé nào được xác nhận.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

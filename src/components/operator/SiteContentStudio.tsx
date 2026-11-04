@@ -1,6 +1,6 @@
 import React, {useEffect,useState} from 'react';
 import {Save,ImagePlus,Plus,Trash2,ArrowUp,ArrowDown,Eye,EyeOff} from 'lucide-react';
-import {SiteContent,HomeTile,FeaturedStory,HeroSlide,useSiteContent,publishSiteContent,uploadSiteImage} from '../../lib/siteContent';
+import {SiteContent,HomeTile,FeaturedStory,HeroSlide,AttractionTicket,useSiteContent,publishSiteContent,uploadSiteImage} from '../../lib/siteContent';
 
 function Uploader({onFile}: {onFile:(url:string)=>void}) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -15,6 +15,13 @@ export default function SiteContentStudio(){
   const edit=(patch:Partial<SiteContent>)=>{setDraft(s=>({...s,...patch}));setDirty(true)};
   const updateTile=(id:string,patch:Partial<HomeTile>)=>edit({tiles:draft.tiles.map(x=>x.id===id?{...x,...patch}:x)});
   const updateStory=(id:string,patch:Partial<FeaturedStory>)=>edit({stories:draft.stories.map(x=>x.id===id?{...x,...patch}:x)});
+  const updateTicket=(id:string,patch:Partial<AttractionTicket>)=>edit({attractionTickets:(draft.attractionTickets||[]).map(x=>x.id===id?{...x,...patch}:x)});
+  const moveTicket=(index:number,offset:number)=>{
+    const tickets=[...(draft.attractionTickets||[])]; const target=index+offset;
+    if(target<0||target>=tickets.length)return;
+    [tickets[index],tickets[target]]=[tickets[target],tickets[index]];
+    edit({attractionTickets:tickets});
+  };
   const move=(key:'tiles'|'stories'|'heroSlides',i:number,offset:number)=>{const copy=[...(draft[key]||[])];const k=i+offset;if(k<0||k>=copy.length)return;[copy[i],copy[k]]=[copy[k],copy[i]];edit({[key]:copy})};
   const publish=async()=>{setPublishing(true);setMessage('');try{await publishSiteContent(draft);setDirty(false);setMessage('Đã xuất bản thành công. Trang khách sẽ nhận cấu hình mới từ Firestore.')}catch(err:any){setMessage('Không thể xuất bản: '+err.message)}finally{setPublishing(false)}};
   const inputClass='w-full rounded-xl border border-stone-200 bg-white p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300';
@@ -48,6 +55,32 @@ export default function SiteContentStudio(){
     </section>
     <section className="space-y-3"><div className="flex justify-between items-center"><h3 className="font-extrabold">Bài viết & điểm đến nổi bật</h3><button onClick={()=>edit({stories:[...draft.stories,{id:`hot-${Date.now()}`,title:'Bài nổi bật',description:'Mô tả ngắn',imageUrl:'',label:'Mới',target:'guide',visible:false}]})} className="text-emerald-800 text-xs font-bold flex gap-1"><Plus className="w-4 h-4"/> Thêm bài</button></div>
       {draft.stories.map((s,i)=><div className="border p-3 rounded-xl space-y-2" key={s.id}><div className="flex justify-between items-center"><strong className="text-xs">{i+1}. {s.title}</strong><div className="flex gap-2"><button aria-label="Lên" onClick={()=>move('stories',i,-1)}><ArrowUp className="w-4 h-4"/></button><button aria-label="Xuống" onClick={()=>move('stories',i,1)}><ArrowDown className="w-4 h-4"/></button><button aria-label="Ẩn hiện" onClick={()=>updateStory(s.id,{visible:!s.visible})}>{s.visible?<Eye className="w-4 h-4 text-emerald-700"/>:<EyeOff className="w-4 h-4"/>}</button><button aria-label="Xóa" onClick={()=>edit({stories:draft.stories.filter(t=>t.id!==s.id)})}><Trash2 className="w-4 h-4 text-red-600"/></button></div></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-2"><input className={inputClass} value={s.title} onChange={e=>updateStory(s.id,{title:e.target.value})}/><input className={inputClass} value={s.label} onChange={e=>updateStory(s.id,{label:e.target.value})}/><input className={inputClass} value={s.description} onChange={e=>updateStory(s.id,{description:e.target.value})}/><select aria-label="Liên kết bài" className={inputClass} value={s.target} onChange={e=>updateStory(s.id,{target:e.target.value})}>{['guide','explore_legacy','moc_chau_today','services','community'].map(t=><option key={t} value={t}>{t}</option>)}</select></div><img src={s.imageUrl} alt="Ảnh bài viết" className="rounded-xl object-cover h-32 w-full"/><input aria-label="URL ảnh" className={inputClass} value={s.imageUrl} onChange={e=>updateStory(s.id,{imageUrl:e.target.value})}/><Uploader onFile={url=>updateStory(s.id,{imageUrl:url})}/></div>)}
+    </section>
+    <section className="space-y-3">
+      <div className="flex justify-between items-center gap-2">
+        <div><h3 className="font-extrabold">Bảng giá vé tham quan Mộc Châu</h3><p className="text-xs text-stone-500 mt-1">Thêm, sửa, ẩn hoặc cập nhật giá theo nguồn công khai. Đây là giá tham khảo, chưa nhận đặt vé.</p></div>
+        <button type="button" onClick={()=>edit({attractionTickets:[...(draft.attractionTickets||[]),{id:"ticket-"+Date.now(),name:"Địa điểm mới",adultPrice:"Đang cập nhật",childPrice:"Theo chính sách điểm đến",note:"Giá tham khảo, vui lòng kiểm tra nguồn",sourceUrl:"",visible:false}]})} className="text-emerald-800 text-xs font-bold flex items-center gap-1">
+          <Plus className="w-4 h-4"/> Thêm điểm
+        </button>
+      </div>
+      {(draft.attractionTickets||[]).map((ticket,i)=><div key={ticket.id} className="p-3 rounded-xl border border-stone-200 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <strong className="text-xs text-stone-900">{i+1}. {ticket.name}</strong>
+          <div className="flex gap-2">
+            <button type="button" aria-label="Đưa lên" onClick={()=>moveTicket(i,-1)}><ArrowUp className="w-4 h-4"/></button>
+            <button type="button" aria-label="Đưa xuống" onClick={()=>moveTicket(i,1)}><ArrowDown className="w-4 h-4"/></button>
+            <button type="button" aria-label={ticket.visible?"Ẩn giá vé":"Hiển thị giá vé"} onClick={()=>updateTicket(ticket.id,{visible:!ticket.visible})}>{ticket.visible?<Eye className="w-4 h-4 text-emerald-700"/>:<EyeOff className="w-4 h-4"/>}</button>
+            <button type="button" aria-label="Xóa địa điểm" onClick={()=>edit({attractionTickets:(draft.attractionTickets||[]).filter(t=>t.id!==ticket.id)})}><Trash2 className="w-4 h-4 text-red-600"/></button>
+          </div>
+        </div>
+        <label className="block text-xs font-bold">Tên địa điểm<input className={inputClass} value={ticket.name} onChange={e=>updateTicket(ticket.id,{name:e.target.value})}/></label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label className="block text-xs font-bold">Giá vé người lớn<input className={inputClass} value={ticket.adultPrice} onChange={e=>updateTicket(ticket.id,{adultPrice:e.target.value})}/></label>
+          <label className="block text-xs font-bold">Giá vé trẻ em<input className={inputClass} value={ticket.childPrice} onChange={e=>updateTicket(ticket.id,{childPrice:e.target.value})}/></label>
+        </div>
+        <label className="block text-xs font-bold">Lưu ý / giá theo ngày<textarea rows={2} className={inputClass} value={ticket.note} onChange={e=>updateTicket(ticket.id,{note:e.target.value})}/></label>
+        <label className="block text-xs font-bold">Nguồn kiểm tra giá (HTTPS)<input className={inputClass} type="url" value={ticket.sourceUrl} onChange={e=>updateTicket(ticket.id,{sourceUrl:e.target.value})} placeholder="https://..."/></label>
+      </div>)}
     </section>
     <section className="space-y-2"><h3 className="font-extrabold">Kênh liên hệ</h3>{([['hotline','Hotline'],['zaloUrl','Zalo'],['messengerUrl','Messenger']] as const).map(([k,label])=><label className="block text-xs font-bold" key={k}>{label}<input className={`${inputClass} mt-1`} value={draft[k]} onChange={e=>edit({[k]:e.target.value})}/></label>)}</section>
     <div className="sticky bottom-16 sm:bottom-4 rounded-2xl bg-white/95 backdrop-blur-md p-3 shadow-xl border flex justify-between items-center gap-2"><span className="text-xs text-stone-600">{dirty?'Có thay đổi chưa xuất bản':'Đang đồng bộ bản đã lưu'}</span><button disabled={publishing||!dirty} onClick={publish} className="bg-[#1b4332] text-white rounded-xl px-5 py-3 font-black text-sm disabled:opacity-40 flex gap-2"><Save className="w-4 h-4"/>{publishing?'Đang lưu...':'Xuất bản'}</button></div>

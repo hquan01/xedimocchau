@@ -1,6 +1,6 @@
 import React, { useState, lazy, Suspense } from "react";
 import { ArrowLeft, House } from "lucide-react";
-import { doc, deleteDoc, writeBatch } from "firebase/firestore";
+import { doc, deleteDoc, writeBatch, collection, onSnapshot } from "firebase/firestore";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
@@ -135,6 +135,10 @@ export default function App() {
   const [limousineSearch, setLimousineSearch] = useState<{ from: string; to: string; date: string; time: string } | null>(null);
   const [comboSearch, setComboSearch] = useState<{ hotelId: string; date: string; from?: string; to?: string; time?: string } | null>(null);
   const [confirmedPopupNotif, setConfirmedPopupNotif] = useState<AppNotification | null>(null);
+  const [operatorBookingAlert, setOperatorBookingAlert] = useState<AppNotification | null>(null);
+  // A booking may arrive through both the notifications and bookings listeners.
+  // This set prevents two alerts for the same booking in one operator session.
+  const operatorAlertedBookingsRef = React.useRef<Set<string>>(new Set());
   const notifiedIdsRef = React.useRef<Set<string>>(new Set());
 
   // Web Audio chime helper for notifications
@@ -179,6 +183,63 @@ export default function App() {
       }
     }
   }, [notifications, currentUser]);
+
+  // Admin: show a prominent alert when a customer booking arrives.
+  // Firestore notifications are the primary source; this works across open tabs/devices.
+  React.useEffect(() => {
+    if (currentUser?.role !== "operator") return;
+    const latest = notifications.find(n =>
+      n.type === "booking_new" && !n.isRead &&
+      Date.now() - new Date(n.timestamp).getTime() < 24 * 60 * 60 * 1000 &&
+      !operatorAlertedBookingsRef.current.has(n.metadata?.bookingId || n.id)
+    );
+    if (!latest) return;
+    operatorAlertedBookingsRef.current.add(latest.metadata?.bookingId || latest.id);
+    setOperatorBookingAlert(latest);
+    playNotificationChime();
+    sendSystemNotification(latest.title, latest.message);
+  }, [notifications, currentUser?.role]);
+
+  // Backup channel: when the booking document is created but notification write
+  // fails, the operator still sees the new order. Skip initial Firestore snapshot
+  // so existing bookings are not announced as new.
+  React.useEffect(() => {
+    if (currentUser?.role !== "operator") {
+      operatorAlertedBookingsRef.current.clear();
+      return;
+    }
+    let ready = false;
+    const unsubscribe = onSnapshot(collection(db, "bookings"), snapshot => {
+      if (!ready) { ready = true; return; }
+      const change = snapshot.docChanges().find(({type, doc: entry}) =>
+        type === "added" &&
+        entry.data()?.status !== "cancelled" &&
+        !operatorAlertedBookingsRef.current.has(entry.id)
+      );
+      if (!change) return;
+      const booking = change.doc.data() as Booking;
+      operatorAlertedBookingsRef.current.add(change.doc.id);
+      const message = `${booking.passengerName} đặt ${booking.routeSelection || booking.type}, ${booking.travelDate} ${booking.departureTime || ""}. ${booking.passengerPhone}`;
+      const alert: AppNotification = {
+        id: "booking_live_" + change.doc.id,
+        title: "🔔 CÓ KHÁCH MỚI ĐẶT VÉ",
+        message,
+        type: "booking_new",
+        isRead: false,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          bookingId: change.doc.id, customerName: booking.passengerName,
+          customerPhone: booking.passengerPhone, travelDate: booking.travelDate,
+          departureTime: booking.departureTime, route: booking.routeSelection,
+          seats: booking.seatNumbers, totalPrice: booking.totalPrice,
+        },
+      };
+      setOperatorBookingAlert(alert);
+      playNotificationChime();
+      sendSystemNotification(alert.title, message);
+    }, error => console.warn("Admin booking alert subscription failed:", error));
+    return unsubscribe;
+  }, [currentUser?.role]);
 
   // Set App Badge when notifications change
   React.useEffect(() => {
@@ -255,7 +316,7 @@ export default function App() {
       const notifMessage = `${booking.passengerName} vừa đặt chuyến ${booking.routeSelection || booking.type} vào lúc ${booking.departureTime || ''} ngày ${booking.travelDate}.`;
 
       const newNotif: AppNotification = {
-        id: `notif_${Date.now()}`,
+        id: `notif_booking_${booking.id}`,
         title: notifTitle,
         message: notifMessage,
         timestamp: new Date().toISOString(),
@@ -264,12 +325,19 @@ export default function App() {
         deviceId: getDeviceId(),
         metadata: {
           bookingId: booking.id,
-          customerName: booking.passengerName
+          customerName: booking.passengerName,
+          // Avoid duplicating customers' phone numbers in the broadly readable
+          // legacy notifications collection. Operator can read it from booking.
+          travelDate: booking.travelDate,
+          departureTime: booking.departureTime,
+          route: booking.routeSelection,
+          seats: booking.seatNumbers,
+          totalPrice: booking.totalPrice
         }
       };
       
       setNotifications([newNotif, ...notifications].slice(0, 50));
-      saveNotificationToFirebase(newNotif);
+      await saveNotificationToFirebase(newNotif);
 
       // Send system level notification for operator
       if (currentUser?.role === "operator") {
@@ -277,6 +345,7 @@ export default function App() {
       }
     } catch (error) {
       console.error("Critical error in handleAddBooking:", error);
+      throw error; // The booking form must not advance to payment if cloud persistence failed.
     }
   };
 
@@ -1068,6 +1137,46 @@ export default function App() {
                   Nhắn Tin Zalo Đặt Xe
                 </a>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* The operator obtains contact details from the booking already shown in
+           their dashboard, rather than copying phone numbers into notifications. */}
+      {/* Real-time new booking alert for the operator (only while this website is open). */}
+      {currentUser?.role === "operator" && operatorBookingAlert && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 p-4 text-left" role="dialog" aria-modal="true" aria-label="Có khách mới đặt vé">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="bg-[#1b4332] px-5 py-4 text-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-emerald-100">🔔 THÔNG BÁO ĐƠN HÀNG MỚI</p>
+                  <h3 className="mt-1 text-xl font-black">{operatorBookingAlert.title}</h3>
+                </div>
+                <button type="button" aria-label="Đóng thông báo" className="rounded-lg bg-white/15 px-3 py-1.5" onClick={()=>setOperatorBookingAlert(null)}>✕</button>
+              </div>
+            </div>
+            <div className="space-y-3 p-5">
+              <p className="text-sm text-stone-700">{operatorBookingAlert.message}</p>
+              <div className="grid grid-cols-2 gap-2 rounded-xl bg-emerald-50 p-3 text-xs">
+                <div><span className="block text-stone-500">Khách hàng</span><strong>{operatorBookingAlert.metadata?.customerName || "Khách đặt xe"}</strong></div>
+                <div><span className="block text-stone-500">Số điện thoại</span><strong>{(allBookings.find(b=>b.id===operatorBookingAlert.metadata?.bookingId)?.passengerPhone || operatorBookingAlert.metadata?.customerPhone || "Xem trong đơn")}</strong></div>
+                <div><span className="block text-stone-500">Ngày đi</span><strong>{operatorBookingAlert.metadata?.travelDate || "Xem trong đơn"}</strong></div>
+                <div><span className="block text-stone-500">Giờ đi / Ghế</span><strong>{operatorBookingAlert.metadata?.departureTime || "-"} · {operatorBookingAlert.metadata?.seats?.join(", ") || "-"}</strong></div>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" className="flex-1 rounded-xl bg-[#1b4332] px-3 py-3 text-sm font-bold text-white" onClick={()=>{
+                  if(!operatorBookingAlert.id.startsWith("booking_live_")) void markNotificationAsRead(operatorBookingAlert.id);
+                  setOperatorBookingAlert(null);
+                  setActiveTab("operator");
+                  window.scrollTo({top: 0, behavior: "smooth"});
+                }}>Xem và xác nhận đơn</button>
+                {(allBookings.find(b=>b.id===operatorBookingAlert.metadata?.bookingId)?.passengerPhone || operatorBookingAlert.metadata?.customerPhone) && (
+                  <a className="rounded-xl border border-emerald-700 px-3 py-3 text-sm font-bold text-emerald-800" href={`tel:${(allBookings.find(b=>b.id===operatorBookingAlert.metadata?.bookingId)?.passengerPhone || operatorBookingAlert.metadata?.customerPhone || "").replace(/[^0-9+]/g, "")}`}>Gọi khách</a>
+                )}
+                <button type="button" className="rounded-xl bg-stone-100 px-3 py-3 text-sm font-bold" onClick={()=>setOperatorBookingAlert(null)}>Đóng</button>
+              </div>
+              <p className="text-[11px] text-stone-500">Âm thanh và thông báo hệ thống có thể bị trình duyệt hạn chế. Cảnh báo này hoạt động khi website đang mở.</p>
             </div>
           </div>
         </div>
