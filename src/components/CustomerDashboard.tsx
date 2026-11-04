@@ -30,9 +30,10 @@ import {
   Info,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import { doc, setDoc } from "firebase/firestore";
 import { updatePassword, updateProfile, updateEmail } from "firebase/auth";
-import { saveUserToFirebase } from "../lib/firebaseUtils";
+
 import { INITIAL_COMBOS } from "../data/combos";
 import {POINT_VALUE_VND, eligibleForNextBookingReward, previousConfirmedBookings} from "../lib/loyalty";
 import {couponDecision,couponAudienceLabel,memberAge} from "../lib/couponEligibility";
@@ -171,7 +172,7 @@ export default function CustomerDashboard({
     try{
       // Never send balance, earned points, roles or password to this profile
       // editor. Only change allowlisted fields to avoid overwriting wallet state.
-      await saveUserToFirebase(currentUser.id,updatedFields);
+      await setDoc(doc(db,'users',currentUser.id),updatedFields,{merge:true});
       if(profileName.trim()!==account.displayName)
         await updateProfile(account,{displayName:profileName.trim()});
       if(profileEmail!==account.email && profileEmail)
