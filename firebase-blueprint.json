@@ -2,15 +2,27 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "User profile containing roles and points",
+      "description": "User profile containing roles, points, and member personal details",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "phone": { "type": "string" },
         "name": { "type": "string" },
         "email": { "type": "string" },
-        "role": { "type": "string", "enum": ["customer", "operator", "admin"] },
-        "points": { "type": "number" }
+        "role": { "type": "string", "enum": ["customer", "operator"] },
+        "points": { "type": "number" },
+        "gender": { "type": "string", "enum": ["male", "female", "other", "undisclosed"] },
+        "birthDate": { "type": "string" },
+        "address": { "type": "string" },
+        "favPickup": { "type": "string" },
+        "favDropoff": { "type": "string" },
+        "avatarDataUrl": { "type": "string" },
+        "welcomeBonusGranted": { "type": "boolean" },
+        "welcomeBonusPoints": { "type": "number" },
+        "welcomeBonusAt": { "type": "string" },
+        "rewardedBookingIds": { "type": "array" },
+        "completedBookingsCount": { "type": "number" },
+        "usedCoupons": { "type": "array" }
       },
       "required": ["id", "role"]
     },
@@ -65,6 +77,28 @@
       },
       "required": ["id", "name", "phone", "plate"]
     },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Promotional vouchers and discounts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "discountPercentage": { "type": "number" },
+        "title": { "type": "string" },
+        "audience": { "type": "string" },
+        "validFrom": { "type": "string" },
+        "validUntil": { "type": "string" },
+        "birthdayWindow": { "type": "string" },
+        "minAge": { "type": "number" },
+        "maxAge": { "type": "number" },
+        "usageLimit": { "type": "number" },
+        "usageCount": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "isPublished": { "type": "boolean" }
+      },
+      "required": ["id", "code", "discountPercentage"]
+    },
     "Config": {
        "title": "Config",
        "description": "Global config models for coupons, combos, articles, etc",
@@ -117,6 +151,10 @@
     "blocked_seats": {
          "schema": { "$ref": "#/entities/BlockedSeat" },
          "description": "List of currently locked seats on travels."
+    },
+    "coupons": {
+         "schema": { "$ref": "#/entities/Coupon" },
+         "description": "List of discount coupons and vouchers."
     },
     "configs": {
          "schema": { "$ref": "#/entities/Config" },

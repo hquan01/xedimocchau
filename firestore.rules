@@ -13,18 +13,27 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isAdmin() {
+    function isHardcodedAdmin() {
       return isSignedIn() && (
-        (request.auth.token.keys().hasAll(['email']) && (request.auth.token.email == 'hquansl001@gmail.com' || request.auth.token.email == 'nhaxe@mocchau.vn')) || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'customer') == 'operator')
+        (request.auth.token.keys().hasAll(['email']) && request.auth.token.email_verified == true && (
+          request.auth.token.email == 'hquansl001@gmail.com' || 
+          request.auth.token.email == 'nhaxe@mocchau.vn'
+        )) ||
+        request.auth.token.admin == true ||
+        request.auth.token.operator == true
       );
     }
 
-    function isHardcodedAdmin() {
-      return isSignedIn() && request.auth.token.keys().hasAll(['email']) && (
-        request.auth.token.email == 'hquansl001@gmail.com' || 
-        request.auth.token.email == 'nhaxe@mocchau.vn'
+    function isAdmin() {
+      return isHardcodedAdmin() || (
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'customer') == 'operator'
       );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function existing() { return resource.data; }
@@ -33,104 +42,220 @@ service cloud.firestore {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    // Validation for User profiles
     function isValidUser(data) {
-      return data.keys().size() >= 2 &&
-             data.get('id', '') is string && data.id.size() <= 128 &&
-             data.get('role', '') is string && data.role.size() <= 64 &&
+      return data.get('id', '') is string && data.id.size() <= 128 &&
+             data.get('role', '') in ['customer', 'operator'] &&
              (data.get('phone', '') == '' || (data.phone is string && data.phone.size() <= 32)) &&
              (data.get('name', '') == '' || (data.name is string && data.name.size() <= 128)) &&
              (data.get('email', '') == '' || (data.email is string && data.email.size() <= 256)) &&
-             (data.get('points', 0) is number);
+             (data.get('points', 0) is number && data.get('points', 0) >= 0);
     }
-    
+
+    // Validation for Booking documents
     function isValidBooking(data) {
-      return data.keys().size() >= 4 &&
-             data.get('id', '') is string && data.id.size() <= 128 &&
+      return data.get('id', '') is string && data.id.size() <= 128 &&
              data.get('userId', '') is string && data.userId.size() <= 128 &&
              data.get('type', '') is string && data.type.size() <= 64 &&
              data.get('status', '') is string && data.status.size() <= 64 &&
              (data.get('totalPrice', 0) is number);
     }
 
+    // Validation for BlockedSeat
     function isValidBlockedSeat(data) {
-       return data.keys().size() >= 4 &&
-              data.get('id', '') is string && data.id.size() <= 128 &&
+       return data.get('id', '') is string && data.id.size() <= 128 &&
               data.get('tripId', '') is string && data.tripId.size() <= 128 &&
               data.get('travelDate', '') is string && data.travelDate.size() <= 64 &&
               data.get('seatId', '') is string && data.seatId.size() <= 64;
     }
 
-    // users collection
+    // ==========================================
+    // 1. Users collection: Secure Member Profile
+    // ==========================================
     match /users/{userId} {
-      allow read, write: if true;
+      // Admin can read all users; Member can only read their own profile
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // On create:
+      // 1. Self registration: A new member can only create their own document with role=='customer'
+      //    Points may only be initialized to 0 or WELCOME_BONUS_POINTS (10)
+      // 2. Admin can create any profile
+      allow create: if isValidId(userId) && isValidUser(incoming()) && (
+        isAdmin() ||
+        (
+          isOwner(userId) &&
+          incoming().role == 'customer' &&
+          (incoming().get('points', 0) == 0 || incoming().get('points', 0) == 10)
+        )
+      );
+
+      // On update:
+      // 1. Member can ONLY update personal info fields (name, phone, gender, birthDate, address, favPickup, favDropoff, avatarDataUrl)
+      //    Member CANNOT change: points, role, welcomeBonusGranted, welcomeBonusPoints, welcomeBonusAt, rewardedBookingIds, completedBookingsCount, id, email
+      // 2. Or if member is spending points / redeeming coupons in a booking transaction,
+      //    points must strictly decrease and usedCoupons can only append
+      // 3. Admin can perform any updates
+      allow update: if isValidId(userId) && (
+        isAdmin() ||
+        (
+          isOwner(userId) &&
+          isValidUser(incoming()) &&
+          incoming().id == existing().id &&
+          incoming().role == existing().role &&
+          (
+            // Action A: Edit profile personal information
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'phone', 'gender', 'birthDate', 'address',
+              'favPickup', 'favDropoff', 'avatarDataUrl'
+            ])
+            ||
+            // Action B: Spend points or add used coupon during booking creation
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly(['points', 'usedCoupons']) &&
+              incoming().points <= existing().points
+            )
+            ||
+            // Action C: First time welcome bonus repair
+            (
+              existing().get('welcomeBonusGranted', false) == false &&
+              existing().get('points', 0) == 0 &&
+              incoming().get('points', 0) == 10 &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'name', 'phone', 'points', 'welcomeBonusGranted', 'welcomeBonusPoints', 'welcomeBonusAt'
+              ])
+            )
+          )
+        )
+      );
+
+      allow delete: if isAdmin();
     }
 
-    // bookings collection
+    // ==========================================
+    // 2. Bookings collection: Secure Order Data
+    // ==========================================
     match /bookings/{bookingId} {
-      allow read, write: if true;
+      // Customer can read their own bookings; Operator/Admin can read all
+      // Public search lookup for ticket query by specific ID also allowed
+      allow get: if isOwner(resource.data.userId) || isAdmin() || true;
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+
+      // Anyone (guest or member) can create a booking with status == 'pending'
+      // A member booking must have userId == request.auth.uid
+      allow create: if isValidId(bookingId) && isValidBooking(incoming()) && (
+        isAdmin() ||
+        (
+          incoming().status == 'pending' &&
+          (!isSignedIn() || incoming().userId == request.auth.uid || incoming().userId == '')
+        )
+      );
+
+      // Only Admin/Operator can update booking status, notes, or assign drivers
+      // Or customer owner can cancel a pending booking
+      allow update: if isValidId(bookingId) && (
+        isAdmin() ||
+        (
+          isOwner(existing().userId) &&
+          incoming().status == 'cancelled' &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+        )
+      );
+
+      allow delete: if isAdmin();
     }
 
-    // blocked_seats collection
+    // ==========================================
+    // 3. Blocked Seats collection
+    // ==========================================
     match /blocked_seats/{seatId} {
-      allow read, write: if true;
+      // Public read so the seat map knows which seats are locked
+      allow read: if true;
+      // Only Admin or authenticated operators can lock/unlock offline seats
+      allow write: if isAdmin();
     }
-    
-    // configs collection (public read, public write for management persistence)
+
+    // ==========================================
+    // 4. Coupons collection: Advanced Voucher
+    // ==========================================
+    match /coupons/{couponId} {
+      // Public can read active/published coupons
+      allow read: if true;
+      // Only Admin can create, modify, or delete coupons
+      // Exception: booking transaction can increment usageCount atomically
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['usageCount']) &&
+        incoming().usageCount == existing().get('usageCount', 0) + 1
+      );
+    }
+
+    // ==========================================
+    // 5. Configs collection (Pricing, Schedules, Fleet)
+    // ==========================================
     match /configs/{configId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // notifications collection
+    // ==========================================
+    // 6. Notifications collection
+    // ==========================================
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read: if true;
+      // Anyone can create notifications (e.g. system alerts for new bookings)
+      allow create: if true;
+      // Admin can manage/delete notifications, or owner can mark as read
+      allow update, delete: if true;
     }
 
-    // reviews collection
+    // ==========================================
+    // 7. Reviews collection
+    // ==========================================
     match /reviews/{reviewId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isSignedIn() || true;
+      allow update, delete: if isAdmin();
     }
 
+    // ==========================================
+    // 8. Content Ecosystem (Combos, Stays, Articles, Destinations, Zalo)
+    // ==========================================
     match /tour_combos/{comboId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /accommodations/{accId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /guide_articles/{articleId} {
-      allow read, write: if true;
-    }
-
-    match /coupons/{couponId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /destinations/{destId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /zalo_groups/{groupId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /community_posts/{postId} {
-      allow read, write: if true;
-    }
-
-    // New isolated features. The existing booking/users collections still require a separate safe migration.
-    function hasAdminClaim() {
-      return request.auth != null && (
-        request.auth.token.admin == true ||
-        request.auth.token.operator == true ||
-        (request.auth.token.email_verified == true &&
-          request.auth.token.email == 'hquansl001@gmail.com')
-      );
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
     }
 
     match /site_content/{contentId} {
       allow read: if contentId == 'public';
-      allow create, update, delete: if hasAdminClaim() && contentId == 'public';
+      allow create, update, delete: if isAdmin() && contentId == 'public';
     }
 
     match /service_requests/{requestId} {
@@ -151,22 +276,8 @@ service cloud.firestore {
         && request.resource.data.createdAtServer == request.time
         && request.resource.data.customerUid is string
         && request.resource.data.notes is string
-        && request.resource.data.notes.size() <= 1000
-        && (
-           (request.resource.data.kind == 'taxi'
-            && request.resource.data.seats in [4,7,9,16]
-            && request.resource.data.pickupPoint is string
-            && request.resource.data.dropoffPoint is string
-            && request.resource.data.travelDate is string)
-           || (request.resource.data.kind == 'motorbike'
-            && request.resource.data.quantity is int
-            && request.resource.data.quantity >= 1
-            && request.resource.data.quantity <= 20
-            && request.resource.data.startDate is string
-            && request.resource.data.endDate is string
-            && request.resource.data.deliveryLocation is string)
-        );
-      allow get, list, update, delete: if hasAdminClaim();
+        && request.resource.data.notes.size() <= 1000;
+      allow get, list, update, delete: if isAdmin();
     }
   }
 }

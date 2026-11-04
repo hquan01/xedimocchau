@@ -79,6 +79,7 @@ export interface Booking {
   status: 'pending' | 'success' | 'completed' | 'cancelled';
   notes?: string;
   couponCode?: string;
+  couponId?: string;
   pointsDeducted?: number;
   pointsRefunded?: boolean; // Prevent double refunds when a reservation is cancelled.
   discountAmount?: number;
@@ -145,13 +146,19 @@ export interface User {
   name: string;
   email?: string;
   role: 'customer' | 'operator';
-  points: number; // Available credit; 1 point = 1,000 VND after one confirmed booking
+  points: number; // Available credit; 1 point = 1,000 VND, discounts start on second order
+  welcomeBonusGranted?: boolean; // True once a new membership receives its 10-point welcome reward
+  welcomeBonusPoints?: number;
+  welcomeBonusAt?: string;
   rewardedBookingIds?: string[]; // Unique confirmed orders, prevents duplicate +1 awards
   completedBookingsCount?: number; // Legacy-safe count, at least rewardedBookingIds.length
   usedCoupons?: string[];
   address?: string;
   favPickup?: string;
   favDropoff?: string;
+  avatarDataUrl?: string; // Compressed thumbnail only, never original photograph
+  gender?: 'male' | 'female' | 'other' | 'undisclosed';
+  birthDate?: string; // Optional YYYY-MM-DD, used for birthday/month and age
   passwordResetToDefault?: boolean;
   customPassword?: string;
 }
@@ -236,6 +243,16 @@ export interface Coupon {
   discountPercentage: number;
   isActive?: boolean;
   isPublished?: boolean;
+  title?: string;
+  audience?: 'all' | 'male' | 'female' | 'birthday' | 'holiday' | 'random' | 'age';
+  validFrom?: string; // YYYY-MM-DD in Vietnam
+  validUntil?: string;
+  birthdayWindow?: 'day' | 'month';
+  minAge?: number;
+  maxAge?: number;
+  assignedUserIds?: string[]; // Explicit one-time random selection by Admin
+  usageLimit?: number; // Maximum times this coupon can be redeemed across all members
+  usageCount?: number; // Times this coupon has been successfully redeemed
 }
 
 export interface ZaloGroup {
