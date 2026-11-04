@@ -246,7 +246,7 @@ export default function CommunityView({
 
       {/* Breadcrumb */}
       <div className="flex items-center space-x-2 text-xs text-stone-500 mb-6">
-        <button onClick={() => setActiveTab("limousine")} className="hover:text-emerald-700 cursor-pointer">Trang chủ</button>
+        <button onClick={() => { setActiveTab("explore"); window.scrollTo({top: 0, behavior: "smooth"}); }} className="hover:text-emerald-700 cursor-pointer">Trang chủ</button>
         <span>/</span>
         <span className="text-emerald-800 font-bold">Trung tâm cộng đồng Mộc Châu</span>
       </div>
