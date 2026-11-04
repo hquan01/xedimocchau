@@ -89,6 +89,9 @@ export const saveBookingToFirebase = async (booking: Booking) => {
       console.log("Booking saved to Firebase successfully");
     } catch (error) {
       console.warn("Could not sync booking to Firebase, saved locally:", error);
+      // A local draft is NOT a received booking. Do not let payment/confirmation
+      // advance silently when the operator cannot see this reservation.
+      throw new Error("Chưa gửi được đơn đặt xe lên máy chủ. Vui lòng kiểm tra kết nối rồi thử lại.");
     }
   }
 };
