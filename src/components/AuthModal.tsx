@@ -97,52 +97,81 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
     onLoginSuccess(profile);
     onClose();
   };
+  const linkPhone = async (account: any, rawPhone: string) => {
+    const number = normalizePhone(rawPhone);
+    if (!number) throw new Error('Số điện thoại Việt Nam không hợp lệ.');
+    if (!account.emailVerified) throw new Error('Hãy xác minh email trước để dùng SĐT đăng nhập và lấy lại mật khẩu.');
+    await postPhoneAuth('register', {phone: number}, await account.getIdToken(true));
+  };
+  const verifyEmail = async () => {
+    setLoading(true); setError(''); setNotice('');
+    try {
+      const account = auth.currentUser;
+      if (!account) throw new Error('Phiên đăng ký đã hết. Vui lòng đăng nhập bằng email.');
+      await reload(account);
+      if (!account.emailVerified) {
+        setNotice('Email chưa được xác minh. Hãy bấm liên kết trong email khôi phục rồi quay lại đây.');
+        return;
+      }
+      await linkPhone(account, phone);
+      setPendingVerification(false);
+      await finish(account, name.trim(), phone.trim());
+    } catch(e) { setError(errorMessage(e)); } finally { setLoading(false); }
+  };
   const submitEmail = async (event: React.FormEvent) => {
     event.preventDefault(); setLoading(true); setError(''); setNotice('');
     try {
       if (mode === 'forgot') {
         if (!email.trim()) throw new Error('Vui lòng nhập email đã đăng ký.');
         await sendPasswordResetEmail(auth, email.trim());
-        setNotice('Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.');
+        setNotice('Nếu email có tài khoản, hướng dẫn đặt lại mật khẩu đã được gửi.');
       } else if (mode === 'register') {
         if (name.trim().length < 2) throw new Error('Vui lòng nhập họ tên.');
-        if (phone.trim() && !normalizePhone(phone)) throw new Error('Số điện thoại Việt Nam không hợp lệ.');
+        if (!normalizePhone(phone)) throw new Error('Vui lòng nhập số điện thoại Việt Nam hợp lệ.');
         if (password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
         const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        await updateProfile(result.user, { displayName: name.trim() });
-        await finish(result.user, name.trim(), phone.trim());
+        await updateProfile(result.user, {displayName: name.trim()});
+        await setDoc(doc(db, 'users', result.user.uid), {
+          id: result.user.uid, email: email.trim(), name: name.trim(),
+          phone: phone.trim(), role: 'customer', points: 0, createdAt: new Date().toISOString()
+        });
+        await sendEmailVerification(result.user);
+        setPendingVerification(true);
+        setNotice('Tài khoản đã được tạo. Hãy mở email khôi phục, bấm liên kết xác minh, rồi quay lại nhấn "Tôi đã xác minh email" để bật đăng nhập bằng số điện thoại.');
       } else {
         const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+        if (result.user.emailVerified) {
+          try {
+            const snap = await getDoc(doc(db,'users',result.user.uid));
+            const savedPhone = snap.data()?.phone;
+            if (typeof savedPhone === 'string' && normalizePhone(savedPhone)) await linkPhone(result.user, savedPhone);
+          } catch (e) {
+            // Phone-alias API may not yet be configured. Email login must remain usable.
+            console.warn('[Auth] Phone alias not activated; email login is still available.');
+          }
+        }
         await finish(result.user);
       }
     } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
-  const sendCode = async (event: React.FormEvent) => {
+  const submitPhone = async (event: React.FormEvent) => {
     event.preventDefault(); setLoading(true); setError(''); setNotice('');
     try {
+      if (mode === 'register') {
+        setLoading(false);
+        return submitEmail(event);
+      }
       const number = normalizePhone(phone);
       if (!number) throw new Error('Vui lòng nhập số điện thoại Việt Nam hợp lệ.');
-      if (mode === 'register' && name.trim().length < 2) throw new Error('Vui lòng nhập họ tên.');
-      // Firebase Authentication phone sign-in uses SMS plus a real reCAPTCHA, not a client-side bypass.
-      if (!recaptchaRef.current) {
-        recaptchaRef.current = new RecaptchaVerifier(auth, 'mocchau-phone-recaptcha', { size: 'invisible' });
+      if (mode === 'forgot') {
+        await postPhoneAuth('reset', {phone: number});
+        setNotice('Nếu số điện thoại đã được liên kết với email xác minh, hướng dẫn đặt lại mật khẩu sẽ được gửi về email của khách.');
+      } else {
+        if (!password) throw new Error('Vui lòng nhập mật khẩu.');
+        const data = await postPhoneAuth<{token: string}>('login', {phone: number, password});
+        const result = await signInWithCustomToken(auth, data.token);
+        await finish(result.user);
       }
-      const result = await signInWithPhoneNumber(auth, number, recaptchaRef.current);
-      setConfirmation(result);
-      setNotice('Mã xác thực đã được yêu cầu gửi tới điện thoại. Hãy nhập mã SMS để tiếp tục.');
-    } catch (e) {
-      setError(errorMessage(e));
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    } finally { setLoading(false); }
-  };
-  const verifyCode = async (event: React.FormEvent) => {
-    event.preventDefault(); setLoading(true); setError(''); setNotice('');
-    try {
-      if (!confirmation || !/^\d{6}$/.test(otp.trim())) throw new Error('Vui lòng nhập mã SMS gồm 6 chữ số.');
-      const result = await confirmation.confirm(otp.trim());
-      if (mode === 'register' && name.trim()) await updateProfile(result.user, { displayName: name.trim() });
-      await finish(result.user, mode === 'register' ? name.trim() : undefined, result.user.phoneNumber || phone.trim());
     } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
   const signInGoogle = async () => {
