@@ -19,6 +19,15 @@ const LIMITS = 'phone_auth_rate_limits';
 const GENERIC_LOGIN_ERROR = 'Số điện thoại hoặc mật khẩu không đúng.';
 const GENERIC_RESET_NOTICE = 'Nếu tài khoản hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi tới email đã xác minh.';
 
+// Public capability check reveals no credentials. When Admin SDK is unavailable,
+// the app keeps Firebase email/Google login working rather than advertising broken phone login.
+phoneAuthRouter.get('/status', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({
+    phonePasswordReady: Boolean(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON?.trim() || process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim())
+  });
+});
+
 function normalizePhone(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const digits = raw.replace(/[\s.\-()]/g, '');
