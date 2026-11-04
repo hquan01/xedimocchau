@@ -120,7 +120,12 @@ service cloud.firestore {
 
     // New isolated features. The existing booking/users collections still require a separate safe migration.
     function hasAdminClaim() {
-      return request.auth != null && (request.auth.token.admin == true || request.auth.token.operator == true);
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.operator == true ||
+        (request.auth.token.email_verified == true &&
+          request.auth.token.email == 'hquansl001@gmail.com')
+      );
     }
 
     match /site_content/{contentId} {
