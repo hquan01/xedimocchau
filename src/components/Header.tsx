@@ -36,22 +36,10 @@ export default function Header({
   ];
 
   const handleMobileSearchClick = () => {
-    // If not in home/limousine, navigate home first
-    if (activeTab !== "limousine" && activeTab !== "combo") {
-      setActiveTab("limousine");
-    }
-    setTimeout(() => {
-      const searchBox = document.getElementById("hero_wrapper");
-      const searchInput = document.querySelector("#hero_wrapper input") as HTMLInputElement | null;
-      if (searchBox) {
-        searchBox.scrollIntoView({ behavior: "smooth", block: "start" });
-        if (searchInput) {
-          searchInput.focus();
-        }
-      } else {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    }, 150);
+    // Search belongs to the new Explore landing, not the legacy Limousine hero.
+    setActiveTab("explore");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.dispatchEvent(new Event("mocchau:open-ai"));
   };
 
   return (
@@ -88,7 +76,7 @@ export default function Header({
           <div className="flex items-center min-w-0 pr-2">
             <button 
               onClick={() => {
-                setActiveTab("limousine");
+                setActiveTab("explore");
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }} 
               className="flex items-center space-x-2 sm:space-x-2.5 cursor-pointer text-left shrink-0"
