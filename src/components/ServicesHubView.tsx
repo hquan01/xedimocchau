@@ -97,31 +97,31 @@ export default function ServicesHubView({
   };
 
   return (
-    <div className="min-h-screen bg-[#f7faf7] pb-20 font-sans" id="services_hub_root">
+    <div className="min-h-screen bg-[#f7faf7] pb-28 font-sans" id="services_hub_root">
       {/* Hero Header Banner */}
-      <div className="bg-gradient-to-br from-[#1b4332] via-emerald-700 to-emerald-600 text-white pt-5 pb-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden rounded-b-[1.5rem]">
+      <div className="bg-gradient-to-br from-[#1b4332] via-emerald-700 to-emerald-600 text-white pt-4 pb-5 sm:pt-5 sm:pb-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden rounded-b-[1.5rem]">
         <div className="absolute right-0 top-0 w-80 h-80 bg-white/20 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-7xl mx-auto text-center relative z-10">
-          <span className="inline-flex items-center space-x-2 bg-white/15 border border-white/20 px-3 py-1 rounded-full text-[10px] font-bold text-white tracking-wide mb-2">
+          <span className="hidden sm:inline-flex items-center space-x-2 bg-white/15 border border-white/20 px-3 py-1 rounded-full text-[10px] font-bold text-white tracking-wide mb-2">
             <Sparkles className="w-3.5 h-3.5 text-yellow-100" />
             <span>Mộc Châu Travel Của Bạn</span>
           </span>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white mb-2">
+          <h1 className="text-xl sm:text-4xl font-black tracking-tight text-white mb-1 sm:mb-2">
             Dịch vụ Mộc Châu
           </h1>
-          <p className="text-emerald-50 text-xs sm:text-sm max-w-2xl mx-auto font-sans leading-relaxed">
+          <p className="text-emerald-50 text-[12px] sm:text-sm max-w-2xl mx-auto font-sans leading-snug sm:leading-relaxed">
             Đặt xe, thuê xe máy, tìm lưu trú và trải nghiệm phù hợp với chuyến đi.
           </p>
 
           {/* Quick Search bar */}
-          <div className="mt-4 max-w-md mx-auto relative">
+          <div className="mt-3 sm:mt-4 max-w-md mx-auto relative">
             <Search className="w-4 h-4 text-emerald-600 absolute left-3.5 top-3.5" />
             <input
               type="text"
-              placeholder="Bạn muốn đi đâu hôm nay?..."
+              placeholder="Tìm xe, lưu trú, quán ăn, giá vé..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-white text-stone-900 rounded-3xl text-sm font-bold shadow-md focus:outline-none focus:ring-4 focus:ring-emerald-200 placeholder:text-stone-400"
+              className="w-full pl-10 pr-4 py-3 bg-white text-stone-900 rounded-xl sm:rounded-3xl text-[14px] font-semibold shadow-md focus:outline-none focus:ring-4 focus:ring-emerald-200 placeholder:text-stone-500"
             />
             {searchTerm.trim()&&<div className="absolute top-full left-0 right-0 mt-2 z-30 bg-white border border-emerald-100 shadow-xl rounded-xl overflow-hidden text-left text-emerald-950">
               {searchMatches.length ? searchMatches.map(result=><button key={result.category} type="button" onClick={()=>{setSelectedCategory(result.category);setSearchTerm('');}} className="block w-full text-left px-4 py-3 text-sm font-semibold hover:bg-emerald-50 border-b last:border-b-0">{result.name}</button>) : <p className="p-3 text-xs text-stone-500">Không tìm thấy dịch vụ. Hãy thử từ khóa khác.</p>}
@@ -132,15 +132,28 @@ export default function ServicesHubView({
 
       {/* Category Filter Chips Bar */}
       <div className="relative sm:sticky sm:top-16 z-20 bg-white border-b border-stone-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5">
-          <label className="sr-only" htmlFor="service_category_filter">Lọc danh mục dịch vụ</label>
-          <select id="service_category_filter" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value as typeof selectedCategory)}
-            className="sm:hidden block w-full rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-900 font-bold text-sm px-3 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-            <option value="all">Tất cả dịch vụ</option><option value="transport">Xe Limousine & Taxi</option>
-            <option value="motorbike">Thuê xe máy</option><option value="accommodation">Lưu trú & Homestay</option>
-            <option value="combo">Combo xe + phòng</option><option value="restaurant">Ẩm thực & Đặc sản</option>
-            <option value="tour">Bảng giá vé tham quan</option>
-          </select>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-2.5">
+          {/* One clearly selected service on small screens, without a nested dropdown. */}
+          <div className="sm:hidden grid grid-cols-2 gap-2" role="group" aria-label="Chọn danh mục dịch vụ">
+            {[
+              {id:'transport',label:'Xe Limousine & Taxi',Icon:Bus},
+              {id:'motorbike',label:'Thuê xe máy',Icon:Bike},
+              {id:'accommodation',label:'Homestay & Khách sạn',Icon:Hotel},
+              {id:'combo',label:'Combo xe & phòng',Icon:Star},
+              {id:'restaurant',label:'Ăn uống & Đặc sản',Icon:UtensilsCrossed},
+              {id:'tour',label:'Giá vé tham quan',Icon:MapPin}
+            ].map((cat)=>(
+              <button type="button" key={cat.id} aria-pressed={selectedCategory===cat.id}
+                onClick={()=>setSelectedCategory(cat.id as typeof selectedCategory)}
+                className={"flex items-center gap-2 min-h-[48px] rounded-xl border px-3 py-2.5 text-left text-[12px] font-bold leading-tight "+
+                (selectedCategory===cat.id
+                  ?"bg-emerald-800 border-emerald-800 text-white shadow-sm"
+                  :"bg-white border-stone-200 text-stone-700")}>
+                <cat.Icon className="w-5 h-5 shrink-0" aria-hidden="true"/>
+                <span>{cat.label}</span>
+              </button>
+            ))}
+          </div>
           <div className="hidden sm:flex space-x-2 overflow-x-auto custom-tab-scrollbar pb-1.5 pt-0.5">
             {[
               { id: "all", label: "Tất Cả Dịch Vụ", icon: Sparkles },
@@ -173,7 +186,7 @@ export default function ServicesHubView({
       </div>
 
       {/* Main Content Catalog Grid */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 space-y-6 text-left">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 space-y-5 text-left min-w-0 overflow-x-hidden">
         
         {/* SECTION 1: XE DI CHUYỂN & TAXI (LIMOUSINE, TAXI 4-16 CHỖ, THUÊ XE MÁY) */}
         {(selectedCategory === "all" || selectedCategory === "transport" || selectedCategory === "motorbike") && (
@@ -183,7 +196,7 @@ export default function ServicesHubView({
                 <Bus className="w-5 h-5 text-emerald-700" />
                 <span>Dịch Vụ Vận Tải & Di Chuyển Mộc Châu</span>
               </h2>
-              <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+              <span className="hidden sm:inline-flex text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                 Gửi yêu cầu tư vấn
               </span>
             </div>
@@ -204,11 +217,11 @@ export default function ServicesHubView({
                       Xe QT Limousine VIP (DCar)
                     </h3>
 
-                    <p className="text-xs text-stone-600 font-sans leading-relaxed">
+                    <p className="text-[13px] sm:text-xs text-stone-600 font-sans leading-relaxed line-clamp-3 sm:line-clamp-none">
                       Chạy liên tục từ 06h30 đến 18h30 hàng ngày hai chiều Hà Nội ⇌ Mộc Châu. Ghế massage êm ái, wifi miễn phí, nước uống & cổng sạc điện thoại.
                     </p>
 
-                    <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100 text-[11px] text-emerald-950 space-y-1">
+                    <div className="hidden sm:block bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100 text-[11px] text-emerald-950 space-y-1">
                       <p>✓ Khung giờ: 06:30, 07:30, 08:30, 09:30, 11:30, 13:30, 15:30, 17:30, 18:30</p>
                       <p>✓ Đón tận nơi phố cổ, Mỹ Đình, BigC Thăng Long & Homestay Mộc Châu</p>
                     </div>
@@ -247,11 +260,11 @@ export default function ServicesHubView({
                       Taxi & xe du lịch 4 · 7 · 9 · 16 chỗ
                     </h3>
 
-                    <p className="text-xs text-stone-600 font-sans leading-relaxed">
+                    <p className="text-[13px] sm:text-xs text-stone-600 font-sans leading-relaxed line-clamp-3 sm:line-clamp-none">
                       Phục vụ tham quan đồi chè, hái mận Nà Ka, Cầu kính Bạch Long, Thác Dải Yếm và xe riêng đưa đón sân bay Nội Bài / Hà Nội về Mộc Châu.
                     </p>
 
-                    <div className="bg-teal-50/80 p-3 rounded-2xl border border-teal-100 text-[11px] text-teal-950 space-y-1">
+                    <div className="hidden sm:block bg-teal-50/80 p-3 rounded-2xl border border-teal-100 text-[11px] text-teal-950 space-y-1">
                       <p>✓ Chọn chính xác xe 4, 7, 9 hoặc 16 chỗ</p>
                       <p>✓ Nhập điểm đón, điểm đến và thời gian sử dụng</p>
                       <p>✓ Giá sẽ được xác nhận sau khi đơn vị cung cấp báo giá</p>
@@ -291,11 +304,11 @@ export default function ServicesHubView({
                       Thuê Xe Máy Chinh Phục Mộc Châu
                     </h3>
 
-                    <p className="text-xs text-stone-600 font-sans leading-relaxed">
+                    <p className="text-[13px] sm:text-xs text-stone-600 font-sans leading-relaxed line-clamp-3 sm:line-clamp-none">
                       Xe Wave Alpha, RSX dẻo dai leo dốc khỏe & Xe Vision, Air Blade êm ái. Giao và nhận xe máy miễn phí tại Homestay, Khách sạn hoặc Bến xe.
                     </p>
 
-                    <div className="bg-indigo-50/80 p-3 rounded-2xl border border-indigo-100 text-[11px] text-indigo-950 space-y-1">
+                    <div className="hidden sm:block bg-indigo-50/80 p-3 rounded-2xl border border-indigo-100 text-[11px] text-indigo-950 space-y-1">
                       <p>🎁 Tặng kèm: 02 mũ bảo hiểm đạt chuẩn + 01 áo mưa tiện lợi</p>
                       <p>🎁 Tặng kèm: Bản đồ du lịch Mộc Châu cầm tay tiện lợi</p>
                       <p>✓ Thủ tục đơn giản: Chỉ cần ảnh chụp CCCD hoặc bằng lái xe</p>
