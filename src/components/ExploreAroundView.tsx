@@ -36,7 +36,7 @@ export default function ExploreAroundView({ setActiveTab, destinations, accommod
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 font-sans">
       <div className="flex items-center space-x-2 text-xs text-stone-500 mb-6">
-        <button onClick={() => setActiveTab("limousine")} className="hover:text-emerald-700">Trang chủ</button>
+        <button onClick={() => { setActiveTab("explore"); window.scrollTo({top: 0, behavior: "smooth"}); }} className="hover:text-emerald-700">Trang chủ</button>
         <span>/</span>
         <span className="text-emerald-800 font-bold">Khám phá quanh tôi (Mộc Châu)</span>
       </div>

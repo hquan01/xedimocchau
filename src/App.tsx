@@ -448,7 +448,7 @@ export default function App() {
     localStorage.removeItem("mock_admin_session");
     localStorage.removeItem("xedimocchau_current_user");
     setCurrentUser(null);
-    setActiveTab("limousine");
+    setActiveTab("explore");
   };
 
   const renderCategoryDirectory = () => {
@@ -527,7 +527,7 @@ export default function App() {
         categoryKey={catKey}
         categoryTitle={title}
         categoryDescription={desc}
-        onBack={() => setActiveTab("limousine")}
+        onBack={() => { setSelectedCategoryItem(null); setActiveTab("explore"); window.scrollTo({top: 0, behavior: "smooth"}); }}
         onSelectBooking={() => setActiveTab("limousine")}
         onOpenItemDetail={(item) => setSelectedCategoryItem(item)}
         items={dataList}
