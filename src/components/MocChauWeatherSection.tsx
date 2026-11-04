@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import {fetchActualMocChauWeather} from "../lib/directWeather";
 import { 
   Sun, 
   CloudSun, 
@@ -47,22 +48,14 @@ export default function MocChauWeatherSection({
 
   const fetchWeather = async (locId: string, isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
-    else setLoading(true);
+    else { setLoading(true); setWeatherData(null); }
     setError(null);
-
     try {
-      const res = await fetch(`/api/weather?location=${encodeURIComponent(locId)}`);
-      if (!res.ok) {
-        throw new Error(`Máy chủ phản hồi mã lỗi: ${res.status}`);
-      }
-      const data: WeatherData = await res.json();
-      if (!data || !data.success) {
-        throw new Error(data?.error || "Không thể tải dữ liệu thời tiết trực tuyến");
-      }
+      const data = await fetchActualMocChauWeather(locId, isManualRefresh);
       setWeatherData(data);
     } catch (err: any) {
-      console.error("[WeatherView] Fetch error:", err);
-      setError(err?.message || "Không thể kết nối trạm thời tiết Open-Meteo");
+      console.error("[WeatherView] Unable to load live weather:", err);
+      setError(err?.message || "Không thể tải dự báo thời tiết trực tuyến");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -104,10 +97,10 @@ export default function MocChauWeatherSection({
           <RefreshCw className="w-6 h-6 animate-spin" />
         </div>
         <h3 className="text-base font-extrabold text-stone-900">
-          Đang kết nối trạm khí tượng cao nguyên Mộc Châu...
+          Đang tải dự báo thời tiết Mộc Châu từ nguồn khí tượng...
         </h3>
         <p className="text-xs text-stone-500 max-w-md mx-auto font-sans">
-          Hệ thống đang truy xuất dữ liệu vệ tinh & trạm quan trắc thực tế thời gian thực.
+          Hệ thống lấy số liệu dự báo mới nhất theo tọa độ Mộc Châu.
         </p>
       </div>
     );
@@ -123,7 +116,7 @@ export default function MocChauWeatherSection({
           Chưa thể cập nhật dữ liệu thời tiết trực tiếp
         </h3>
         <p className="text-xs text-stone-600 max-w-md mx-auto font-sans">
-          {error}. Mộc Châu Travel cam kết không hiển thị thông số giả khi mất kết nối trạm. Quý khách vui lòng bấm nút thử lại.
+          {error} Mộc Châu Travel không tự tạo thông số thời tiết khi nguồn dữ liệu gặp sự cố.
         </p>
         <button
           onClick={() => fetchWeather(selectedLocationId, true)}
@@ -142,6 +135,11 @@ export default function MocChauWeatherSection({
 
   return (
     <div className="space-y-6 text-left" id="moc_chau_weather_container">
+      {error && weatherData && (
+        <div role="status" className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs p-4">
+          Không làm mới được dữ liệu. Số liệu bên dưới là lần cập nhật trước đó: {error}
+        </div>
+      )}
       {/* Location Selector & Refresh Header */}
       <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex items-center space-x-2">
@@ -185,7 +183,7 @@ export default function MocChauWeatherSection({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-900/90 border border-emerald-400/40 text-emerald-300 text-[11px] font-extrabold uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Dữ liệu khí tượng trực tuyến (Live)</span>
+              <span>Dữ liệu dự báo khí tượng trực tuyến</span>
             </div>
 
             <div className="flex items-center gap-4">
@@ -202,7 +200,7 @@ export default function MocChauWeatherSection({
                 {current.conditionText}
               </h4>
               <p className="text-xs sm:text-sm text-stone-200 font-sans">
-                Cảm giác thực tế ngoài trời: <strong className="text-white font-mono">{current.apparentTemperature}°C</strong> • Cao độ: ~{location.elevation}m
+                Nhiệt độ cảm nhận (ước tính): <strong className="text-white font-mono">{current.apparentTemperature}°C</strong> • Cao độ: ~{location.elevation}m
               </p>
             </div>
           </div>
@@ -232,19 +230,19 @@ export default function MocChauWeatherSection({
             <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/15 text-center">
               <Sun className="w-4 h-4 text-amber-400 mx-auto mb-1" />
               <span className="text-[10px] text-emerald-200 uppercase font-bold block">Chỉ số UV</span>
-              <span className="text-sm font-black font-mono mt-0.5 block text-amber-200">{current.uvIndex ?? "3.1"}</span>
+              <span className="text-sm font-black font-mono mt-0.5 block text-amber-200">{current.uvIndex ?? "—"}</span>
             </div>
 
             <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/15 text-center">
               <Thermometer className="w-4 h-4 text-emerald-300 mx-auto mb-1" />
               <span className="text-[10px] text-emerald-200 uppercase font-bold block">Điểm ngưng</span>
-              <span className="text-sm font-black font-mono mt-0.5 block">{current.dewPoint ? `${current.dewPoint}°C` : `${current.apparentTemperature}°C`}</span>
+              <span className="text-sm font-black font-mono mt-0.5 block">{current.dewPoint !== undefined ? `${current.dewPoint}°C` : "—"}</span>
             </div>
 
             <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/15 text-center">
               <Clock className="w-4 h-4 text-teal-200 mx-auto mb-1" />
               <span className="text-[10px] text-emerald-200 uppercase font-bold block">Bình minh</span>
-              <span className="text-xs font-black font-mono mt-0.5 block">{current.sunrise || "06:08"}</span>
+              <span className="text-xs font-black font-mono mt-0.5 block">{current.sunrise || "—"}</span>
             </div>
           </div>
         </div>
@@ -253,14 +251,14 @@ export default function MocChauWeatherSection({
         <div className="relative z-10 mt-6 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-stone-300 font-sans">
           <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Nguồn dữ liệu thực tế: <strong>{weatherData?.source || "dubaothoitiet.edu.vn (Sơn La - Mộc Châu)"}</strong></span>
+            <span>Nguồn dữ liệu khí tượng: <strong>{weatherData?.source || "Chưa có nguồn"}</strong></span>
             <a 
-              href="https://dubaothoitiet.edu.vn/son-la/moc-chau" 
+              href={weatherData?.sourceUrl || "https://open-meteo.com/en/docs"} 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-cyan-300 hover:text-cyan-100 underline font-bold ml-1 inline-flex items-center gap-1"
             >
-              <span>[Xem trang gốc dubaothoitiet.edu.vn]</span>
+              <span>[Xem nguồn và phương pháp dự báo]</span>
             </a>
           </div>
           <span className="text-emerald-300 font-mono text-[10px]">
@@ -275,7 +273,7 @@ export default function MocChauWeatherSection({
           <div className="flex items-center justify-between">
             <h3 className="font-extrabold text-stone-900 text-sm flex items-center space-x-1.5">
               <Clock className="w-4 h-4 text-emerald-700" />
-              <span>Dự báo thời tiết chi tiết theo giờ (Trực tiếp từ dubaothoitiet.edu.vn)</span>
+              <span>Dự báo thời tiết theo giờ (theo nguồn hiển thị ở trên)</span>
             </h3>
             <span className="text-[10px] text-stone-400 font-sans">Vuốt ngang để xem thêm →</span>
           </div>
@@ -305,10 +303,10 @@ export default function MocChauWeatherSection({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
             <h3 className="font-extrabold text-stone-900 text-sm sm:text-base flex items-center space-x-1.5">
               <Calendar className="w-4 h-4 text-emerald-700" />
-              <span>Dự báo thời tiết các ngày tới tại Mộc Châu (Cập nhật từ dubaothoitiet.edu.vn)</span>
+              <span>Dự báo thời tiết các ngày tới tại Mộc Châu</span>
             </h3>
             <span className="text-[11px] text-stone-500 font-sans">
-              Trích xuất trực tiếp số liệu khí tượng Mộc Châu
+              Theo dữ liệu mô hình thời tiết, không phải đo trực tiếp tại điểm
             </span>
           </div>
 
@@ -335,7 +333,7 @@ export default function MocChauWeatherSection({
                 </span>
                 <div className="mt-1.5 inline-flex items-center space-x-1 text-[10px] font-bold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-100">
                   <Droplets className="w-2.5 h-2.5 text-cyan-600" />
-                  <span>{d.precipitationMm !== undefined ? `${d.precipitationMm} mm` : `${d.precipitationProbabilityMax}%`}</span>
+                  <span>{d.precipitationMm !== undefined ? `${d.precipitationMm} mm` : d.precipitationProbabilityMax !== undefined ? `${d.precipitationProbabilityMax}%` : "—"}</span>
                 </div>
               </div>
             ))}
