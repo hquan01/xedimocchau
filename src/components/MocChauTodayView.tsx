@@ -23,13 +23,13 @@ export default function MocChauTodayView({ setActiveTab }: MocChauTodayViewProps
         <div className="absolute right-0 top-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 max-w-3xl">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-900/80 border border-teal-400/30 text-teal-300 text-xs font-extrabold uppercase tracking-widest mb-3">
-            🌸 Cập Nhật Thời Tiết & Mùa Hoa Thực Tế
+            🌸 Thời Tiết Trực Tuyến & Mùa Hoa Mộc Châu
           </span>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-3">
             Mộc Châu Hôm Nay Có Gì?
           </h1>
           <p className="text-stone-200 text-xs sm:text-sm leading-relaxed">
-            Dữ liệu thời tiết trực tuyến, trạng thái hoa nở thực tế được kiểm chứng bởi kiểm lâm và ban quản lý du lịch địa phương. Không dùng dữ liệu giả.
+            Dự báo thời tiết cập nhật từ nguồn khí tượng trực tuyến. Lịch mùa hoa là thông tin tham khảo theo mùa, không phải xác nhận tình trạng hoa nở tại vườn.
           </p>
         </div>
       </div>
@@ -64,9 +64,9 @@ export default function MocChauTodayView({ setActiveTab }: MocChauTodayViewProps
       {selectedSeasonTab === "flowers" && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
-            { name: "Mùa Hoa Mận Trắng", time: "Tháng 1 - Tháng 2", status: "Đã qua mùa", desc: "Thung lũng Nà Ka, Ba Phách rợp trời hoa mận trắng tinh khôi.", verified: true },
-            { name: "Mùa Mận Hậu Chín", time: "Tháng 4 - Tháng 6", status: "Đang diễn ra", desc: "Trải nghiệm hái mận tận vườn, thưởng thức trái mận hậu giòn ngọt tại vườn.", verified: true },
-            { name: "Mùa Cải Trắng & Dã Quỳ", time: "Tháng 11 - Tháng 12", status: "Sắp diễn ra", desc: "Cả cao nguyên khoác tấm áo vàng dã quỳ và trắng tinh khôi hoa cải bản Áng.", verified: true },
+            { name: "Mùa Hoa Mận Trắng", time: "Tháng 1 - Tháng 2", status: "Theo mùa", desc: "Thông thường có thể ngắm hoa mận tại Nà Ka, Ba Phách vào mùa nở. Tình trạng hoa thực tế tùy thời tiết.", verified: false },
+            { name: "Mùa Mận Hậu Chín", time: "Tháng 4 - Tháng 6", status: "Theo mùa", desc: "Mận hậu thường vào vụ trong khoảng tháng 4–6; thời gian thu hoạch thay đổi theo năm.", verified: false },
+            { name: "Mùa Cải Trắng & Dã Quỳ", time: "Tháng 11 - Tháng 12", status: "Theo mùa", desc: "Hoa cải trắng và dã quỳ thường xuất hiện vào cuối năm; nên liên hệ điểm tham quan trước khi đi.", verified: false },
           ].map((flower, idx) => (
             <div key={idx} className="bg-white rounded-3xl p-6 shadow-xl border border-stone-200 flex flex-col justify-between">
               <div>
@@ -83,7 +83,7 @@ export default function MocChauTodayView({ setActiveTab }: MocChauTodayViewProps
               <div className="pt-4 mt-4 border-t border-stone-100 flex items-center justify-between">
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>Đã kiểm chứng thực tế</span>
+                  <span>Thời gian tham khảo</span>
                 </span>
                 <button
                   onClick={() => setActiveTab("limousine")}
