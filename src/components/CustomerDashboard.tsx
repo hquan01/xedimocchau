@@ -34,6 +34,7 @@ import { auth } from "../firebase";
 import { updatePassword, updateProfile, updateEmail } from "firebase/auth";
 import { saveUserToFirebase } from "../lib/firebaseUtils";
 import { INITIAL_COMBOS } from "../data/combos";
+import {POINT_VALUE_VND, eligibleForNextBookingReward, previousConfirmedBookings} from "../lib/loyalty";
 
 interface CustomerDashboardProps {
   currentUser: User;
@@ -130,10 +131,8 @@ export default function CustomerDashboard({
       favDropoff: profileFavDropoff,
     };
 
-    if (newPassword) {
-      updatedUser.passwordResetToDefault = false;
-      updatedUser.customPassword = newPassword;
-    }
+    // Never copy the new password into a Firestore profile. Only Firebase Auth
+    // may receive it through updatePassword() below.
 
     onUpdateUser(updatedUser);
 
@@ -188,39 +187,34 @@ export default function CustomerDashboard({
     }
   };
 
-  // Generate dynamic points history
+  // Display only real +1 booking awards, not fabricated +10/+5 bonuses.
   const getPointsHistory = (): PointTransaction[] => {
-    const list: PointTransaction[] = [
-      {
-        id: "tx_init",
-        date: "20/05/2026",
-        description: "Quà tặng chào mừng thành viên mới đăng ký xe đi Mộc Châu",
-        amount: 10,
-        type: "plus",
-      },
-    ];
-
-    // Filter success/completed user bookings to award flat +5 points (1 point = 1000đ)
-    bookings.forEach((b) => {
-      if (
-        b.passengerPhone === currentUser.phone &&
-        (b.status === "success" || b.status === "completed")
-      ) {
-        list.push({
-          id: `tx_earn_${b.id}`,
-          date: b.bookingDate || "20/05/2026",
-          description: `Tích lũy điểm đặt vé thành công đơn #${(b.id || "").toUpperCase()}`,
-          amount: 5,
-          type: "plus",
+    const history: PointTransaction[] = [];
+    const rewarded = Array.isArray(currentUser.rewardedBookingIds)
+      ? currentUser.rewardedBookingIds : [];
+    rewarded.forEach(id => {
+      const b = bookings.find(booking => booking.id === id);
+      history.push({
+        id:"tx_earn_"+id,date:b?.bookingDate || "—",
+        description:"Đã xác nhận vé #"+id.toUpperCase(),
+        amount:1,type:"plus"
+      });
+    });
+    bookings.forEach(b => {
+      if (b.pointsDeducted && b.pointsDeducted>0 && !b.pointsRefunded &&
+          b.userId === currentUser.id && b.status!=="cancelled") {
+        history.push({
+          id:"tx_spend_"+b.id,date:b.bookingDate||"—",
+          description:"Giảm giá khi đặt vé #"+b.id.toUpperCase(),
+          amount:b.pointsDeducted,type:"minus"
         });
       }
     });
-
-    // Sort descending by date
-    return list;
+    return history;
   };
-
   const pointsHistory = getPointsHistory();
+  const confirmedOrders = previousConfirmedBookings(currentUser);
+  const voucherUnlocked = eligibleForNextBookingReward(currentUser);
 
   // Tier parameters calculations
   const totalEarnedPoints = currentUser.points;
@@ -259,8 +253,9 @@ export default function CustomerDashboard({
   }
 
   // Filter local user bookings
-  const userBookings = bookings.filter(
-    (b) => b.passengerPhone === currentUser.phone,
+  const userBookings = bookings.filter(b =>
+    b.userId === currentUser.id ||
+    (Boolean(currentUser.phone) && b.passengerPhone === currentUser.phone)
   );
 
   const handleCopy = (code: string) => {
@@ -342,7 +337,7 @@ export default function CustomerDashboard({
                   Quy đổi tiền mặt
                 </span>
                 <span className="block text-sm font-black text-[#1b4332] mt-1.5">
-                  {(currentUser.points * 1000).toLocaleString()}đ
+                  {(currentUser.points * POINT_VALUE_VND).toLocaleString()}đ
                 </span>
               </div>
             </div>
@@ -909,9 +904,8 @@ export default function CustomerDashboard({
                   <span>Ví Điểm Tích Lũy & Thẻ Quà Tặng</span>
                 </h3>
                 <p className="text-stone-400 text-[11px] mt-0.5">
-                  Tích lũy tự động 5% tiền mặt cho mỗi chuyến xe thành công. Đổi
-                  điểm ngay để nhận Coupon giảm giá phòng nghỉ và vé xe trực
-                  tiếp.
+                  Mỗi vé được nhà xe xác nhận sẽ cộng 1 điểm vào tài khoản thành viên.
+                  Dùng điểm và voucher từ đơn thứ hai, sau khi đơn đầu đã được xác nhận.
                 </p>
               </div>
 
@@ -933,7 +927,7 @@ export default function CustomerDashboard({
                   <p className="text-[10px] text-stone-100 mt-2 leading-tight">
                     Tương ứng quy đổi:{" "}
                     <strong className="font-mono text-amber-300 font-bold text-xs">
-                      {(currentUser.points * 1000).toLocaleString()}đ
+                      {(currentUser.points * POINT_VALUE_VND).toLocaleString()}đ
                     </strong>{" "}
                     khi thanh toán vé trực tuyến.
                   </p>
@@ -944,28 +938,15 @@ export default function CustomerDashboard({
                     <Zap className="w-4 h-4 text-emerald-600" />
                     Cơ chế hoạt động điểm thưởng:
                   </span>
-                  <ul className="list-disc list-inside space-y-1 text-[11px] text-stone-600">
-                    <li>
-                      <b>Khi đăng ký:</b> Tặng nóng 10 điểm (~10.000đ).
-                    </li>
-                    <li>
-                      <b>Khi hoàn thành chuyến đi:</b> Tích lũy cộng ngay +5
-                      điểm quý khách thân thiết.
-                    </li>
-                    <li>
-                      <b>Trừ tiền trực tiếp vào vé:</b> Áp dụng linh hoạt từ{" "}
-                      <strong className="text-emerald-700 font-bold">
-                        chuyến xe thứ 3 trở đi
-                      </strong>{" "}
-                      với tỷ giá{" "}
-                      <strong className="font-mono">1 Điểm = 1.000đ</strong>.
-                    </li>
-                    <li>
-                      <b>Quy đổi Coupon lớn:</b> Đổi các mã Voucher lớn (lên tới
-                      500.000đ) để đặt xe/khách sạn bất cứ khi nào đủ điểm tích
-                      lũy!
-                    </li>
+                  <ul className="list-disc list-inside space-y-1 text-[12px] text-stone-700">
+                    <li><b>Lần đặt vé đầu:</b> Không trừ điểm hay áp mã voucher.</li>
+                    <li><b>Admin xác nhận đơn:</b> +1 điểm cho vé hợp lệ, không cộng trùng.</li>
+                    <li><b>Từ lần đặt vé thứ hai:</b> Có thể dùng số điểm đã tích lũy hoặc voucher đang được công bố.</li>
+                    <li><b>Quy đổi:</b> 1 điểm = 1.000đ giảm trực tiếp vào vé. Vé bị hủy không được cộng điểm.</li>
                   </ul>
+                  <p className="text-[11px] font-bold text-emerald-800 mt-2">
+                    Đơn đã xác nhận: {confirmedOrders} · {voucherUnlocked?"Đã mở quyền dùng voucher":"Voucher sẽ mở sau khi vé đầu tiên được xác nhận"}.
+                  </p>
                 </div>
               </div>
 
@@ -1001,8 +982,10 @@ export default function CustomerDashboard({
 
                           <div className="pt-2 flex items-center justify-end">
                             <button
-                              onClick={() => handleCopy(cp.code)}
-                              className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1"
+                              onClick={() => { if(voucherUnlocked) handleCopy(cp.code); }}
+                              disabled={!voucherUnlocked}
+                              title={!voucherUnlocked?"Voucher mở từ đơn thứ hai sau khi vé đầu xác nhận":undefined}
+                              className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Copy className="w-3.5 h-3.5" /> Sao chép mã
                             </button>
@@ -1035,6 +1018,7 @@ export default function CustomerDashboard({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
+                      {pointsHistory.length===0 && <tr><td colSpan={3} className="p-4 text-center text-stone-500">Chưa có điểm từ đơn đã xác nhận.</td></tr>}
                       {pointsHistory.map((tx) => (
                         <tr key={tx.id} className="hover:bg-stone-50/50">
                           <td className="p-3 font-mono text-stone-500 text-[11px] whitespace-nowrap">
@@ -1093,9 +1077,9 @@ export default function CustomerDashboard({
                   </span>
                   <div className="h-px bg-stone-100 my-2" />
                   <ul className="space-y-1.5 text-[10px] text-stone-600 list-disc list-inside">
-                    <li>Cộng +5 điểm sau mỗi lượt di chuyển.</li>
-                    <li>Quà tặng chào mừng 10K.</li>
-                    <li>Khấu trừ trực tiếp hay tích lũy thành vé miễn phí.</li>
+                    <li>+1 điểm sau mỗi vé được nhà xe xác nhận.</li>
+                    <li>Không cộng điểm chào mừng tự động.</li>
+                    <li>Từ lần đặt vé thứ hai: 1 điểm giảm 1.000đ.</li>
                   </ul>
                 </div>
 
@@ -1122,7 +1106,7 @@ export default function CustomerDashboard({
                     <li>
                       Ưu tiên chọn ghế VIP mong muốn miễn phí khi đặt sớm.
                     </li>
-                    <li>Tặng Voucher giảm giá 10% dịp sinh nhật.</li>
+                    <li>Voucher chỉ áp dụng nếu có chương trình được công bố.</li>
                   </ul>
                 </div>
 
@@ -1149,7 +1133,7 @@ export default function CustomerDashboard({
                     <li>
                       Miễn phí khăn lạnh, đồ ăn nhẹ cao cấp trên xe limousine.
                     </li>
-                    <li>Giảm trực tiếp 100K khi mua phòng resort liên kết.</li>
+                    <li>Ưu đãi lưu trú sẽ được thông báo riêng khi có chương trình.</li>
                     <li>Đưa đón tận nơi vượt bán kính 5Km tại Mộc Châu.</li>
                   </ul>
                 </div>
@@ -1173,13 +1157,13 @@ export default function CustomerDashboard({
                   </span>
                   <div className="h-px bg-stone-100 my-2" />
                   <ul className="space-y-1.5 text-[10px] text-stone-600 list-disc list-inside">
-                    <li>Phục vụ độc quyền ưu tiên.</li>
+                    <li>Tích điểm theo đúng lịch sử đặt xe đã xác nhận.</li>
                     <li>
                       Hỗ trợ đổi chuyến, lịch khởi hành muộn/sớm MIỄN PHÍ trước
                       12 giờ.
                     </li>
                     <li>Phục vụ đón trả không phụ thu tại trung tâm Hà Nội.</li>
-                    <li>Nhận quà tặng tết & combo đặc biệt hàng năm.</li>
+                    <li>Ưu đãi theo từng chương trình được công bố.</li>
                   </ul>
                 </div>
               </div>

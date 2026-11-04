@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
 import { Seat, SharedCarConfig, LocationPoint } from "../types";
 import { Users, User, Phone, Mail, MapPin, Armchair, ChevronRight, Check, Compass, Info, ShieldCheck, Award, Tag, ArrowLeftRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -151,10 +152,14 @@ export default function SharedCarBooking({
 
   const handleApplyCoupon = () => {
     setCouponError("");
+    if (!eligibleForNextBookingReward(currentUser)) {
+      setCouponError("Voucher chỉ được dùng từ lần đặt vé thứ hai, sau khi vé đầu tiên được xác nhận.");
+      return;
+    }
     if (!couponCodeInput.trim()) return;
     
     // Find published coupon
-    const found = coupons?.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false);
+    const found = coupons?.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false && c.isPublished === true);
     
     if (found) {
        // Check if this coupon is already used by currentUser
@@ -175,8 +180,8 @@ export default function SharedCarBooking({
     )
   ).length;
   
-  const usablePoints = currentUser ? Math.min(1000, Math.floor(currentUser.points / 50) * 50) : 0;
-  const isEligibleForPointsDeduction = usablePoints >= 50 && currentUser?.role === "customer";
+  const usablePoints = redeemablePoints(currentUser);
+  const isEligibleForPointsDeduction = usablePoints >= 1 && currentUser?.role === "customer";
 
   // Form notifications and challenge elements
   const [errorMsg, setErrorMsg] = useState("");
@@ -396,11 +401,11 @@ export default function SharedCarBooking({
     let pointsDeducted = 0;
     let pointsDiscountAmount = 0;
     if (usePoints && isEligibleForPointsDeduction) {
-       pointsDiscountAmount = usablePoints * 1000;
+       pointsDiscountAmount = usablePoints * POINT_VALUE_VND;
        pointsDeducted = usablePoints; 
        if (pointsDiscountAmount > originalTotalPrice) {
           pointsDiscountAmount = originalTotalPrice;
-          pointsDeducted = Math.ceil(originalTotalPrice / 1000);
+          pointsDeducted = Math.ceil(originalTotalPrice / POINT_VALUE_VND);
        }
     }
 
@@ -871,7 +876,7 @@ export default function SharedCarBooking({
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-extrabold text-[#1b4332] flex items-center gap-1">
                               <Award className="w-4 h-4 text-emerald-600" />
-                              Phần thưởng tích lũy: Sẵn có {currentUser.points} điểm ({ (currentUser.points * 1000).toLocaleString() }đ)
+                              Phần thưởng tích lũy: Sẵn có {currentUser.points} điểm ({ (currentUser.points * POINT_VALUE_VND).toLocaleString() }đ)
                             </span>
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input
@@ -884,12 +889,12 @@ export default function SharedCarBooking({
                             </label>
                           </div>
                           <p className="text-[10px] text-stone-500">
-                            * Tích điểm: Nhận ngay 5% giá trị quy đổi tiền mặt vào ví điểm cho mỗi chuyến đi hoàn thành thành công.
+                            * Sau khi nhà xe xác nhận mỗi vé: +1 điểm. Từ đơn thứ hai có thể giảm 1.000đ cho mỗi điểm hiện có.
                           </p>
                           {usePoints && (
                             <div className="p-2 bg-white rounded-lg border border-emerald-200 flex justify-between items-center text-xs text-emerald-800 font-bold font-sans">
                               <span>Số tiền được giảm:</span>
-                              <span className="font-mono text-red-600">-{ Math.min(getSelectedSeatsPrice(), currentUser.points * 1000).toLocaleString() } VNĐ</span>
+                              <span className="font-mono text-red-600">-{ Math.min(getSelectedSeatsPrice(), currentUser.points * POINT_VALUE_VND).toLocaleString() } VNĐ</span>
                             </div>
                           )}
                         </>
@@ -901,13 +906,13 @@ export default function SharedCarBooking({
                               <span className="text-xs font-bold text-stone-600">
                                 Sử dụng điểm trực tiếp (Đang khóa 🔒)
                               </span>
-                              <span className="text-[10px] text-stone-500 block">Ví điểm khả dụng: {currentUser.points} điểm (~{(currentUser.points * 1000).toLocaleString()}đ)</span>
+                              <span className="text-[10px] text-stone-500 block">Ví điểm khả dụng: {currentUser.points} điểm (~{(currentUser.points * POINT_VALUE_VND).toLocaleString()}đ)</span>
                             </div>
                           </div>
                           <div className="bg-amber-50 border border-amber-100 p-2.5 rounded-lg text-[10px] text-amber-800 leading-normal font-sans font-medium">
-                            🚀 Tính năng áp điểm trực tiếp khấu trừ vào đơn hàng sẽ được kích hoạt từ **lần đặt vé thứ 3 trở đi** (Hiện tại lịch sử của bạn ghi nhận: <b>{userBookingsCount}/2 chuyến đã đặt</b>).
+                            Điểm và voucher áp dụng từ đơn thứ hai, sau khi vé đầu được nhà xe xác nhận.
                             <br />
-                            <span className="text-stone-500 font-normal mt-1 block"><b>Mẹo:</b> Bạn vẫn luôn có thể vào <b>Trang cá nhân ➔ Lợi ích điểm thưởng</b> để đổi điểm thành các mã Coupon cực rẻ bất kì lúc nào!</span>
+                            <span className="text-stone-600 mt-1 block">Hiện đã xác nhận: {currentUser.rewardedBookingIds?.length || currentUser.completedBookingsCount || 0} đơn.</span>
                           </div>
                         </div>
                       )}
@@ -935,14 +940,14 @@ export default function SharedCarBooking({
                     {usePoints && isEligibleForPointsDeduction && currentUser && currentUser.role === "customer" && (
                       <div className="flex justify-between text-emerald-700 font-bold">
                         <span>Giảm trừ điểm tích lũy ({Math.min(getSelectedSeatsPrice() / 1000, usablePoints)} điểm):</span>
-                        <span className="font-mono">- {Math.min(getSelectedSeatsPrice(), usablePoints * 1000).toLocaleString()}đ</span>
+                        <span className="font-mono">- {Math.min(getSelectedSeatsPrice(), usablePoints * POINT_VALUE_VND).toLocaleString()}đ</span>
                       </div>
                     )}
                     <div className="h-px bg-stone-200 my-2" />
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-extrabold text-stone-850">Tổng thanh toán:</span>
                       <span className="text-lg font-black text-[#1b4332] font-mono">
-                        {Math.max(0, getSelectedSeatsPrice() - ((appliedCoupon ? (getSelectedSeatsPrice() * appliedCoupon.discountPercentage) / 100 : 0) + (usePoints && isEligibleForPointsDeduction ? Math.min(getSelectedSeatsPrice(), usablePoints * 1000) : 0))).toLocaleString()}đ
+                        {Math.max(0, getSelectedSeatsPrice() - ((appliedCoupon ? (getSelectedSeatsPrice() * appliedCoupon.discountPercentage) / 100 : 0) + (usePoints && isEligibleForPointsDeduction ? Math.min(getSelectedSeatsPrice(), usablePoints * POINT_VALUE_VND) : 0))).toLocaleString()}đ
                       </span>
                     </div>
                   </div>

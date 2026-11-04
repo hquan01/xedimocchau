@@ -63,12 +63,12 @@ export default function BottomNavigation({
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-50 flex lg:hidden bg-white/95 backdrop-blur-md border-t border-emerald-100 shadow-2xl px-2 pb-[env(safe-area-inset-bottom,12px)] pt-1.5"
+      className="fixed bottom-0 left-0 right-0 z-50 flex lg:hidden bg-white/98 backdrop-blur-md border-t border-emerald-200 shadow-[0_-6px_22px_rgba(0,0,0,0.1)] px-2 pt-2 pb-[max(10px,env(safe-area-inset-bottom))]"
       id="mobile_bottom_nav"
       role="navigation"
       aria-label="Thanh điều hướng dưới điện thoại"
     >
-      <div className="grid grid-cols-4 items-center justify-around h-14 max-w-md mx-auto">
+      <div className="grid grid-cols-4 items-center gap-1 min-h-[72px] max-w-lg mx-auto w-full">
         {navTabs.map((tab) => {
           const Icon = tab.icon;
           const active = tab.isActive;
@@ -76,29 +76,29 @@ export default function BottomNavigation({
             <button
               key={tab.id}
               onClick={tab.onClick}
-              className={`flex flex-col items-center justify-center h-full min-h-[44px] min-w-[44px] py-1 px-1 rounded-xl transition-all select-none cursor-pointer ${
+              className={`flex flex-col gap-1.5 items-center justify-center h-[72px] min-w-0 px-0.5 rounded-2xl transition-all select-none cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-600 ${
                 active 
-                  ? "text-emerald-700" 
-                  : "text-stone-400 hover:text-emerald-600"
+                  ? "text-emerald-800 bg-emerald-50 border border-emerald-200" 
+                  : "text-stone-600 hover:text-emerald-700 hover:bg-stone-50"
               }`}
               id={`bottom_nav_${tab.id}`}
               aria-current={active ? "page" : undefined}
             >
               <div className="relative">
                 <Icon 
-                  className={`w-5 h-5 transition-transform ${
-                    active ? "scale-110 text-emerald-700 stroke-[2.4]" : "stroke-[1.8]"
+                  className={`w-7 h-7 transition-transform ${
+                    active ? "scale-105 text-emerald-800 stroke-[2.5]" : "stroke-[2.1]"
                   }`} 
                 />
                 {tab.id === "trip" && bookingCount > 0 && (
-                  <span className="absolute -top-1 -right-2.5 min-w-[14px] h-[14px] bg-emerald-600 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5">
+                  <span className="absolute -top-1 -right-2.5 min-w-[18px] h-[18px] bg-emerald-600 text-white text-[10px] font-black rounded-full flex items-center justify-center px-0.5">
                     {bookingCount}
                   </span>
                 )}
               </div>
               <span 
-                className={`text-[10px] mt-1 tracking-tight leading-none whitespace-nowrap ${
-                  active ? "font-extrabold text-emerald-700" : "font-semibold"
+                className={`text-[12px] sm:text-[13px] tracking-normal leading-tight whitespace-nowrap ${
+                  active ? "font-black text-emerald-800" : "font-bold text-stone-600"
                 }`}
               >
                 {tab.label}

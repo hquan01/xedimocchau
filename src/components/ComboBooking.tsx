@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
 import { Accommodation, TourCombo, User, LocationPoint } from "../types";
 import { Compass, Check, Phone, ShieldCheck, Mail, Star, Users, MapPin, CalendarDays, Ticket, ArrowRight, Sparkles, Building, Award, X, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -81,10 +82,14 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
 
   const handleApplyCoupon = () => {
     setCouponError("");
+    if (!eligibleForNextBookingReward(currentUser)) {
+      setCouponError("Voucher chỉ được dùng từ lần đặt vé thứ hai, sau khi vé đầu tiên được xác nhận.");
+      return;
+    }
     if (!couponCodeInput.trim()) return;
     
     // Find published coupon
-    const found = coupons?.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false);
+    const found = coupons?.find(c => c.code.toUpperCase() === couponCodeInput.trim().toUpperCase() && c.isActive !== false && c.isPublished === true);
     
     if (found) {
        // Check if this coupon is already used by currentUser
@@ -104,8 +109,8 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
       (currentUser?.phone && b.passengerPhone === currentUser.phone)
     )
   ).length;
-  const usablePoints = currentUser ? Math.min(1000, Math.floor(currentUser.points / 50) * 50) : 0;
-  const isEligibleForPointsDeduction = usablePoints >= 50 && currentUser?.role === "customer";
+  const usablePoints = redeemablePoints(currentUser);
+  const isEligibleForPointsDeduction = usablePoints >= 1 && currentUser?.role === "customer";
 
   // Booking details configuration
   const [nights, setNights] = useState(1);
@@ -303,11 +308,11 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
     let pointsDeducted = 0;
     let pointsDiscountAmount = 0;
     if (usePoints && isEligibleForPointsDeduction) {
-       pointsDiscountAmount = usablePoints * 1000;
+       pointsDiscountAmount = usablePoints * POINT_VALUE_VND;
        pointsDeducted = usablePoints; 
        if (pointsDiscountAmount > originalTotalPrice) {
           pointsDiscountAmount = originalTotalPrice;
-          pointsDeducted = Math.ceil(originalTotalPrice / 1000);
+          pointsDeducted = Math.ceil(originalTotalPrice / POINT_VALUE_VND);
        }
     }
 
@@ -946,7 +951,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                              </div>
                              <div>
                                <p className="text-xs font-bold text-emerald-900">Sử dụng điểm tích lũy</p>
-                               <p className="text-[10px] text-emerald-700">Ví điểm: {currentUser.points.toLocaleString()} điểm ({ (currentUser.points * 1000).toLocaleString() } VNĐ)</p>
+                               <p className="text-[10px] text-emerald-700">Ví điểm: {currentUser.points.toLocaleString()} điểm ({ (currentUser.points * POINT_VALUE_VND).toLocaleString() } VNĐ)</p>
                              </div>
                            </div>
                            <button
@@ -967,13 +972,13 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                                <span className="text-xs font-bold text-stone-600">
                                  Sử dụng điểm trực tiếp (Đang khóa 🔒)
                                </span>
-                               <span className="text-[10px] text-stone-500 block">Ví điểm khả dụng: {currentUser.points} điểm (~{(currentUser.points * 1000).toLocaleString()}đ)</span>
+                               <span className="text-[10px] text-stone-500 block">Ví điểm khả dụng: {currentUser.points} điểm (~{(currentUser.points * POINT_VALUE_VND).toLocaleString()}đ)</span>
                              </div>
                            </div>
                            <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg text-[10px] text-amber-800 leading-normal font-sans font-medium">
-                             🚀 Hệ thống tự động kích hoạt tính năng trừ điểm trực tiếp vào tiền thanh toán từ <b>lần đặt vé thứ 3 trở đi</b> (Lịch sử đặt vé của bạn ghi nhận: <b>{userBookingsCount}/2 chuyến đã đặt</b>).
+                             Điểm và voucher áp dụng từ đơn thứ hai, sau khi vé đầu được nhà xe xác nhận.
                              <br />
-                             <span className="text-stone-500 font-normal mt-1 block"><b>Gợi ý:</b> Bạn vẫn có thể truy cập vào <b>Trang cá nhân ➔ Lịch sử & Đổi quà</b> để quy đổi tích lũy thành các coupon ưu đãi lớn bất cứ lúc nào!</span>
+                             <span className="text-stone-600 mt-1 block">Hiện đã xác nhận: {currentUser.rewardedBookingIds?.length || currentUser.completedBookingsCount || 0} đơn.</span>
                            </div>
                          </div>
                        )}
@@ -996,13 +1001,13 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
 
                        {usePoints && isEligibleForPointsDeduction && currentUser && currentUser.role === "customer" && (
                          <span className="text-[11px] text-emerald-700 font-bold block pt-1">
-                           ✓ Đã giảm trừ điểm tích lũy: -{Math.min(calculateTotalComboPrice(), usablePoints * 1000).toLocaleString()}đ
+                           ✓ Đã giảm trừ điểm tích lũy: -{Math.min(calculateTotalComboPrice(), usablePoints * POINT_VALUE_VND).toLocaleString()}đ
                          </span>
                        )}
                      </div>
                      <div className="text-right mt-1 sm:mt-0">
                        <span className="text-2xl font-extrabold text-amber-600 font-mono block">
-                         {Math.max(0, calculateTotalComboPrice() - ((appliedCoupon ? (calculateTotalComboPrice() * appliedCoupon.discountPercentage) / 100 : 0) + (usePoints && isEligibleForPointsDeduction && currentUser ? Math.min(calculateTotalComboPrice(), usablePoints * 1000) : 0))).toLocaleString()} VNĐ
+                         {Math.max(0, calculateTotalComboPrice() - ((appliedCoupon ? (calculateTotalComboPrice() * appliedCoupon.discountPercentage) / 100 : 0) + (usePoints && isEligibleForPointsDeduction && currentUser ? Math.min(calculateTotalComboPrice(), usablePoints * POINT_VALUE_VND) : 0))).toLocaleString()} VNĐ
                        </span>
                        <span className="text-[10px] text-stone-400 block font-sans">Đã bao gồm toàn bộ thuế VAT</span>
                      </div>
