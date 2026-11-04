@@ -4,11 +4,12 @@ import {
   reload, sendEmailVerification, sendPasswordResetEmail, signInWithCustomToken,
   signInWithEmailAndPassword, signInWithPopup, updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { X, UserRound, TicketPercent, ShieldCheck, Mail, Smartphone, ArrowLeft } from 'lucide-react';
 import { auth, db } from '../firebase';
 import {getEmailForPhone,hasOperatorAccess,normalizeVietnamPhone,rememberPhoneEmail} from '../lib/simpleAuth';
 import { User } from '../types';
+import { ensureMemberWelcomeBonus } from '../lib/memberWelcomeBonus';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -86,22 +87,12 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
   const finish = async (account: any, preferredName?: string, preferredPhone?: string) => {
     const token = await getIdTokenResult(account, true);
     const isAdmin = hasOperatorAccess(token);
-    const ref = doc(db, 'users', account.uid);
-    const snapshot = await getDoc(ref);
-    const old = snapshot.exists() ? snapshot.data() : {};
-    const profile: User = {
-      id: account.uid,
-      email: account.email || old.email || '',
-      name: preferredName || old.name || account.displayName || account.email || 'Thành viên',
-      phone: preferredPhone || old.phone || account.phoneNumber || '',
-      points: typeof old.points === 'number' ? old.points : 0,
-      role: isAdmin ? 'operator' : 'customer',
-    };
-    if (!snapshot.exists()) {
-      // Never allow a newly registered user to create an Admin role or award points.
-      await setDoc(ref, { ...profile, role: 'customer', points: 0, createdAt: new Date().toISOString() });
-    }
-    onLoginSuccess(profile);
+    // The initial +10 must be committed together with the new member profile,
+    // not added to a stale UI counter or rewritten at every Google login.
+    const { profile } = await ensureMemberWelcomeBonus(account, {
+      preferredName, preferredPhone, isAdmin
+    });
+    onLoginSuccess({ ...profile, role: isAdmin ? 'operator' : 'customer' });
     onClose();
   };
   const linkPhone = async (account: any, rawPhone: string) => {
@@ -141,9 +132,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
         if (password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
         const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
         await updateProfile(result.user, {displayName: name.trim()});
-        await setDoc(doc(db, 'users', result.user.uid), {
-          id: result.user.uid, email: email.trim(), name: name.trim(),
-          phone: phone.trim(), role: 'customer', points: 0, createdAt: new Date().toISOString()
+        // Also award the one-time welcome bonus for email + password members.
+        // Google users enter through finish(), both paths share one transaction.
+        await ensureMemberWelcomeBonus(result.user, {
+          preferredName: name.trim(), preferredPhone: phone.trim(), isAdmin: false
         });
         await sendEmailVerification(result.user);
         if (phoneReady) {
@@ -201,7 +193,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
       <div className="flex gap-3 items-center mb-3 pr-9">
         <div className="bg-emerald-50 rounded-2xl p-3 shrink-0"><UserRound className="w-7 h-7 text-emerald-700"/></div>
         <div><h2 className="text-lg sm:text-xl font-black text-[#1b4332] leading-tight">{mode === 'register' ? 'Đăng ký thành viên' : mode === 'forgot' ? 'Khôi phục mật khẩu' : 'Đăng nhập Mộc Châu Travel'}</h2>
-          <p className="text-xs text-stone-500 mt-1">Đặt xe, lưu vé và quản lý ưu đãi của bạn</p></div>
+          <p className="text-xs text-stone-500 mt-1">Đăng ký hội viên mới nhận 10 điểm chào mừng. Giảm giá áp dụng từ đơn thứ hai.</p></div>
       </div>
       <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 flex gap-2 items-start">
         <TicketPercent className="w-5 h-5 text-emerald-700 shrink-0"/>

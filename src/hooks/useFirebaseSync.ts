@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { collection, doc, onSnapshot, getDocs, setDoc, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { hasOperatorAccess } from "../lib/simpleAuth";
+import { ensureMemberWelcomeBonus } from "../lib/memberWelcomeBonus";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
 import { Booking, BlockedSeat, User, AppNotification, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, Driver, ZaloGroup } from "../types";
 import { INITIAL_COMBOS } from "../data/combos";
@@ -47,6 +48,15 @@ export function useFirebaseSync() {
       try {
         const token = await firebaseUser.getIdTokenResult();
         const isAdmin = hasOperatorAccess(token);
+        if (!isAdmin) {
+          try {
+            // Also runs on refresh for an already-signed-in first-time Google
+            // user whose zero-point profile was created before this release.
+            await ensureMemberWelcomeBonus(firebaseUser);
+          } catch (error) {
+            console.warn('[Member] Could not create/reconcile welcome reward:', error);
+          }
+        }
         unsubscribeProfile = onSnapshot(doc(db, "users", firebaseUser.uid), snap => {
           if (snap.exists()) {
             const profile = snap.data() as User;
