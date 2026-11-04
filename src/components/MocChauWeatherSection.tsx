@@ -118,6 +118,10 @@ export default function MocChauWeatherSection({
         <p className="text-xs text-stone-600 max-w-md mx-auto font-sans">
           {error} Mộc Châu Travel không tự tạo thông số thời tiết khi nguồn dữ liệu gặp sự cố.
         </p>
+        <a href="https://dubaothoitiet.edu.vn/son-la/moc-chau/moc-chau" target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center justify-center rounded-xl border border-emerald-700 px-4 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50">
+          Xem dự báo Thị trấn Mộc Châu trên trang gốc ↗
+        </a>
         <button
           onClick={() => fetchWeather(selectedLocationId, true)}
           className="px-5 py-2.5 bg-[#1b4332] text-white text-xs font-bold rounded-xl hover:bg-emerald-800 transition-colors cursor-pointer shadow-md inline-flex items-center space-x-1.5"
@@ -135,6 +139,16 @@ export default function MocChauWeatherSection({
 
   return (
     <div className="space-y-6 text-left" id="moc_chau_weather_container">
+      <div className="rounded-2xl border border-emerald-200 bg-white p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h3 className="font-black text-sm text-[#1b4332]">Kiểm tra dự báo Thị trấn Mộc Châu tại trang nguồn</h3>
+          <p className="text-xs text-stone-600 mt-1">Trang này hiển thị số liệu từ <strong>{weatherData?.source || 'nguồn khí tượng đã kết nối'}</strong>. Liên kết bên phải mở dự báo của dubaothoitiet.edu.vn để đối chiếu, không phải nguồn của các chỉ số bên dưới.</p>
+        </div>
+        <a href="https://dubaothoitiet.edu.vn/son-la/moc-chau/moc-chau" target="_blank" rel="noopener noreferrer"
+          className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-[#1b4332] text-white px-4 py-3 text-xs font-black hover:bg-emerald-800">
+          Xem thời tiết tại trang gốc ↗
+        </a>
+      </div>
       {error && weatherData && (
         <div role="status" className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs p-4">
           Không làm mới được dữ liệu. Số liệu bên dưới là lần cập nhật trước đó: {error}
@@ -162,7 +176,7 @@ export default function MocChauWeatherSection({
 
         <div className="flex items-center justify-between sm:justify-end gap-2 text-xs font-medium text-stone-500 font-sans">
           <span className="text-[11px]">
-            Cập nhật: <strong className="text-stone-800 font-mono">{weatherData?.updatedAtTimeOnly}</strong>
+            Truy xuất lúc: <strong className="text-stone-800 font-mono">{weatherData?.updatedAtTimeOnly}</strong>
           </span>
           <button
             onClick={() => fetchWeather(selectedLocationId, true)}
