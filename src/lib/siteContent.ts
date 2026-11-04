@@ -4,11 +4,12 @@ import {auth, db} from '../firebase';
 import {useEffect,useState} from 'react';
 
 export interface HomeTile {id:string; title:string; subtitle:string; icon:string; target:string; visible:boolean}
+export interface HeroSlide {id:string; imageUrl:string; title:string; description:string; target:string; visible:boolean}
 export interface FeaturedStory {id:string; title:string; description:string; imageUrl:string; label:string; target:string; visible:boolean}
 export interface SiteContent {
   siteName:string; tagline:string; logoUrl:string; heroImageUrl:string; heroTitle:string; heroDescription:string;
   hotline:string; zaloUrl:string; messengerUrl:string;
-  tiles:HomeTile[]; stories:FeaturedStory[];
+  tiles:HomeTile[]; stories:FeaturedStory[]; heroSlides?:HeroSlide[];
 }
 export const defaultSiteContent: SiteContent = {
   siteName:'MỘC CHÂU TRAVEL', tagline:'Cẩm nang & Dịch vụ du lịch Mộc Châu',
@@ -29,6 +30,11 @@ export const defaultSiteContent: SiteContent = {
     {id:'food',title:'Ăn uống',subtitle:'Đặc sản · Nhà hàng',icon:'utensils',target:'services',visible:true},
     {id:'tour',title:'Tour & Combo',subtitle:'Trải nghiệm trọn gói',icon:'ticket',target:'services',visible:true},
   ],
+  heroSlides:[
+    {id:'flower',imageUrl:'/mocchau-flower-v5.jpg',title:'Mùa hoa Mộc Châu',description:'Tìm mùa hoa và thời điểm ngắm cảnh phù hợp',target:'moc_chau_today',visible:true},
+    {id:'tea',imageUrl:'/mocchau-tea-v5.jpg',title:'Những đồi chè xanh',description:'Điểm check-in và kinh nghiệm tham quan',target:'explore_legacy',visible:true},
+    {id:'waterfall',imageUrl:'/mocchau-waterfall-v5.jpg',title:'Khám phá Thác Dải Yếm',description:'Địa điểm nổi bật tại Mộc Châu',target:'explore_legacy',visible:true}
+  ],
   stories:[
     {id:'flower',title:'Mùa hoa mận Mộc Châu có gì đẹp?',description:'Thời điểm tham khảo, địa điểm ngắm hoa và lưu ý khi check-in.',imageUrl:'/mocchau-flower-v5.jpg',label:'Mùa hoa',target:'moc_chau_today',visible:true},
     {id:'waterfall',title:'Thác Dải Yếm',description:'Một điểm tham quan nổi tiếng tại Mộc Châu.',imageUrl:'/mocchau-waterfall-v5.jpg',label:'Địa điểm',target:'explore_legacy',visible:true},
@@ -42,7 +48,7 @@ export function useSiteContent(){
   useEffect(()=>onSnapshot(doc(db,'site_content','public'),snap=>{
     if(!snap.exists()) return;
     const raw=snap.data() as Partial<SiteContent>;
-    setContent({...defaultSiteContent,...raw,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories});
+    setContent({...defaultSiteContent,...raw,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides});
     setError('');
   },e=>{console.warn('Public content defaults used',e);setError('Không tải được cấu hình; đang sử dụng nội dung mặc định.')}),[]);
   return {content,error};
@@ -53,7 +59,7 @@ export async function publishSiteContent(content:SiteContent){
   const token=await user.getIdTokenResult(true);
   if(token.claims.admin!==true && token.claims.operator!==true) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase (custom claim).');
   const secure=(s:string)=>s.startsWith('/')||/^https:\/\//i.test(s);
-  if(!secure(content.logoUrl)||!secure(content.heroImageUrl)||content.stories.some(x=>x.imageUrl&&!secure(x.imageUrl)))throw new Error('Đường dẫn ảnh chỉ được dùng HTTPS hoặc đường dẫn nội bộ.');
+  if(!secure(content.logoUrl)||!secure(content.heroImageUrl)||content.stories.some(x=>x.imageUrl&&!secure(x.imageUrl))||content.heroSlides?.some(x=>x.imageUrl&&!secure(x.imageUrl)))throw new Error('Đường dẫn ảnh chỉ được dùng HTTPS hoặc đường dẫn nội bộ.');
   await setDoc(doc(db,'site_content','public'),{...content,updatedAt:serverTimestamp(),updatedBy:user.uid});
 }
 export async function uploadSiteImage(file:File){

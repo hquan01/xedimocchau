@@ -1,4 +1,5 @@
 import React, { useState, lazy, Suspense } from "react";
+import { ArrowLeft, House } from "lucide-react";
 import { doc, deleteDoc, writeBatch } from "firebase/firestore";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -536,7 +537,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col justify-between selection:bg-[#1b4332] selection:text-white pb-24 md:pb-0" id="app_root">
+    <div className="min-h-screen bg-stone-50 flex flex-col justify-between selection:bg-[#1b4332] selection:text-white pb-24 lg:pb-0" id="app_root">
       {/* Platform Header */}
       <Header
         activeTab={activeTab}
@@ -558,6 +559,17 @@ export default function App() {
         />
       ) : null}
 
+      {/* Every detail/service page can return to the new Explore homepage. */}
+      {!['explore', 'trip', 'community', 'services'].includes(activeTab) && (
+        <nav aria-label="Quay về trang chủ" className="bg-white border-b border-emerald-100 px-3 py-2">
+          <div className="max-w-7xl mx-auto">
+            <button type="button" onClick={() => { setSelectedCategoryItem(null); setActiveTab('explore'); window.scrollTo({top:0,behavior:'smooth'}); }}
+              className="inline-flex items-center gap-2 text-sm font-bold text-emerald-800 rounded-xl px-3 py-2 min-h-[44px] hover:bg-emerald-50">
+              <ArrowLeft className="w-4 h-4"/><House className="w-4 h-4"/> Quay lại trang chủ
+            </button>
+          </div>
+        </nav>
+      )}
       {/* Main Tab Render Switcher */}
       <main className="flex-1">
         <Suspense fallback={

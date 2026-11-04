@@ -1,5 +1,5 @@
-import React from 'react';
-import {CloudSun,Sparkles,Flower2,BookOpen,MapPin,Flame,Bus,Car,Bike,House,UtensilsCrossed,Ticket,ArrowRight,Heart,ChevronRight,MessageCircle} from 'lucide-react';
+import React, {useEffect,useState} from 'react';
+import {CloudSun,Sparkles,Flower2,BookOpen,MapPin,Flame,Bus,Car,Bike,House,UtensilsCrossed,Ticket,ArrowRight,Heart,ChevronRight,ChevronLeft,MessageCircle} from 'lucide-react';
 import {useSiteContent,HomeTile,FeaturedStory} from '../lib/siteContent';
 
 interface Props {setActiveTab:(tab:string)=>void;openMotorbike:()=>void;openAuth:()=>void;isSignedIn:boolean}
@@ -7,6 +7,13 @@ const icons:Record<string,React.ComponentType<any>>={'cloud-sun':CloudSun,sparkl
 
 export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSignedIn}:Props){
   const {content}=useSiteContent();
+  const [slideIndex,setSlideIndex]=useState(0);
+  const heroSlides=[
+    {id:'main',imageUrl:content.heroImageUrl,title:content.heroTitle,description:content.heroDescription,target:'explore',visible:true},
+    ...(content.heroSlides||[]).filter(x=>x.visible && !!x.imageUrl)
+  ];
+  const currentSlide=heroSlides[slideIndex % heroSlides.length];
+  useEffect(()=>{const timer=window.setInterval(()=>setSlideIndex(i=>i+1),6500);return()=>window.clearInterval(timer)},[heroSlides.length]);
   const navigate=(target:string)=>{
     if(target==='hot'){document.getElementById('hot_stories')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
     if(target==='motorbike'){openMotorbike();return;}
@@ -18,12 +25,25 @@ export default function ExploreLanding({setActiveTab,openMotorbike,openAuth,isSi
   return <div className="bg-[#f7faf7] text-[#17382b] pb-28 min-h-screen" id="explore_mobile_home">
     <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 space-y-6">
       <section className="relative overflow-hidden rounded-[24px] shadow-lg bg-[#1b4332]" aria-label="Khám phá Mộc Châu">
-        <img src={content.heroImageUrl} alt={content.heroTitle} className="w-full aspect-[1009/440] sm:aspect-[1009/350] object-cover" loading="eager"/>
-        {content.heroImageUrl !== '/mocchau-hero-v5.jpg' && <div className="absolute inset-x-0 bottom-0 p-4 sm:p-8 bg-gradient-to-t from-[#0e291f]/90 via-[#0e291f]/30 to-transparent text-white">
-          <p className="text-[10px] sm:text-xs tracking-[0.2em] font-black uppercase text-emerald-100">Mộc Châu Travel · QT Limousine</p>
-          <h1 className="text-2xl sm:text-4xl font-black leading-tight mt-1">{content.heroTitle}</h1>
-          <p className="text-xs sm:text-base mt-1 text-white/90 max-w-lg">{content.heroDescription}</p>
+        <img key={currentSlide.id} src={currentSlide.imageUrl} alt={currentSlide.title} className="w-full aspect-[1009/440] sm:aspect-[1009/350] object-cover" loading="eager"/>
+        {(slideIndex % heroSlides.length !== 0 || currentSlide.imageUrl !== '/mocchau-hero-v5.jpg') && <div className="absolute inset-x-0 bottom-0 px-5 pt-16 pb-10 sm:p-8 bg-gradient-to-t from-[#0e291f]/95 via-[#0e291f]/30 to-transparent text-white pointer-events-none">
+          <p className="text-[10px] sm:text-xs tracking-[0.16em] font-black uppercase text-emerald-100">Mộc Châu Travel · QT Limousine</p>
+          <h2 className="text-xl sm:text-4xl font-black leading-tight mt-1">{currentSlide.title}</h2>
+          <p className="text-[11px] sm:text-base mt-1 text-white/90 max-w-lg">{currentSlide.description}</p>
         </div>}
+        {heroSlides.length>1 && <>
+          <button type="button" aria-label="Ảnh banner trước" onClick={()=>setSlideIndex(i=>(i-1+heroSlides.length)%heroSlides.length)} className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/60 text-white rounded-full p-2"><ChevronLeft className="w-5 h-5"/></button>
+          <button type="button" aria-label="Ảnh banner tiếp theo" onClick={()=>setSlideIndex(i=>(i+1)%heroSlides.length)} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/60 text-white rounded-full p-2"><ChevronRight className="w-5 h-5"/></button>
+          {/* The original hero artwork already has decorative dots baked into its pixels.
+              Mask only that narrow strip; preserve the supplied photograph and keep a
+              single, fully interactive set of navigation buttons over it. */}
+          {currentSlide.imageUrl === '/mocchau-hero-v5.jpg' && (
+            <div aria-hidden="true" className="absolute pointer-events-none bottom-0 left-1/2 -translate-x-1/2 w-[200px] h-14" style={{background: 'linear-gradient(to top, #113c29 0%, #113c29 78%, transparent 100%)'}} />
+          )}
+          <div role="group" aria-label="Chọn ảnh banner" className="absolute bottom-2.5 inset-x-0 z-10 flex justify-center gap-3">
+            {heroSlides.map((slide,i)=><button key={slide.id} type="button" aria-label={`Xem banner ${i+1}`} aria-current={i===slideIndex%heroSlides.length ? 'true' : undefined} onClick={()=>setSlideIndex(i)} className={`w-3 h-3 rounded-full border-2 border-white shadow-md transition-colors ${i===slideIndex%heroSlides.length?'bg-white':'bg-black/25'}`}/>) }
+          </div>
+        </>}
       </section>
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-2"><h2 className="text-lg sm:text-2xl font-black">🌿 Bạn muốn tìm gì?</h2><button onClick={()=>navigate('services')} className="text-xs text-emerald-700 font-bold whitespace-nowrap">Xem dịch vụ <ChevronRight className="inline w-3 h-3"/></button></div>

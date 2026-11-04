@@ -1,4 +1,5 @@
 import express from "express";
+import { phoneAuthRouter } from "./src/server/phoneAuthRoutes";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -225,6 +226,8 @@ const PORT = 3000;
 // Middleware for parsing JSON JSON and urlencoded
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Phone/password alias authentication, isolated from public legacy bookings.
+app.use("/api/auth", phoneAuthRouter);
 
 // Initialize Google Gen AI
 let aiClient: GoogleGenAI | null = null;

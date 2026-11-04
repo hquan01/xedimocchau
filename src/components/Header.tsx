@@ -73,13 +73,13 @@ export default function Header({
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center">
         <div className="flex justify-between w-full items-center">
           {/* Brand Logo - Mộc Châu Travel */}
-          <div className="flex items-center min-w-0 pr-2">
+          <div className="flex items-center min-w-0 pr-2 max-w-[235px] lg:max-w-[180px] xl:max-w-[250px]">
             <button 
               onClick={() => {
                 setActiveTab("explore");
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }} 
-              className="flex items-center space-x-2 sm:space-x-2.5 cursor-pointer text-left shrink-0"
+              className="flex items-center space-x-2 sm:space-x-2.5 cursor-pointer text-left min-w-0"
               id="logo_btn"
               aria-label="Về trang chủ Mộc Châu Travel"
             >
@@ -100,7 +100,7 @@ export default function Header({
           </div>
 
           {/* Desktop Navigation - 4 clean unboxed tabs */}
-          <div className="hidden md:flex items-center space-x-1 lg:space-x-1.5">
+          <div className="hidden lg:flex items-center space-x-1 lg:space-x-1.5">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -132,7 +132,7 @@ export default function Header({
 
 
           {/* Right Action buttons for Desktop */}
-          <div className="hidden md:flex items-center space-x-2.5">
+          <div className="hidden lg:flex items-center space-x-2.5">
             <button
               id="my_bookings_btn"
               onClick={openBookingList}
@@ -210,7 +210,7 @@ export default function Header({
           </div>
 
           {/* Dedicated Mobile Header Controls - Clean, uncluttered, touch-friendly */}
-          <div className="flex items-center md:hidden space-x-1 sm:space-x-1.5 shrink-0">
+          <div className="flex items-center lg:hidden space-x-1 sm:space-x-1.5 shrink-0">
             {/* Quick Search Button */}
             <button
               onClick={handleMobileSearchClick}
@@ -278,7 +278,7 @@ export default function Header({
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
-          className="md:hidden border-t border-stone-200 bg-white px-4 py-4 space-y-3 shadow-xl"
+          className="lg:hidden border-t border-stone-200 bg-white px-4 py-4 space-y-3 shadow-xl"
           id="mobile_menu_panel"
         >
           {/* User Account Bar in Mobile Drawer */}
