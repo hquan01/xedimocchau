@@ -30,6 +30,16 @@ export default function ServicesHubView({
 }: ServicesHubViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<"all" | "transport" | "motorbike" | "accommodation" | "combo" | "restaurant" | "tour">("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const serviceSearchItems = [
+    { category:'transport' as const, name:'Xe QT Limousine & Taxi 4–7–9–16 chỗ', keywords:'limousine taxi o to xe dua don' },
+    { category:'motorbike' as const, name:'Thuê xe máy Mộc Châu', keywords:'xe may xe so xe tay ga' },
+    { category:'accommodation' as const, name:'Homestay & Khách sạn', keywords:'homestay khach san luu tru nha nghi' },
+    { category:'combo' as const, name:'Combo xe và phòng', keywords:'combo phong khach san' },
+    { category:'restaurant' as const, name:'Nhà hàng & Đặc sản', keywords:'an uong nha hang dac san' },
+    { category:'tour' as const, name:'Tour & Trải nghiệm', keywords:'tour tham quan trai nghiem' },
+  ];
+  const simplify=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d');
+  const searchMatches=searchTerm.trim()?serviceSearchItems.filter(x=>simplify(x.name+' '+x.keywords).includes(simplify(searchTerm.trim()))):[];
 
   // Quick Taxi Booking Modal State
   const [isTaxiModalOpen, setIsTaxiModalOpen] = useState(false);
@@ -74,22 +84,22 @@ export default function ServicesHubView({
   return (
     <div className="min-h-screen bg-[#f7faf7] pb-20 font-sans" id="services_hub_root">
       {/* Hero Header Banner */}
-      <div className="bg-gradient-to-br from-[#1b4332] via-emerald-700 to-emerald-600 text-white pt-8 pb-10 px-4 sm:px-6 lg:px-8 shadow-lg relative overflow-hidden rounded-b-[2rem]">
+      <div className="bg-gradient-to-br from-[#1b4332] via-emerald-700 to-emerald-600 text-white pt-5 pb-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden rounded-b-[1.5rem]">
         <div className="absolute right-0 top-0 w-80 h-80 bg-white/20 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-7xl mx-auto text-center relative z-10">
-          <span className="inline-flex items-center space-x-2 bg-white/20 border border-white/30 px-3 py-1 rounded-full text-[11px] font-extrabold text-white uppercase tracking-wider mb-3">
+          <span className="inline-flex items-center space-x-2 bg-white/15 border border-white/20 px-3 py-1 rounded-full text-[10px] font-bold text-white tracking-wide mb-2">
             <Sparkles className="w-3.5 h-3.5 text-yellow-100" />
             <span>Mộc Châu Travel Của Bạn</span>
           </span>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white mb-2">
-            Khám Phá Mộc Châu
+            Dịch vụ Mộc Châu
           </h1>
           <p className="text-emerald-50 text-xs sm:text-sm max-w-2xl mx-auto font-sans leading-relaxed">
-            Đặt xe, thuê xe máy và tìm Homestay êm ái, xinh xắn nhất.
+            Đặt xe, thuê xe máy, tìm lưu trú và trải nghiệm phù hợp với chuyến đi.
           </p>
 
           {/* Quick Search bar */}
-          <div className="mt-5 max-w-md mx-auto relative">
+          <div className="mt-4 max-w-md mx-auto relative">
             <Search className="w-4 h-4 text-emerald-600 absolute left-3.5 top-3.5" />
             <input
               type="text"
@@ -98,14 +108,25 @@ export default function ServicesHubView({
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-white text-stone-900 rounded-3xl text-sm font-bold shadow-md focus:outline-none focus:ring-4 focus:ring-emerald-200 placeholder:text-stone-400"
             />
+            {searchTerm.trim()&&<div className="absolute top-full left-0 right-0 mt-2 z-30 bg-white border border-emerald-100 shadow-xl rounded-xl overflow-hidden text-left text-emerald-950">
+              {searchMatches.length ? searchMatches.map(result=><button key={result.category} type="button" onClick={()=>{setSelectedCategory(result.category);setSearchTerm('');}} className="block w-full text-left px-4 py-3 text-sm font-semibold hover:bg-emerald-50 border-b last:border-b-0">{result.name}</button>) : <p className="p-3 text-xs text-stone-500">Không tìm thấy dịch vụ. Hãy thử từ khóa khác.</p>}
+            </div>}
           </div>
         </div>
       </div>
 
       {/* Category Filter Chips Bar */}
-      <div className="sticky top-14 sm:top-16 z-30 bg-white border-b border-stone-200 shadow-2xs">
+      <div className="relative sm:sticky sm:top-16 z-20 bg-white border-b border-stone-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5">
-          <div className="flex space-x-2 overflow-x-auto custom-tab-scrollbar pb-1.5 pt-0.5">
+          <label className="sr-only" htmlFor="service_category_filter">Lọc danh mục dịch vụ</label>
+          <select id="service_category_filter" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value as typeof selectedCategory)}
+            className="sm:hidden block w-full rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-900 font-bold text-sm px-3 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="all">Tất cả dịch vụ</option><option value="transport">Xe Limousine & Taxi</option>
+            <option value="motorbike">Thuê xe máy</option><option value="accommodation">Lưu trú & Homestay</option>
+            <option value="combo">Combo xe + phòng</option><option value="restaurant">Nhà hàng & Đặc sản</option>
+            <option value="tour">Tour & Vé tham quan</option>
+          </select>
+          <div className="hidden sm:flex space-x-2 overflow-x-auto custom-tab-scrollbar pb-1.5 pt-0.5">
             {[
               { id: "all", label: "Tất Cả Dịch Vụ", icon: Sparkles },
               { id: "transport", label: "Xe Limousine & Taxi", icon: Bus },
@@ -137,35 +158,35 @@ export default function ServicesHubView({
       </div>
 
       {/* Main Content Catalog Grid */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-6 space-y-8 text-left">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 space-y-6 text-left">
         
         {/* SECTION 1: XE DI CHUYỂN & TAXI (LIMOUSINE, TAXI 4-16 CHỖ, THUÊ XE MÁY) */}
         {(selectedCategory === "all" || selectedCategory === "transport" || selectedCategory === "motorbike") && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-2">
-              <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-2">
+              <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
                 <Bus className="w-5 h-5 text-emerald-700" />
                 <span>Dịch Vụ Vận Tải & Di Chuyển Mộc Châu</span>
               </h2>
               <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                Phục vụ 24/7
+                Gửi yêu cầu tư vấn
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Card 1: QT Limousine VIP 9 chỗ */}
               {(selectedCategory === "all" || selectedCategory === "transport") && (
-                <div className="bg-white rounded-3xl p-5 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
+                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
                   <div className="space-y-3">
                     <div className="flex justify-between items-start">
                       <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300">
                         ⭐ XE ĐÓN TRẢ TẬN NƠI VIP
                       </span>
-                      <span className="font-mono font-black text-emerald-800 text-sm">300.000đ / ghế</span>
+                      <span className="font-mono font-black text-emerald-800 text-sm">Xem giá khi đặt</span>
                     </div>
 
                     <h3 className="font-black text-stone-900 text-base group-hover:text-emerald-800 transition-colors">
-                      Xe QT Limousine 9 Chỗ VIP (DCar)
+                      Xe QT Limousine VIP (DCar)
                     </h3>
 
                     <p className="text-xs text-stone-600 font-sans leading-relaxed">
@@ -198,17 +219,17 @@ export default function ServicesHubView({
 
               {/* Card 2: Taxi & Xe Du Lịch 4 - 7 - 16 chỗ */}
               {(selectedCategory === "all" || selectedCategory === "transport") && (
-                <div className="bg-white rounded-3xl p-5 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
+                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
                   <div className="space-y-3">
                     <div className="flex justify-between items-start">
                       <span className="text-[10px] font-black uppercase text-teal-900 bg-teal-100 px-2.5 py-1 rounded-full border border-teal-300">
                         🚕 TAXI & XE HỢP ĐỒNG
                       </span>
-                      <span className="font-mono font-black text-emerald-800 text-sm">Từ 200.000đ / chuyến</span>
+                      <span className="font-mono font-black text-emerald-800 text-sm">Liên hệ báo giá</span>
                     </div>
 
                     <h3 className="font-black text-stone-900 text-base group-hover:text-emerald-800 transition-colors">
-                      Taxi & Xe Du Lịch 4 - 7 - 16 Chỗ
+                      Taxi & xe du lịch 4 · 7 · 9 · 16 chỗ
                     </h3>
 
                     <p className="text-xs text-stone-600 font-sans leading-relaxed">
@@ -216,9 +237,9 @@ export default function ServicesHubView({
                     </p>
 
                     <div className="bg-teal-50/80 p-3 rounded-2xl border border-teal-100 text-[11px] text-teal-950 space-y-1">
-                      <p>✓ Xe 4 chỗ Vios/City: 200.000đ / chuyến nội thành</p>
-                      <p>✓ Xe 7 chỗ Innova/Fortuner: 350.000đ / chuyến tham quan</p>
-                      <p>✓ Xe 16 chỗ Solati/Ford Transit: Trọn gói tour 1.800.000đ</p>
+                      <p>✓ Chọn chính xác xe 4, 7, 9 hoặc 16 chỗ</p>
+                      <p>✓ Nhập điểm đón, điểm đến và thời gian sử dụng</p>
+                      <p>✓ Giá sẽ được xác nhận sau khi đơn vị cung cấp báo giá</p>
                     </div>
                   </div>
 
@@ -242,13 +263,13 @@ export default function ServicesHubView({
 
               {/* Card 3: Thuê Xe Máy (Giao tận nơi) */}
               {(selectedCategory === "all" || selectedCategory === "motorbike") && (
-                <div className="bg-white rounded-3xl p-5 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
+                <div className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between group">
                   <div className="space-y-3">
                     <div className="flex justify-between items-start">
                       <span className="text-[10px] font-black uppercase text-indigo-900 bg-indigo-100 px-2.5 py-1 rounded-full border border-indigo-300">
                         🛵 GIAO XE TẬN NƠI FREE
                       </span>
-                      <span className="font-mono font-black text-emerald-800 text-sm">150.000đ - 200.000đ / ngày</span>
+                      <span className="font-mono font-black text-emerald-800 text-sm">Nhận báo giá theo ngày</span>
                     </div>
 
                     <h3 className="font-black text-stone-900 text-base group-hover:text-emerald-800 transition-colors">
@@ -292,8 +313,8 @@ export default function ServicesHubView({
         {/* SECTION 2: LƯU TRÚ & HOMESTAY */}
         {(selectedCategory === "all" || selectedCategory === "accommodation") && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-2">
-              <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-2">
+              <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
                 <Hotel className="w-5 h-5 text-emerald-700" />
                 <span>Homestay, Khách Sạn & Resort Xác Thực</span>
               </h2>
@@ -317,7 +338,7 @@ export default function ServicesHubView({
                         className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                       />
                       <span className="absolute top-3 right-3 bg-amber-400 text-stone-950 font-black text-xs px-2.5 py-1 rounded-full shadow-md">
-                        ★ {acc.rating || 4.9}
+                        ★ {acc.rating ? acc.rating : 'Chưa có đánh giá'}
                       </span>
                       <span className="absolute bottom-3 left-3 bg-stone-900/80 text-white font-bold text-[10px] px-2.5 py-1 rounded-full backdrop-blur-xs">
                         📍 {acc.location}
@@ -342,14 +363,14 @@ export default function ServicesHubView({
                     <div>
                       <span className="text-[10px] text-stone-400 uppercase font-bold block">Giá từ</span>
                       <span className="font-mono font-black text-emerald-800 text-sm">
-                        {acc.roomTypes?.[0]?.pricePerNight?.toLocaleString() || "600.000"}đ / đêm
+                        {acc.roomTypes?.[0]?.pricePerNight ? `${acc.roomTypes[0].pricePerNight.toLocaleString('vi-VN')}đ / đêm` : 'Liên hệ để biết giá'}
                       </span>
                     </div>
                     <button
                       onClick={() => onSearchCombo(acc.id, new Date().toISOString().split("T")[0])}
                       className="px-4 py-2 bg-[#1b4332] text-white text-xs font-bold rounded-xl hover:bg-emerald-800 transition-colors cursor-pointer"
                     >
-                      Đặt Kèm Xe (-20%)
+                      Xem combo xe + phòng
                     </button>
                   </div>
                 </div>
@@ -361,8 +382,8 @@ export default function ServicesHubView({
         {/* SECTION 3: COMBO TIẾT KIỆM */}
         {(selectedCategory === "all" || selectedCategory === "combo") && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-2">
-              <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-2">
+              <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
                 <Star className="w-5 h-5 text-amber-500" />
                 <span>Gói Combo Tiết Kiệm (Xe Limousine VIP + Homestay)</span>
               </h2>
@@ -416,8 +437,8 @@ export default function ServicesHubView({
         {/* SECTION 4: NHÀ HÀNG & ẨM THỰC */}
         {(selectedCategory === "all" || selectedCategory === "restaurant") && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-2">
-              <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-2">
+              <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-amber-600" />
                 <span>Nhà Hàng & Ẩm Thực Đặc Sản Mộc Châu</span>
               </h2>
@@ -447,7 +468,7 @@ export default function ServicesHubView({
                   location: "Thung lũng đồi chè Tân Lập"
                 }
               ].map((res, i) => (
-                <div key={i} className="bg-white rounded-3xl p-5 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between">
+                <div key={i} className="bg-white rounded-2xl p-4 border border-stone-200 hover:border-emerald-500 hover:shadow-lg transition-all flex flex-col justify-between">
                   <div className="space-y-2">
                     <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md">
                       {res.type}

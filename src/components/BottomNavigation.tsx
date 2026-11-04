@@ -63,7 +63,7 @@ export default function BottomNavigation({
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden bg-white/95 backdrop-blur-md border-t border-emerald-100 shadow-2xl px-2 pb-[env(safe-area-inset-bottom,12px)] pt-1.5"
+      className="fixed bottom-0 left-0 right-0 z-50 flex lg:hidden bg-white/95 backdrop-blur-md border-t border-emerald-100 shadow-2xl px-2 pb-[env(safe-area-inset-bottom,12px)] pt-1.5"
       id="mobile_bottom_nav"
       role="navigation"
       aria-label="Thanh điều hướng dưới điện thoại"
