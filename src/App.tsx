@@ -326,7 +326,8 @@ export default function App() {
         metadata: {
           bookingId: booking.id,
           customerName: booking.passengerName,
-          customerPhone: booking.passengerPhone,
+          // Avoid duplicating customers' phone numbers in the broadly readable
+          // legacy notifications collection. Operator can read it from booking.
           travelDate: booking.travelDate,
           departureTime: booking.departureTime,
           route: booking.routeSelection,
@@ -1140,6 +1141,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* The operator obtains contact details from the booking already shown in
+           their dashboard, rather than copying phone numbers into notifications. */}
       {/* Real-time new booking alert for the operator (only while this website is open). */}
       {currentUser?.role === "operator" && operatorBookingAlert && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 p-4 text-left" role="dialog" aria-modal="true" aria-label="Có khách mới đặt vé">
@@ -1157,7 +1160,7 @@ export default function App() {
               <p className="text-sm text-stone-700">{operatorBookingAlert.message}</p>
               <div className="grid grid-cols-2 gap-2 rounded-xl bg-emerald-50 p-3 text-xs">
                 <div><span className="block text-stone-500">Khách hàng</span><strong>{operatorBookingAlert.metadata?.customerName || "Khách đặt xe"}</strong></div>
-                <div><span className="block text-stone-500">Số điện thoại</span><strong>{operatorBookingAlert.metadata?.customerPhone || "Xem trong đơn"}</strong></div>
+                <div><span className="block text-stone-500">Số điện thoại</span><strong>{(allBookings.find(b=>b.id===operatorBookingAlert.metadata?.bookingId)?.passengerPhone || operatorBookingAlert.metadata?.customerPhone || "Xem trong đơn")}</strong></div>
                 <div><span className="block text-stone-500">Ngày đi</span><strong>{operatorBookingAlert.metadata?.travelDate || "Xem trong đơn"}</strong></div>
                 <div><span className="block text-stone-500">Giờ đi / Ghế</span><strong>{operatorBookingAlert.metadata?.departureTime || "-"} · {operatorBookingAlert.metadata?.seats?.join(", ") || "-"}</strong></div>
               </div>
@@ -1168,8 +1171,8 @@ export default function App() {
                   setActiveTab("operator");
                   window.scrollTo({top: 0, behavior: "smooth"});
                 }}>Xem và xác nhận đơn</button>
-                {operatorBookingAlert.metadata?.customerPhone && (
-                  <a className="rounded-xl border border-emerald-700 px-3 py-3 text-sm font-bold text-emerald-800" href={`tel:${operatorBookingAlert.metadata.customerPhone.replace(/[^0-9+]/g, "")}`}>Gọi khách</a>
+                {(allBookings.find(b=>b.id===operatorBookingAlert.metadata?.bookingId)?.passengerPhone || operatorBookingAlert.metadata?.customerPhone) && (
+                  <a className="rounded-xl border border-emerald-700 px-3 py-3 text-sm font-bold text-emerald-800" href={`tel:${(allBookings.find(b=>b.id===operatorBookingAlert.metadata?.bookingId)?.passengerPhone || operatorBookingAlert.metadata?.customerPhone || "").replace(/[^0-9+]/g, "")}`}>Gọi khách</a>
                 )}
                 <button type="button" className="rounded-xl bg-stone-100 px-3 py-3 text-sm font-bold" onClick={()=>setOperatorBookingAlert(null)}>Đóng</button>
               </div>
