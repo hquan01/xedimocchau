@@ -66,6 +66,29 @@ export function githubDataRouter():Router {
     }else if(req.headers['sec-fetch-site']==='cross-site')return next(new StoreError('Yêu cầu khác trang bị từ chối.',403));
     next();
   });
+  r.post('/_write-test',async(req,res,next)=>{
+    try{
+      requireAdmin(req);
+      const id='probe_'+randomUUID().replace(/-/g,'');
+      const sample={id,kind:'connection_test',createdAt:new Date().toISOString()};
+      let stored=false;
+      try {
+        await putDocument('security_audit',id,sample);
+        stored=true;
+        const found=await getDocument('security_audit',id);
+        if(!found||found.data.kind!=='connection_test')throw new StoreError('Đã ghi nhưng không đọc lại được dữ liệu GitHub.',503);
+        await deleteDocument('security_audit',id,found.sha);
+        stored=false;
+      }finally{
+        if(stored){
+          // Best-effort cleanup of harmless encrypted temporary diagnostic record.
+          try{const latest=await getDocument('security_audit',id);if(latest)await deleteDocument('security_audit',id,latest.sha);}catch{}
+        }
+      }
+      res.setHeader('Cache-Control','no-store');
+      res.json({ok:true,read:true,write:true,delete:true,storage:'github-encrypted'});
+    }catch(e){next(e);}
+  });
   r.get('/status',async(_req,res)=>{
     if(!isStoreConfigured())return res.status(503).json({configured:false,provider:'github-encrypted',firebase:false,error:'Thiếu cấu hình GitHub trên Vercel.'});
     try{await verifyStoreConnectivity();return res.json({configured:true,provider:'github-encrypted',firebase:false});}
