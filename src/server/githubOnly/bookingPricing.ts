@@ -1,5 +1,5 @@
 import type {JsonRecord} from './githubStore';
-import {StoreError} from './githubStore';
+import {StoreError} from './githubStore.ts';
 
 const positive=(v:unknown)=>Math.max(0,Math.floor(Number(v)||0));
 export function quoteBooking(input:JsonRecord,user:JsonRecord|null,config:JsonRecord|null,coupons:JsonRecord[]){
