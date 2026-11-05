@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'mocchau-v6-*'
+      - 'feature/github-admin-functional-20261105'
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -15,5 +16,6 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - run: npm run test:admin
       - run: npm run lint
       - run: npm run build
