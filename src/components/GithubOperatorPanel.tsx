@@ -162,7 +162,7 @@ export default function GithubOperatorPanel({account,onLogout}:{account:Row,onLo
  const refreshCurrent=()=>{void (moduleId==='overview'||moduleId==='growth_analytics'?loadStats():load())};
  return <div className="min-h-screen bg-stone-100 text-stone-900 flex font-sans" data-github-admin="true">
   <div className="hidden md:flex w-64 shrink-0 sticky top-0 h-screen flex-col bg-stone-900">
-   <div className="flex-1 min-h-0"><AdminSidebar activeModuleId={moduleId} onSelectModule={go} pendingBookingsCount={stats.pending}/></div>
+   <div className="flex-1 min-h-0"><AdminSidebar activeModuleId={moduleId} onSelectModule={go} pendingBookingsCount={stats.pending} sourceLabel="GitHub Data"/></div>
    <div className="p-3 border-t border-stone-700 bg-stone-950 flex flex-col gap-2 text-xs">
     <button className="border border-stone-600 text-stone-100 rounded-xl px-3 py-2 flex items-center justify-center gap-2" onClick={()=>void onLogout()}><LogOut size={16}/>Đăng xuất</button>
     <a className="text-center underline text-stone-300" href="/">Về website</a>
