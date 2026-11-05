@@ -19,7 +19,7 @@ Thay phần **Quản trị thử nghiệm** dùng Firebase bằng bảng điều
 - `GITHUB_DATA_TOKEN`: fine-grained PAT chỉ có quyền Contents Read/Write cho **repo dữ liệu**, không cấp toàn bộ GitHub.
 - `GITHUB_DATA_ENCRYPTION_KEY`: base64 của 32 byte ngẫu nhiên; sử dụng một khóa cố định, đừng thay khi chưa có phương án giải mã dữ liệu cũ.
 - `GITHUB_SESSION_SECRET`: chuỗi ngẫu nhiên >=32 ký tự; dùng để ký cookie phiên đăng nhập.
-- `GITHUB_ADMIN_PASSWORD`: mật khẩu Admin riêng >=20 ký tự; không lưu trong ZIP.
+- `GITHUB_ADMIN_PASSWORD`: mật khẩu Admin riêng tối thiểu 8 ký tự (khuyên dùng 12–16 ký tự hoặc dài hơn); không lưu trong ZIP.
 - `GITHUB_ADMIN_EMAIL`: email liên hệ của bạn (không dùng để tự động nâng quyền trong browser).
 - Nếu cần đăng nhập hội viên bằng Google, cấu hình `GOOGLE_OAUTH_CLIENT_ID` sau khi cấp quyền domain.
 
