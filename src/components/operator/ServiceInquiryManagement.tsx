@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {Phone, RefreshCw, CheckCircle2, AlertTriangle} from 'lucide-react';
 import {ServiceInquiry, InquiryStatus, subscribeServiceInquiries, updateServiceInquiryStatus} from '../../lib/serviceRequests';
+import {gh} from '../../client/githubApi';
 
 const statuses: {value:InquiryStatus; label:string}[] = [
   {value:'pending',label:'Chờ xử lý'}, {value:'contacted',label:'Đã liên hệ'},
@@ -8,22 +9,33 @@ const statuses: {value:InquiryStatus; label:string}[] = [
   {value:'cancelled',label:'Đã hủy'}
 ];
 
-export default function ServiceInquiryManagement() {
+export default function ServiceInquiryManagement({backend='firebase'}:{backend?:'firebase'|'github'}) {
   const [data,setData]=useState<ServiceInquiry[]>([]);
   const [filter,setFilter]=useState('all');
   const [error,setError]=useState('');
   const [saving,setSaving]=useState('');
-  useEffect(()=> subscribeServiceInquiries(setData, e=>setError('Không thể đọc đơn dịch vụ: '+e.message+'. Kiểm tra tài khoản quản trị và Firestore Rules.')),[]);
+  const refreshGithub=async()=>{
+    const result=await gh.list('service_requests');
+    setData((result.items||[]) as ServiceInquiry[]);
+  };
+  useEffect(()=>{
+    if(backend==='firebase')return subscribeServiceInquiries(setData,e=>setError('Không thể đọc đơn dịch vụ: '+e.message+'. Kiểm tra Firestore Rules.'));
+    void refreshGithub().catch(e=>setError('Không thể đọc đơn GitHub: '+(e instanceof Error?e.message:String(e))));
+  },[backend]);
   const changeStatus=async (item:ServiceInquiry, value:InquiryStatus)=>{
     setSaving(item.id); setError('');
-    try {await updateServiceInquiryStatus(item.id,value)}
+    try {
+      if(backend==='github'){await gh.patch('service_requests',item.id,{status:value});await refreshGithub();}
+      else await updateServiceInquiryStatus(item.id,value);
+    }
     catch(e:any){setError('Không lưu được trạng thái: '+(e?.message||'Lỗi kết nối'))}
     finally{setSaving('')}
   };
   const displayed = data.filter(x=>filter==='all'||x.status===filter);
   return <section className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 space-y-4">
-    <div className="flex flex-wrap justify-between gap-2 items-center"><div><h2 className="text-lg font-black text-[#1b4332]">Yêu cầu Taxi & Thuê xe máy</h2><p className="text-xs text-stone-500">Đồng bộ Firebase • Chỉ báo đã nhận khi khách gửi thành công</p></div><span className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-900">{data.length} yêu cầu</span></div>
+    <div className="flex flex-wrap justify-between gap-2 items-center"><div><h2 className="text-lg font-black text-[#1b4332]">Yêu cầu Taxi & Thuê xe máy</h2><p className="text-xs text-stone-500">{backend==='github'?'Đồng bộ GitHub mã hóa • Chỉ nhận đơn khi máy chủ xác nhận':'Đồng bộ Firebase • Chỉ báo đã nhận khi khách gửi thành công'}</p></div><span className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-900">{data.length} yêu cầu</span></div>
     {error&&<p role="alert" className="rounded-xl bg-red-50 text-red-800 p-3 text-xs flex gap-2"><AlertTriangle className="w-4 h-4"/>{error}</p>}
+    {backend==='github'&&<button onClick={()=>void refreshGithub().catch(e=>setError(String(e)))} className="rounded-xl border border-emerald-300 text-emerald-900 px-3 py-2 text-xs font-bold">Tải lại đơn GitHub</button>}
     <select aria-label="Lọc trạng thái đơn" value={filter} onChange={e=>setFilter(e.target.value)} className="border rounded-xl p-3 text-sm w-full sm:max-w-xs"><option value="all">Tất cả đơn</option>{statuses.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
       {displayed.map(item=><article key={item.id} className="border border-stone-200 rounded-2xl p-4 space-y-2 bg-stone-50/60">
