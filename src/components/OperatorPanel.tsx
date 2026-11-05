@@ -3333,6 +3333,17 @@ export default function OperatorPanel({
               </button>
               <button 
                 onClick={() => {
+                  if (storageBackend === 'github') {
+                    const id=String(userToDelete.id);
+                    void gh.remove('users', id).then(async()=>{
+                      await onRefreshBackend?.();
+                      window.alert('Đã xóa tài khoản trên GitHub.');
+                      setUserToDelete(null);
+                    }).catch(e=>{
+                      window.alert('Chưa xóa được tài khoản: '+(e instanceof Error?e.message:String(e)));
+                    });
+                    return;
+                  }
                   import("../lib/firebaseUtils").then(({ getLocalList, setLocalList }) => {
                     const current = getLocalList<any>("users", []);
                     const filtered = current.filter(user => user.id !== userToDelete.id);
