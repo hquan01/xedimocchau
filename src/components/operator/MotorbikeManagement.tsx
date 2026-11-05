@@ -205,19 +205,19 @@ export default function MotorbikeManagement() {
   };
 
   const handleDeleteBike = async (id: string) => {
-    alert("Nút xóa đã được bấm!");
-    if (confirm("Xóa dòng xe máy này khỏi danh sách quản lý?")) {
+      console.log("Attempting to delete bike ID:", id);
       const updated = fleet.filter(b => b.id !== id);
       setFleet(updated);
+      console.log("Local state updated to:", updated);
       try {
-        console.log("Attempting to delete bike:", id);
+        console.log("Calling deleteItemFromCollection for:", id);
         const { deleteItemFromCollection } = await import("../../lib/firebaseUtils");
         await deleteItemFromCollection("motorbike_fleet", id);
         console.log("Deletion successful.");
       } catch (err: any) {
         console.error("Deletion failed, check Firestore rules:", err);
+        alert("Lỗi xóa: " + err.message);
       }
-    }
   };
 
   const handleUpdateRequestStatus = async (reqId: string, status: MotorbikeBookingRequest["status"]) => {

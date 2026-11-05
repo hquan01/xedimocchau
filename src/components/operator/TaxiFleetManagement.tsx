@@ -228,16 +228,17 @@ export default function TaxiFleetManagement() {
   };
 
   const handleDeleteVehicle = async (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa phương tiện này?")) {
       const updated = fleet.filter(v => v.id !== id);
       setFleet(updated);
       try {
+        console.log("Attempting to delete vehicle ID:", id);
         const { deleteItemFromCollection } = await import("../../lib/firebaseUtils");
         await deleteItemFromCollection("taxi_fleet", id);
+        console.log("Deletion successful.");
       } catch (err: any) {
-        console.warn("Background Firebase deletion failed:", err);
+        console.error("Deletion failed, check Firestore rules:", err);
+        alert("Lỗi xóa: " + err.message);
       }
-    }
   };
 
   const handleUpdateRequestStatus = async (reqId: string, status: TaxiRequest["status"]) => {
