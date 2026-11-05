@@ -1,0 +1,2059 @@
+--- a/firestore.rules
++++ b/firestore.rules
+@@ -1,131 +1,124 @@
+ rules_version = '2';
+-
+ service cloud.firestore {
+   match /databases/{database}/documents {
+-  
+-    // Default Deny
+-    match /{document=**} {
+-      allow read, write: if false;
++    // Deny by default. Test with Emulator and merge with deployed rules.
++    function signedIn() { return request.auth != null; }
++    function isAdmin() {
++      return signedIn() && (
++        request.auth.token.admin == true || request.auth.token.operator == true ||
++        (request.auth.token.email_verified == true &&
++        request.auth.token.email in ['hquansl001@gmail.com','nhaxe@mocchau.vn'])
++      );
++    }
++    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
++    function safeId(id) {
++      return id is string && id.size()>0 && id.size()<=128 && id.matches('^[a-zA-Z0-9_-]+$');
+     }
+ 
+-    // Global Helpers
+-    function isSignedIn() {
+-      return request.auth != null;
++    match /users/{userId} {
++      allow get: if isOwner(userId) || isAdmin();
++      allow list: if isAdmin();
++      allow create: if isAdmin() || (
++        isOwner(userId) && safeId(userId) &&
++        request.resource.data.id == userId &&
++        request.resource.data.role == 'customer' &&
++        request.resource.data.points == 10 &&
++        request.resource.data.welcomeBonusGranted == true &&
++        request.resource.data.welcomeBonusPoints == 10
++      );
++      allow update: if isAdmin() || (
++        isOwner(userId) &&
++        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
++          'name','phone','address','favPickup','favDropoff'
++        ])
++      ) || (
++        isOwner(userId) &&
++        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['points','usedCoupons']) &&
++        request.resource.data.points is number &&
++        request.resource.data.points >= 0 &&
++        request.resource.data.points <= resource.data.points
++      );
++      allow delete: if isAdmin();
+     }
+ 
+-    function isAdmin() {
+-      return isSignedIn() && (
+-        (request.auth.token.keys().hasAll(['email']) && (request.auth.token.email == 'hquansl001@gmail.com' || request.auth.token.email == 'nhaxe@mocchau.vn')) || 
+-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'customer') == 'operator')
++    match /bookings/{bookingId} {
++      // Never expose passenger details to people with an arbitrary booking ID.
++      allow get, list: if isAdmin() || (
++        signedIn() && resource.data.get('userId','') == request.auth.uid
++      );
++      allow create: if safeId(bookingId) &&
++        request.resource.data.id == bookingId &&
++        request.resource.data.status == 'pending' &&
++        request.resource.data.get('userId','') == (signedIn() ? request.auth.uid : '') &&
++        request.resource.data.passengerName is string &&
++        request.resource.data.passengerPhone is string &&
++        request.resource.data.totalPrice is number &&
++        request.resource.data.totalPrice >= 0;
++      allow update: if isAdmin() || (
++        signedIn() && resource.data.get('userId','') == request.auth.uid &&
++        resource.data.status == 'pending' &&
++        request.resource.data.status == 'cancelled' &&
++        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
++      );
++      allow delete: if isAdmin();
++    }
++
++    // Guest sends a report, NOT a payment confirmation or booking edit.
++    // The bank transfer is always verified manually by the operator.
++    match /payment_reports/{reportId} {
++      allow create: if request.resource.data.keys().hasOnly(['bookingId','kind','createdAt']) &&
++        request.resource.data.bookingId is string &&
++        safeId(request.resource.data.bookingId) &&
++        request.resource.data.kind == 'deposit_report' &&
++        request.resource.data.createdAt == request.time &&
++        exists(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)) &&
++        get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status == 'pending';
++      allow get, list, update, delete: if isAdmin();
++    }
++
++    match /admin_collections/{key} {
++      allow read, write: if isAdmin();
++    }
++    match /blocked_seats/{id} {
++      allow read: if true;
++      allow write: if isAdmin();
++    }
++    match /configs/{id} {
++      allow read: if true;
++      allow write: if isAdmin();
++    }
++    match /notifications/{id} {
++      allow read, update, delete: if isAdmin();
++      allow create: if isAdmin() || (
++        request.resource.data.type == 'booking_new' &&
++        request.resource.data.isRead == false &&
++        request.resource.data.metadata.bookingId is string &&
++        exists(/databases/$(database)/documents/bookings/$(request.resource.data.metadata.bookingId))
+       );
+     }
+-
+-    function isHardcodedAdmin() {
+-      return isSignedIn() && request.auth.token.keys().hasAll(['email']) && (
+-        request.auth.token.email == 'hquansl001@gmail.com' || 
+-        request.auth.token.email == 'nhaxe@mocchau.vn'
+-      );
++    match /reviews/{id} {
++      allow read: if true;
++      allow create: if signedIn() && request.resource.data.rating is number &&
++        request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
++      allow update, delete: if isAdmin();
+     }
+-
+-    function existing() { return resource.data; }
+-    function incoming() { return request.resource.data; }
+-    function isValidId(id) {
+-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
++    match /tour_combos/{id} { allow read: if true; allow write: if isAdmin(); }
++    match /accommodations/{id} { allow read: if true; allow write: if isAdmin(); }
++    match /guide_articles/{id} { allow read: if true; allow write: if isAdmin(); }
++    match /coupons/{id} { allow read: if true; allow write: if isAdmin(); }
++    match /destinations/{id} { allow read: if true; allow write: if isAdmin(); }
++    match /zalo_groups/{id} { allow read: if true; allow write: if isAdmin(); }
++    match /community_posts/{id} {
++      allow read: if true;
++      allow create: if request.resource.data.title is string &&
++        request.resource.data.title.size() <= 180 &&
++        request.resource.data.content is string &&
++        request.resource.data.content.size() <= 3000;
++      allow update, delete: if isAdmin();
+     }
+-
+-    function isValidUser(data) {
+-      return data.keys().size() >= 2 &&
+-             data.get('id', '') is string && data.id.size() <= 128 &&
+-             data.get('role', '') is string && data.role.size() <= 64 &&
+-             (data.get('phone', '') == '' || (data.phone is string && data.phone.size() <= 32)) &&
+-             (data.get('name', '') == '' || (data.name is string && data.name.size() <= 128)) &&
+-             (data.get('email', '') == '' || (data.email is string && data.email.size() <= 256)) &&
+-             (data.get('points', 0) is number);
+-    }
+-    
+-    function isValidBooking(data) {
+-      return data.keys().size() >= 4 &&
+-             data.get('id', '') is string && data.id.size() <= 128 &&
+-             data.get('userId', '') is string && data.userId.size() <= 128 &&
+-             data.get('type', '') is string && data.type.size() <= 64 &&
+-             data.get('status', '') is string && data.status.size() <= 64 &&
+-             (data.get('totalPrice', 0) is number);
+-    }
+-
+-    function isValidBlockedSeat(data) {
+-       return data.keys().size() >= 4 &&
+-              data.get('id', '') is string && data.id.size() <= 128 &&
+-              data.get('tripId', '') is string && data.tripId.size() <= 128 &&
+-              data.get('travelDate', '') is string && data.travelDate.size() <= 64 &&
+-              data.get('seatId', '') is string && data.seatId.size() <= 64;
+-    }
+-
+-    // users collection
+-    match /users/{userId} {
+-      allow read, write: if true;
+-    }
+-
+-    // bookings collection
+-    match /bookings/{bookingId} {
+-      allow read, write: if true;
+-    }
+-
+-    // blocked_seats collection
+-    match /blocked_seats/{seatId} {
+-      allow read, write: if true;
+-    }
+-    
+-    // configs collection (public read, public write for management persistence)
+-    match /configs/{configId} {
+-      allow read, write: if true;
+-    }
+-
+-    // notifications collection
+-    match /notifications/{notificationId} {
+-      allow read, write: if true;
+-    }
+-
+-    // reviews collection
+-    match /reviews/{reviewId} {
+-      allow read, write: if true;
+-    }
+-
+-    match /tour_combos/{comboId} {
+-      allow read, write: if true;
+-    }
+-
+-    match /accommodations/{accId} {
+-      allow read, write: if true;
+-    }
+-
+-    match /guide_articles/{articleId} {
+-      allow read, write: if true;
+-    }
+-
+-    match /coupons/{couponId} {
+-      allow read, write: if true;
+-    }
+-
+-    match /destinations/{destId} {
+-      allow read, write: if true;
+-    }
+-
+-    match /zalo_groups/{groupId} {
+-      allow read, write: if true;
+-    }
+-
+-    match /community_posts/{postId} {
+-      allow read, write: if true;
+-    }
+-
+-    // New isolated features. The existing booking/users collections still require a separate safe migration.
+-    function hasAdminClaim() {
+-      return request.auth != null && (request.auth.token.admin == true || request.auth.token.operator == true);
+-    }
+-
+-    match /site_content/{contentId} {
+-      allow read: if contentId == 'public';
+-      allow create, update, delete: if hasAdminClaim() && contentId == 'public';
++    match /site_content/{id} {
++      allow read: if id == 'public';
++      allow create, update, delete: if isAdmin() && id == 'public';
+     }
+ 
+     match /service_requests/{requestId} {
+@@ -161,7 +154,7 @@
+             && request.resource.data.endDate is string
+             && request.resource.data.deliveryLocation is string)
+         );
+-      allow get, list, update, delete: if hasAdminClaim();
++      allow get, list, update, delete: if isAdmin();
+     }
+   }
+ }
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -38,6 +38,7 @@
+ import { signOut } from "firebase/auth";
+ import { 
+   saveBookingToFirebase, 
++  updateBookingStatusWithRewards,
+   updateBookingStatusInFirebase, 
+   updateStatusInFirebase,
+   saveUserToFirebase,
+@@ -98,6 +99,7 @@
+     users,
+     bookings,
+     allBookings,
++    reportedBookingIds,
+     blockedSeats,
+     combos,
+     setCombos,
+@@ -267,7 +269,7 @@
+       };
+       
+       setNotifications([newNotif, ...notifications].slice(0, 50));
+-      saveNotificationToFirebase(newNotif);
++      saveNotificationToFirebase(newNotif).catch(err=>console.warn('Admin notification unavailable (order was saved):',err));
+ 
+       // Send system level notification for operator
+       if (currentUser?.role === "operator") {
+@@ -275,6 +277,7 @@
+       }
+     } catch (error) {
+       console.error("Critical error in handleAddBooking:", error);
++      throw error;
+     }
+   };
+ 
+@@ -351,37 +354,6 @@
+     await deleteBookingFromFirebase(id);
+   };
+ 
+-  const handleConfirmPaymentSuccess = async (id: string, newTotal?: number) => {
+-    console.log("Payment submitted for booking:", id, "New Price:", newTotal);
+-    const bk = bookings.find(b => b.id === id);
+-    if (!bk) return;
+-    
+-    // Save new price if applicable
+-    const bookingToUpdate: Booking = { ...bk };
+-    if (newTotal) {
+-      bookingToUpdate.totalPrice = newTotal;
+-    }
+-    await updateBookingStatusInFirebase(id, bookingToUpdate);
+-
+-    // Save used coupon and deducted points logic to current user
+-    if (currentUser && currentUser.role === "customer") {
+-      let requiresUpdate = false;
+-      const userUpdates = { ...currentUser };
+-      
+-      if (bk.couponCode && !userUpdates.usedCoupons?.includes(bk.couponCode)) {
+-         userUpdates.usedCoupons = [...(userUpdates.usedCoupons || []), bk.couponCode];
+-         requiresUpdate = true;
+-      }
+-      
+-      // if points were deducted, we need to ensure the user object stores it (we already deducted it visually, but verify)
+-      // Actually we passed userUpdates to setCurrentUser when "Đặt Ngay" is pressed, but they are not saved to Firebase until we do it explicitly.
+-      // We will save UserToFirebase to ensure usedCoupons is saved.
+-      if (requiresUpdate) {
+-         setCurrentUser(userUpdates);
+-         await saveUserToFirebase(userUpdates.id!, userUpdates);
+-      }
+-    }
+-  };
+ 
+   const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all", pickup?: string, dropoff?: string) => {
+     setLimousineSearch({ from, to, date, time, pickup, dropoff });
+@@ -580,11 +552,7 @@
+               locations={locations}
+               limousineConfig={limousineConfig}
+               sharedCarConfig={sharedCarConfig}
+-              onDeductPoints={(deducted) => {
+-                if (!currentUser || !currentUser.id) return;
+-                const nextPoints = Math.max(0, currentUser.points - deducted);
+-                saveUserToFirebase(currentUser.id, { points: nextPoints });
+-              }}
++              onDeductPoints={() => { /* Balance is updated atomically by saveBookingToFirebase. */ }}
+             />
+           )}
+ 
+@@ -599,11 +567,7 @@
+               currentUser={currentUser}
+               bookings={bookings}
+               coupons={coupons}
+-              onDeductPoints={(deducted) => {
+-                if (!currentUser || !currentUser.id) return;
+-                const nextPoints = Math.max(0, currentUser.points - deducted);
+-                saveUserToFirebase(currentUser.id, { points: nextPoints });
+-              }}
++              onDeductPoints={() => { /* Balance is updated atomically by saveBookingToFirebase. */ }}
+             />
+           )}
+ 
+@@ -638,11 +602,7 @@
+               onOpenPayment={setActivePaymentBooking}
+               onCancelBooking={handleCancelBooking}
+               onDeleteBooking={handleDeleteBooking}
+-              onDeductPoints={(deducted) => {
+-                if (!currentUser || !currentUser.id) return;
+-                const nextPoints = Math.max(0, currentUser.points - deducted);
+-                saveUserToFirebase(currentUser.id, { points: nextPoints });
+-              }}
++              onDeductPoints={() => { /* Balance is updated atomically by saveBookingToFirebase. */ }}
+               onOpenAuth={() => setIsAuthOpen(true)}
+             />
+           )}
+@@ -716,16 +676,18 @@
+           {activeTab === "operator" && currentUser?.role === "operator" && (
+             <OperatorPanel
+               users={users}
+-              bookings={allBookings.length > 0 ? allBookings : bookings}
++              bookings={(allBookings.length > 0 ? allBookings : bookings).map(b=>({
++                ...b,paymentReported:b.paymentReported || reportedBookingIds.includes(b.id)
++              }))}
+               onUpdateBookingStatus={async (bookingId, status) => {
+                 const targetList = allBookings.length > 0 ? allBookings : bookings;
+                 const bk = targetList.find(b => b.id === bookingId) || bookings.find(b => b.id === bookingId);
+                 if (bk) {
+                   const updatedBk = { ...bk, status };
+-                  await updateBookingStatusInFirebase(bookingId, updatedBk);
++                  await updateBookingStatusWithRewards(bookingId, status);
+ 
+                   // Send confirmation notification to customer when status becomes success or completed
+-                  if (status === "success" || status === "completed") {
++                  if ((status === "success" || status === "completed") && bk.status !== "success" && bk.status !== "completed") {
+                     const { saveNotificationToFirebase } = await import("./lib/firebaseUtils");
+                     const seatInfo = (bk.seatNumbers && bk.seatNumbers.length > 0) 
+                       ? `Ghế: ${bk.seatNumbers.join(', ')}` 
+@@ -857,14 +819,9 @@
+                   await saveConfigToFirebase("drivers", updated);
+               }}
+               zaloGroups={zaloGroups}
+-              onUpdateZaloGroups={async (updated) => {
+-                  setZaloGroups(updated);
+-                  const { saveZaloGroupToFirebase } = await import("./lib/firebaseUtils");
+-                  // Save each group
+-                  for (const g of updated) {
+-                    await saveZaloGroupToFirebase(g);
+-                  }
+-                  alert("Đã cập nhật danh sách nhóm Zalo cộng đồng thành công!");
++              onUpdateZaloGroups={(updated) => {
++                // ZaloCommunityManagement performs the cloud write first.
++                setZaloGroups(updated);
+               }}
+             />
+           )}
+@@ -920,7 +877,6 @@
+               setIsBookingListOpen(true);
+             }
+           }}
+-          onConfirmSuccess={handleConfirmPaymentSuccess}
+           coupons={coupons}
+         />
+       </Suspense>
+--- a/src/components/AuthModal.tsx
++++ b/src/components/AuthModal.tsx
+@@ -1,8 +1,9 @@
+ import React, {useState} from 'react';
+ import {GoogleAuthProvider, createUserWithEmailAndPassword, getIdTokenResult, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, updateProfile} from 'firebase/auth';
+-import {doc, getDoc, setDoc} from 'firebase/firestore';
+ import {X, UserRound, TicketPercent, ShieldCheck} from 'lucide-react';
+-import {auth, db} from '../firebase';
++import {auth} from '../firebase';
++import {hasOperatorAccess} from '../lib/adminAccess';
++import {ensureMemberProfile} from '../lib/memberProfile';
+ import {User} from '../types';
+ 
+ interface AuthModalProps {
+@@ -28,20 +29,21 @@
+   if (!isOpen) return null;
+   const finish=async (account: any, preferredName?: string, preferredPhone?: string) => {
+     const token = await getIdTokenResult(account, true);
+-    const isAdmin = token.claims.admin === true || token.claims.operator === true;
+-    const ref = doc(db,'users',account.uid);
+-    const snapshot=await getDoc(ref);
+-    const old = snapshot.exists()?snapshot.data():{};
+-    const profile: User = {
+-      id:account.uid,
+-      email:account.email||'',
+-      name:preferredName||old.name||account.displayName||account.email||'Thành viên',
+-      phone:preferredPhone||old.phone||account.phoneNumber||'',
+-      points:typeof old.points==='number'?old.points:0,
+-      role:isAdmin?'operator':'customer'
+-    };
+-    // Unprivileged registrations never grant themselves operator rights or welcome points.
+-    if(!snapshot.exists()) await setDoc(ref,{...profile,role:'customer',points:0,createdAt:new Date().toISOString()});
++    const isAdmin = hasOperatorAccess(token);
++    let profile: User;
++    try {
++      profile = await ensureMemberProfile(account, isAdmin, preferredName, preferredPhone);
++    } catch (error) {
++      // A Firestore outage must not turn valid Firebase authentication into an
++      // apparent wrong-password error. Keep permissions based on verified token.
++      console.error('Firebase authenticated but member profile unavailable:', error);
++      profile = {
++        id: account.uid, email: account.email || '',
++        name: preferredName || account.displayName || 'Thành viên',
++        phone: preferredPhone || account.phoneNumber || '',
++        points: 0, role: isAdmin ? 'operator' : 'customer'
++      };
++    }
+     onLoginSuccess(profile);
+     onClose();
+   };
+@@ -65,7 +67,7 @@
+       }
+     } catch(e:any) {
+       const code=e?.code||'';
+-      setError(code.includes('email-already-in-use')?'Email đã có tài khoản. Hãy đăng nhập.':code.includes('invalid-credential')?'Email hoặc mật khẩu không đúng.':code.includes('popup-closed')?'Cửa sổ đăng nhập đã đóng.':e?.message||'Không thể kết nối, vui lòng thử lại.');
++      setError(code.includes('permission-denied')?'Đăng nhập thành công nhưng quyền truy cập dữ liệu bị từ chối. Hãy kiểm tra Firebase Rules.':code.includes('auth/unauthorized-domain')?'Tên miền chưa được cho phép trong Firebase Authentication.':code.includes('email-already-in-use')?'Email đã có tài khoản. Hãy đăng nhập.':code.includes('invalid-credential')?'Email hoặc mật khẩu không đúng.':code.includes('popup-closed')?'Cửa sổ đăng nhập đã đóng.':e?.message||'Không thể kết nối, vui lòng thử lại.');
+     } finally {setLoading(false)}
+   };
+   const google=async()=>{setLoading(true);setError('');try{const r=await signInWithPopup(auth,new GoogleAuthProvider());await finish(r.user)}catch(e:any){setError(e?.message||'Không thể đăng nhập Google.')}finally{setLoading(false)}};
+@@ -73,7 +75,7 @@
+     <div className="bg-white w-full max-w-md max-h-[93dvh] overflow-auto rounded-3xl p-5 sm:p-7 shadow-2xl text-left relative">
+       <button onClick={onClose} aria-label="Đóng" className="absolute top-4 right-4 text-stone-500 p-2 rounded-xl hover:bg-stone-100"><X className="w-5 h-5"/></button>
+       <div className="flex gap-3 items-center mb-3"><div className="bg-emerald-50 rounded-2xl p-3"><UserRound className="w-7 h-7 text-emerald-700"/></div><div><h2 className="text-xl font-black text-[#1b4332]">{mode==='register'?'Đăng ký thành viên':mode==='forgot'?'Khôi phục mật khẩu':'Đăng nhập Mộc Châu Travel'}</h2><p className="text-xs text-stone-500">Đặt xe, lưu vé và quản lý ưu đãi của bạn</p></div></div>
+-      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 flex gap-2 items-start"><TicketPercent className="w-5 h-5 text-emerald-700 shrink-0"/><p className="text-xs text-emerald-950">Thành viên có thể sử dụng voucher QT Limousine <strong>khi có chương trình đủ điều kiện</strong>. Ưu đãi không tự phát sinh khi đăng ký.</p></div>
++      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 flex gap-2 items-start"><TicketPercent className="w-5 h-5 text-emerald-700 shrink-0"/><p className="text-xs text-emerald-950">Hội viên mới được tặng <strong>10 điểm chào mừng một lần</strong>; mỗi vé được Admin xác nhận cộng 1 điểm. Voucher dùng từ lần đặt thứ hai theo điều kiện.</p></div>
+       <form onSubmit={submit} className="space-y-3">
+         {mode==='register'&&<><label className="block text-xs font-bold">Họ và tên *<input required maxLength={100} autoComplete="name" value={name} onChange={e=>setName(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="Tên của bạn"/></label><label className="block text-xs font-bold">Số điện thoại liên hệ<input inputMode="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="09xxxxxxxx"/></label></>}
+         <label className="block text-xs font-bold">Email *<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="email@example.com"/></label>
+--- a/src/components/ComboBooking.tsx
++++ b/src/components/ComboBooking.tsx
+@@ -4,7 +4,7 @@
+ import { motion, AnimatePresence } from "motion/react";
+ 
+ interface ComboBookingProps {
+-  onAddBooking: (booking: any) => void;
++  onAddBooking: (booking: any) => Promise<void>;
+   searchParams: { hotelId: string; date: string; from?: string; to?: string; time?: string } | null;
+   onOpenPayment: (booking: any) => void;
+   currentUser: User | null;
+@@ -202,7 +202,7 @@
+     return baseComboPriceForGroup + extraNightsSurcharge;
+   };
+ 
+-  const handleBookingSubmit = (e: React.FormEvent) => {
++  const handleBookingSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     setErrorMsg("");
+ 
+@@ -241,7 +241,7 @@
+       }
+     }
+ 
+-    const systemToday = new Date().toISOString().split('T')[0];
++    const systemToday = new Date(Date.now()+7*3600000).toISOString().slice(0,10);
+     if (travelDate < systemToday) {
+       setErrorMsg("Ngày khởi hành không được phép chọn ngày trong quá khứ!");
+       return;
+@@ -320,9 +320,6 @@
+     const finalPrice = Math.max(0, originalTotalPrice - totalDiscount);
+ 
+     // Deduct points from active user wallet
+-    if (pointsDeducted > 0) {
+-      onDeductPoints(pointsDeducted);
+-    }
+ 
+     const bookingData = {
+       id: "bk_" + Math.random().toString(36).substr(2, 9),
+@@ -332,7 +329,7 @@
+       returnDate: returnDateStr,
+       passengerName: trimmedName,
+       passengerPhone: trimmedPhone,
+-      passengerEmail: trimmedEmail || "contact@client.vn",
++      passengerEmail: trimmedEmail || "",
+       pickupPoint: pickupPoint || finalPickupPoint,
+       dropoffPoint: dropoffPoint || `Sảnh khách sạn: ${selectedAcc.name} (Mộc Châu)`,
+       totalPrice: finalPrice,
+@@ -351,8 +348,15 @@
+       isReturningCustomer
+     };
+ 
+-    onAddBooking(bookingData);
+-    onOpenPayment(bookingData);
++    try {
++      await onAddBooking(bookingData);
++      onOpenPayment(bookingData);
++    } catch (error) {
++      console.error('Đặt combo thất bại:', error);
++      setErrorMsg('Chưa thể lưu đơn đặt combo lên máy chủ. Vui lòng thử lại.');
++      setIsSubmitting(false);
++      return;
++    }
+ 
+     // Reset fields
+     setSelectedCombo(null);
+@@ -752,7 +756,7 @@
+                         type="date"
+                         required
+                         value={travelDate}
+-                        min={new Date().toISOString().split('T')[0]}
++                        min={new Date(Date.now()+7*3600000).toISOString().slice(0,10)}
+                         onChange={(e) => setTravelDate(e.target.value)}
+                         className="w-full bg-white px-3 py-2 border border-stone-200 rounded-lg text-sm font-semibold text-stone-800 cursor-pointer focus:outline-none font-sans"
+                       />
+--- a/src/components/CustomerDashboard.tsx
++++ b/src/components/CustomerDashboard.tsx
+@@ -101,7 +101,7 @@
+     }, 2500);
+   };
+ 
+-  const handleSaveProfile = (e: React.FormEvent) => {
++  const handleSaveProfile = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!profileName.trim()) {
+       showToast("Tên không được để trống!");
+@@ -130,77 +130,40 @@
+       favDropoff: profileFavDropoff,
+     };
+ 
+-    if (newPassword) {
+-      updatedUser.passwordResetToDefault = false;
+-      updatedUser.customPassword = newPassword;
++    // Never put passwords or Admin roles in Firestore/localStorage.
++    // The UI is updated only after Firebase accepts the profile change.
++
++    if (!auth.currentUser) {
++      showToast('Bạn cần đăng nhập để sửa hồ sơ.');
++      return;
+     }
+-
+-    onUpdateUser(updatedUser);
+-
+-    // If the active session is a mock session, update it in localStorage
+-    const cachedAdmin = localStorage.getItem("mock_admin_session");
+-    if (cachedAdmin) {
+-      try {
+-        const parsed = JSON.parse(cachedAdmin);
+-        if (parsed.id === currentUser.id) {
+-          localStorage.setItem(
+-            "mock_admin_session",
+-            JSON.stringify(updatedUser),
+-          );
+-        }
+-      } catch (e) {
+-        // ignore
+-      }
++    try {
++      await saveUserToFirebase(currentUser.id,updatedUser);
++      if(profileName!==auth.currentUser.displayName)
++        await updateProfile(auth.currentUser,{displayName:profileName});
++      if(profileEmail && profileEmail!==auth.currentUser.email)
++        await updateEmail(auth.currentUser,profileEmail);
++      if(newPassword)await updatePassword(auth.currentUser,newPassword);
++      onUpdateUser({...updatedUser,email:auth.currentUser.email||updatedUser.email});
++      setNewPassword('');setConfirmPassword('');
++      showToast('Thông tin đã được lưu lên Firebase.');
++    } catch(err:any) {
++      console.error('Profile update failed',err);
++      showToast('Lưu hồ sơ thất bại: '+(err?.message||'Hãy thử lại.'));
+     }
+ 
+-    // Save to Firestore
+-    saveUserToFirebase(currentUser.id, updatedUser).catch(console.error);
+-
+-    // Sync auth changes
+-    if (auth.currentUser) {
+-      const promises: Promise<any>[] = [];
+-      if (profileName !== auth.currentUser.displayName) {
+-        promises.push(
+-          updateProfile(auth.currentUser, { displayName: profileName }),
+-        );
+-      }
+-      if (profileEmail !== auth.currentUser.email && profileEmail) {
+-        promises.push(updateEmail(auth.currentUser, profileEmail));
+-      }
+-      if (newPassword) {
+-        promises.push(updatePassword(auth.currentUser, newPassword));
+-      }
+-
+-      Promise.all(promises)
+-        .then(() => {
+-          setNewPassword("");
+-          setConfirmPassword("");
+-          showToast(
+-            "Đã lưu thông tin tài khoản và cập nhật dữ liệu thành công! ✨",
+-          );
+-        })
+-        .catch((e) => {
+-          console.error(e);
+-          showToast("Lưu thông tin thất bại: " + e.message);
+-        });
+-    } else {
+-      showToast("Đã lưu thông tin tài khoản (Ngoại vi) thành công! ✨");
+-    }
+   };
+ 
+   // Generate dynamic points history
+   const getPointsHistory = (): PointTransaction[] => {
+-    const list: PointTransaction[] = [
+-      {
+-        id: "tx_init",
+-        date: "20/05/2026",
+-        description: "Quà tặng chào mừng thành viên mới đăng ký xe đi Mộc Châu",
+-        amount: 10,
+-        type: "plus",
+-      },
+-    ];
+-
+-    // Filter success/completed user bookings to award flat +5 points (1 point = 1000đ)
++    const list: PointTransaction[] = currentUser.welcomeBonusGranted ? [{
++      id:'tx_init',
++      date:currentUser.welcomeBonusAt || '',
++      description:'Tặng 10 điểm chào mừng hội viên mới',
++      amount:10,type:'plus'
++    }] : [];
++
++    // Confirmed bookings add 1 point once each (1 point = 1000đ)
+     bookings.forEach((b) => {
+       if (
+         b.passengerPhone === currentUser.phone &&
+@@ -210,7 +173,7 @@
+           id: `tx_earn_${b.id}`,
+           date: b.bookingDate || "20/05/2026",
+           description: `Tích lũy điểm đặt vé thành công đơn #${(b.id || "").toUpperCase()}`,
+-          amount: 5,
++          amount: 1,
+           type: "plus",
+         });
+       }
+--- a/src/components/LimousineBooking.tsx
++++ b/src/components/LimousineBooking.tsx
+@@ -4,7 +4,7 @@
+ import { motion, AnimatePresence } from "motion/react";
+ 
+ interface LimousineBookingProps {
+-  onAddBooking: (booking: any) => void;
++  onAddBooking: (booking: any) => Promise<void>;
+   searchParams: { from: string; to: string; date: string; time?: string; pickup?: string; dropoff?: string } | null;
+   onOpenPayment: (booking: any) => void;
+   bookings: any[];
+@@ -76,7 +76,7 @@
+     searchParams?.to && searchParams.to !== "Hà Nội" && searchParams.to !== "Mộc Châu" ? searchParams.to : ""
+   );
+ 
+-  const [date, setDate] = useState(searchParams?.date || "2026-05-25");
++  const [date, setDate] = useState(searchParams?.date || new Date(Date.now()+7*3600000).toISOString().slice(0,10));
+   const [selectedTimeFilter, setSelectedTimeFilter] = useState(
+     searchParams?.time && searchParams.time !== "all" && searchParams.time !== "morning" && searchParams.time !== "afternoon"
+       ? searchParams.time
+@@ -311,7 +311,7 @@
+     return seatCount * pricePerSeat;
+   };
+ 
+-  const handleBookingSubmit = (e: React.FormEvent) => {
++  const handleBookingSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     setErrorMsg("");
+ 
+@@ -322,7 +322,7 @@
+       return;
+     }
+ 
+-    const systemToday = new Date().toISOString().split('T')[0];
++    const systemToday = new Date(Date.now()+7*3600000).toISOString().slice(0,10);
+     if (date < systemToday) {
+       setErrorMsg("Ngày khởi hành không được trong quá khứ!");
+       return;
+@@ -376,9 +376,6 @@
+       const totalDiscount = pointsDiscountAmount + couponDiscountAmount;
+       const finalPrice = Math.max(0, originalTotalPrice - totalDiscount);
+ 
+-      if (pointsDeducted > 0) {
+-        onDeductPoints(pointsDeducted);
+-      }
+ 
+       const trimmedEmail = passengerEmail.trim();
+ 
+@@ -392,7 +389,7 @@
+         travelDate: date,
+         passengerName: trimmedName,
+         passengerPhone: trimmedPhone,
+-        passengerEmail: trimmedEmail || "contact@client.vn",
++        passengerEmail: trimmedEmail || "",
+         pickupPoint: finalPickupPoint,
+         dropoffPoint: finalDropoffPoint,
+         totalPrice: finalPrice,
+@@ -406,7 +403,7 @@
+         routeSelection: `${from} ➔ ${to}`
+       };
+ 
+-      onAddBooking(bookingData);
++      await onAddBooking(bookingData);
+       onOpenPayment(bookingData);
+ 
+       setSelectedTrip(null);
+@@ -522,7 +519,7 @@
+             <input
+               type="date"
+               value={date}
+-              min={new Date().toISOString().split('T')[0]}
++              min={new Date(Date.now()+7*3600000).toISOString().slice(0,10)}
+               onChange={(e) => setDate(e.target.value)}
+               className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold text-[#1b4332] focus:outline-none cursor-pointer"
+             />
+--- a/src/components/OperatorPanel.tsx
++++ b/src/components/OperatorPanel.tsx
+@@ -1878,6 +1878,7 @@
+                                         Đang Chờ
+                                       </span>
+                                     )}
++                                    {bk.status === 'pending' && bk.paymentReported && <span className="block mt-1 text-[10px] font-bold bg-amber-100 text-amber-950 rounded px-2 py-1">⚡ Khách báo đã chuyển cọc — Kiểm tra ngân hàng</span>}
+                                     {bk.status === "success" && (
+                                       <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
+                                         Đã Đi / OK
+@@ -2220,6 +2221,7 @@
+                                 Đang Chờ
+                               </span>
+                             )}
++                            {bk.status === 'pending' && bk.paymentReported && <span className="block mt-1 text-[10px] font-bold bg-amber-100 text-amber-950 rounded px-2 py-1">⚡ Khách báo đã chuyển cọc — Kiểm tra ngân hàng</span>}
+                             {bk.status === "success" && (
+                               <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
+                                 Đã Đi / OK
+--- a/src/components/PaymentModal.tsx
++++ b/src/components/PaymentModal.tsx
+@@ -17,19 +17,18 @@
+ interface PaymentModalProps {
+   booking: Booking | null;
+   onClose: (wasSuccessful?: boolean) => void;
+-  onConfirmSuccess: (id: string, newTotal?: number) => void;
+   coupons?: Coupon[];
+ }
+ 
+ export default function PaymentModal({
+   booking,
+   onClose,
+-  onConfirmSuccess,
+   coupons = [],
+ }: PaymentModalProps) {
+   const [copiedAccount, setCopiedAccount] = useState(false);
+   const [copiedContent, setCopiedContent] = useState(false);
+   const [isVerifying, setIsVerifying] = useState(false);
++  const [reportError, setReportError] = useState('');
+   const [successPaid, setSuccessPaid] = useState(false);
+ 
+   if (!booking) return null;
+@@ -53,16 +52,26 @@
+     setTimeout(() => setCopiedContent(false), 2000);
+   };
+ 
+-  const verifyPayment = () => {
++  const verifyPayment = async () => {
++    if (isVerifying || !booking.id) return;
+     setIsVerifying(true);
+-    // Simulate real bank transfer webhook verify wait
+-    setTimeout(() => {
+-      setIsVerifying(false);
++    setReportError('');
++    try {
++      const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
++      const {db} = await import('../firebase');
++      // Report is NOT bank verification. Admin alone confirms receipt of deposit.
++      await addDoc(collection(db,'payment_reports'),{
++        bookingId: booking.id, kind:'deposit_report', createdAt:serverTimestamp()
++      });
++      // Mark this device only after the report document is saved remotely.
++      const { getLocalList, setLocalList } = await import('../lib/firebaseUtils');
++      const all = getLocalList<Booking>('bookings', []);
++      setLocalList('bookings',all.map(b=>b.id===booking.id?{...b,paymentReported:true,paymentReportedAt:new Date().toISOString()}:b));
+       setSuccessPaid(true);
+-      if (booking?.id) {
+-        onConfirmSuccess(booking.id, finalPrice);
+-      }
+-    }, 2800);
++    } catch (error) {
++      console.error('Could not submit deposit notification',error);
++      setReportError('Chưa gửi được thông báo chuyển cọc. Hãy thử lại hoặc gửi mã đơn qua Zalo nhà xe.');
++    } finally {setIsVerifying(false)}
+   };
+ 
+   const transferCode = `COC 50% ${(booking?.id || "").toUpperCase()}`;
+@@ -105,9 +114,9 @@
+                 <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                 <div>
+                   <span className="font-extrabold block">
+-                    Giữ chỗ thành công! Đang chờ thanh toán cọc 50%
+-                  </span>
+-                  Nhà xe cam kết giữ nguyên vị trí chỗ ngồi cho bạn. Quý khách
++                    Đã tạo yêu cầu đặt vé – Chờ thanh toán cọc 50%
++                  </span>
++                  Nhà xe sẽ xác nhận giữ chỗ sau khi kiểm tra tiền cọc. Quý khách
+                   vui lòng quét mã VietQR ngân hàng Quân đội (MB Bank) phía dưới
+                   để tiến hành thanh toán cọc nhanh chóng.
+                 </div>
+@@ -429,7 +438,8 @@
+                 </div>
+               </div>
+ 
+-              {/* Verify triggers */}
++              {reportError && <div role="alert" className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-medium">{reportError}</div>}
++              {/* Send report only; operator verifies actual bank transfer */}
+               <div className="pt-4 border-t border-stone-100/80 flex flex-col sm:flex-row gap-3">
+                 <button
+                   type="button"
+@@ -453,8 +463,8 @@
+                   )}
+                   <span>
+                     {isVerifying
+-                      ? "Đang xác thực giao dịch..."
+-                      : "Tôi Đã Chuyển Khoản Cọc 50% Thành Công"}
++                      ? "Đang gửi thông báo..."
++                      : "Tôi đã chuyển khoản cọc 50% – Báo nhà xe"}
+                   </span>
+                 </button>
+               </div>
+@@ -473,12 +483,11 @@
+ 
+               <div className="space-y-2">
+                 <h4 className="font-extrabold text-[#1b4332] text-lg">
+-                  Đã Hoàn Thành Xác Nhận Cọc!
++                  Đã gửi thông báo chuyển khoản – Chờ nhà xe kiểm tra
+                 </h4>
+                 <p className="text-stone-500 text-xs leading-relaxed font-sans">
+-                  Nhà xe đã ghi nhận thông tin cọc đặt giữ vị trí 50% của hành
+-                  khách <b>{booking.passengerName}</b>. Chuyến đi của quý khách
+-                  đã được lưu giữ chỗ thành công!
++                  Hệ thống đã ghi nhận việc khách thông báo chuyển cọc 50%. Admin sẽ kiểm tra tài khoản ngân hàng trước khi xác nhận vé của
++                  khách <b>{booking.passengerName}</b>. Vé hiện vẫn ở trạng thái chờ xác nhận!
+                 </p>
+               </div>
+ 
+--- a/src/components/SharedCarBooking.tsx
++++ b/src/components/SharedCarBooking.tsx
+@@ -4,7 +4,7 @@
+ import { motion, AnimatePresence } from "motion/react";
+ 
+ interface SharedCarBookingProps {
+-  onAddBooking: (booking: any) => void;
++  onAddBooking: (booking: any) => Promise<void>;
+   searchParams: { from: string; to: string; date: string; time?: string } | null;
+   onOpenPayment: (booking: any) => void;
+   bookings: any[];
+@@ -83,7 +83,7 @@
+   // Query parameters
+   const [from, setFrom] = useState(searchParams?.from || "Hà Nội");
+   const [to, setTo] = useState(searchParams?.to || "Mộc Châu");
+-  const [date, setDate] = useState(searchParams?.date || "2026-05-25");
++  const [date, setDate] = useState(searchParams?.date || new Date(Date.now()+7*3600000).toISOString().slice(0,10));
+   const [selectedTimeFilter, setSelectedTimeFilter] = useState(
+     searchParams?.time && searchParams.time !== "all" && searchParams.time !== "morning" && searchParams.time !== "afternoon"
+       ? searchParams.time
+@@ -213,7 +213,7 @@
+     if (searchParams) {
+       setFrom(searchParams.from);
+       setTo(searchParams.to);
+-      setDate(searchParams.date || "2026-05-25");
++      setDate(searchParams.date || new Date(Date.now()+7*3600000).toISOString().slice(0,10));
+       setSelectedTimeFilter(
+         searchParams.time && searchParams.time !== "all" && searchParams.time !== "morning" && searchParams.time !== "afternoon"
+           ? searchParams.time
+@@ -323,7 +323,7 @@
+     return seatCount * currentPrice;
+   };
+ 
+-  const handleBookingSubmit = (e: React.FormEvent) => {
++  const handleBookingSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     setErrorMsg("");
+ 
+@@ -412,9 +412,6 @@
+     const totalDiscount = pointsDiscountAmount + couponDiscountAmount;
+     const finalPrice = Math.max(0, originalTotalPrice - totalDiscount);
+ 
+-    if (pointsDeducted > 0) {
+-      onDeductPoints(pointsDeducted);
+-    }
+ 
+     const isPickupCustomNow = pickupPoint.toLowerCase().includes("tận nhà") || pickupPoint.toLowerCase().includes("tận nơi") || pickupPoint.toLowerCase().includes("tại nhà");
+     const isDropoffCustomNow = dropoffPoint.toLowerCase().includes("tận nhà") || dropoffPoint.toLowerCase().includes("tận nơi") || dropoffPoint.toLowerCase().includes("tại nhà");
+@@ -428,7 +425,7 @@
+       travelDate: date,
+       passengerName: trimmedName,
+       passengerPhone: trimmedPhone,
+-      passengerEmail: passengerEmail.trim() || "sharedcar@client.vn",
++      passengerEmail: passengerEmail.trim() || "",
+       pickupPoint: pickupDetail,
+       dropoffPoint: dropoffDetail,
+       totalPrice: finalPrice,
+@@ -443,7 +440,7 @@
+       routeSelection: `${from} ➔ ${to}`
+     };
+ 
+-    onAddBooking(bookingData);
++    await onAddBooking(bookingData);
+     onOpenPayment(bookingData);
+ 
+     // Clean states
+--- a/src/components/operator/AIAssistantManagement.tsx
++++ b/src/components/operator/AIAssistantManagement.tsx
+@@ -1,3 +1,4 @@
++import {useAdminCloudList} from '../../hooks/useAdminCloudList';
+ import React, { useState } from "react";
+ import { Layers, Sparkles, CheckCircle2, AlertCircle, RefreshCw, MessageSquare, Send, BookOpen, Plus, Trash2, Edit2 } from "lucide-react";
+ 
+@@ -46,14 +47,7 @@
+ ];
+ 
+ export default function AIAssistantManagement() {
+-  const [faqs, setFaqs] = useState<AIKnowledgeItem[]>(() => {
+-    try {
+-      const saved = localStorage.getItem("mocchau_operator_ai_faqs");
+-      return saved ? JSON.parse(saved) : DEFAULT_FAQ;
+-    } catch {
+-      return DEFAULT_FAQ;
+-    }
+-  });
++  const [faqs, setFaqs, faqsCloud] = useAdminCloudList<AIKnowledgeItem>('ai_faqs','mocchau_operator_ai_faqs');
+ 
+   const [testQuery, setTestQuery] = useState("Thời tiết Mộc Châu hôm nay thế nào?");
+   const [testResult, setTestResult] = useState<string | null>(null);
+@@ -105,9 +99,7 @@
+     };
+     const updated = [item, ...faqs];
+     setFaqs(updated);
+-    try {
+-      localStorage.setItem("mocchau_operator_ai_faqs", JSON.stringify(updated));
+-    } catch {}
++
+     setIsAddingFaq(false);
+     setNewTopic("");
+     setNewQuestion("");
+@@ -117,13 +109,13 @@
+   const handleDeleteFaq = (id: string) => {
+     const updated = faqs.filter(f => f.id !== id);
+     setFaqs(updated);
+-    try {
+-      localStorage.setItem("mocchau_operator_ai_faqs", JSON.stringify(updated));
+-    } catch {}
++
+   };
+ 
+   return (
+     <div className="space-y-6 text-left">
++      {(faqsCloud.error || faqsCloud.saving) && <div role="status" className={`rounded-xl border p-3 text-xs font-semibold ${faqsCloud.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>{faqsCloud.error || 'Đang đồng bộ dữ liệu lên Firestore...'}</div>}
++
+       {/* Overview status box */}
+       <div className="bg-gradient-to-r from-stone-900 via-teal-950 to-emerald-950 p-6 rounded-3xl text-white shadow-xl border border-emerald-900/60 relative overflow-hidden">
+         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+--- a/src/components/operator/FlowerSeasonManagement.tsx
++++ b/src/components/operator/FlowerSeasonManagement.tsx
+@@ -1,3 +1,4 @@
++import {useAdminCloudList} from '../../hooks/useAdminCloudList';
+ import React, { useState, useEffect } from "react";
+ import { CalendarDays, Plus, Edit2, Trash2, MapPin, CheckCircle2, Clock, Sparkles, AlertTriangle, Eye, EyeOff } from "lucide-react";
+ 
+@@ -71,14 +72,7 @@
+ ];
+ 
+ export default function FlowerSeasonManagement() {
+-  const [seasons, setSeasons] = useState<FlowerSeasonItem[]>(() => {
+-    try {
+-      const saved = localStorage.getItem("mocchau_operator_flower_seasons");
+-      return saved ? JSON.parse(saved) : INITIAL_SEASONS;
+-    } catch {
+-      return INITIAL_SEASONS;
+-    }
+-  });
++  const [seasons, setSeasons, seasonsCloud] = useAdminCloudList<FlowerSeasonItem>('flower_seasons','mocchau_operator_flower_seasons');
+ 
+   const [editingItem, setEditingItem] = useState<FlowerSeasonItem | null>(null);
+   const [isModalOpen, setIsModalOpen] = useState(false);
+@@ -92,13 +86,6 @@
+   const [formBestTime, setFormBestTime] = useState("");
+   const [formTips, setFormTips] = useState("");
+ 
+-  useEffect(() => {
+-    try {
+-      localStorage.setItem("mocchau_operator_flower_seasons", JSON.stringify(seasons));
+-    } catch (e) {
+-      console.warn("Could not save flower seasons", e);
+-    }
+-  }, [seasons]);
+ 
+   const handleOpenAdd = () => {
+     setEditingItem(null);
+@@ -194,6 +181,7 @@
+ 
+   return (
+     <div className="space-y-6">
++      {(seasonsCloud.error || seasonsCloud.saving) && <div role="status" className={`rounded-xl border p-3 text-xs font-semibold ${seasonsCloud.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>{seasonsCloud.error || 'Đang đồng bộ dữ liệu lên Firestore...'}</div>}
+       {/* Top Banner */}
+       <div className="bg-white p-5 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-xs">
+         <div>
+--- a/src/components/operator/MotorbikeManagement.tsx
++++ b/src/components/operator/MotorbikeManagement.tsx
+@@ -1,3 +1,4 @@
++import {useAdminCloudList} from '../../hooks/useAdminCloudList';
+ import React, { useState, useEffect } from "react";
+ import { Bike, Plus, Edit2, Trash2, Search, Eye, EyeOff, CheckCircle2, MapPin, Phone, Clock, FileText } from "lucide-react";
+ 
+@@ -79,23 +80,9 @@
+ export default function MotorbikeManagement() {
+   const [activeTab, setActiveTab] = useState<"fleet" | "requests">("fleet");
+ 
+-  const [fleet, setFleet] = useState<MotorbikeVehicle[]>(() => {
+-    try {
+-      const saved = localStorage.getItem("mocchau_admin_motorbike_fleet");
+-      return saved ? JSON.parse(saved) : INITIAL_MOTORBIKES;
+-    } catch {
+-      return INITIAL_MOTORBIKES;
+-    }
+-  });
+-
+-  const [requests, setRequests] = useState<MotorbikeBookingRequest[]>(() => {
+-    try {
+-      const saved = localStorage.getItem("mocchau_admin_motorbike_requests");
+-      return saved ? JSON.parse(saved) : INITIAL_RENTAL_REQUESTS;
+-    } catch {
+-      return INITIAL_RENTAL_REQUESTS;
+-    }
+-  });
++  const [fleet, setFleet, fleetCloud] = useAdminCloudList<MotorbikeVehicle>('motorbike_fleet','mocchau_admin_motorbike_fleet');
++
++  const [requests, setRequests, requestsCloud] = useAdminCloudList<MotorbikeBookingRequest>('motorbike_requests_legacy','mocchau_admin_motorbike_requests');
+ 
+   const [searchTerm, setSearchTerm] = useState("");
+   const [typeFilter, setTypeFilter] = useState("all");
+@@ -113,13 +100,9 @@
+   const [formLocations, setFormLocations] = useState("Giao tận nơi Homestay / Bến xe");
+   const [formRequirements, setFormRequirements] = useState("CCCD / Bằng lái xe + Mũ bảo hiểm miễn phí");
+ 
+-  useEffect(() => {
+-    localStorage.setItem("mocchau_admin_motorbike_fleet", JSON.stringify(fleet));
+-  }, [fleet]);
+-
+-  useEffect(() => {
+-    localStorage.setItem("mocchau_admin_motorbike_requests", JSON.stringify(requests));
+-  }, [requests]);
++
++
++
+ 
+   const handleOpenModal = (bike?: MotorbikeVehicle) => {
+     if (bike) {
+@@ -206,6 +189,9 @@
+ 
+   return (
+     <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 sm:p-8 space-y-6 text-left" id="motorbike_management_root">
++      {(fleetCloud.error || fleetCloud.saving) && <div role="status" className={`rounded-xl border p-3 text-xs font-semibold ${fleetCloud.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>{fleetCloud.error || 'Đang đồng bộ dữ liệu lên Firestore...'}</div>}
++      {(requestsCloud.error || requestsCloud.saving) && <div role="status" className={`rounded-xl border p-3 text-xs font-semibold ${requestsCloud.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>{requestsCloud.error || 'Đang đồng bộ dữ liệu lên Firestore...'}</div>}
++
+       {/* Header */}
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-stone-200 pb-4">
+         <div>
+--- a/src/components/operator/PartnerManagement.tsx
++++ b/src/components/operator/PartnerManagement.tsx
+@@ -1,3 +1,4 @@
++import {useAdminCloudList} from '../../hooks/useAdminCloudList';
+ import React, { useState, useEffect } from "react";
+ import { UserCheck, Plus, Edit2, Trash2, Phone, Mail, Building, Percent, FileText, CheckCircle, Search, ExternalLink } from "lucide-react";
+ 
+@@ -72,14 +73,7 @@
+ ];
+ 
+ export default function PartnerManagement() {
+-  const [partners, setPartners] = useState<PartnerItem[]>(() => {
+-    try {
+-      const saved = localStorage.getItem("mocchau_operator_partners");
+-      return saved ? JSON.parse(saved) : INITIAL_PARTNERS;
+-    } catch {
+-      return INITIAL_PARTNERS;
+-    }
+-  });
++  const [partners, setPartners, partnersCloud] = useAdminCloudList<PartnerItem>('partners','mocchau_operator_partners');
+ 
+   const [searchTerm, setSearchTerm] = useState("");
+   const [categoryFilter, setCategoryFilter] = useState("all");
+@@ -98,11 +92,6 @@
+   const [formBankAccount, setFormBankAccount] = useState("");
+   const [formNotes, setFormNotes] = useState("");
+ 
+-  useEffect(() => {
+-    try {
+-      localStorage.setItem("mocchau_operator_partners", JSON.stringify(partners));
+-    } catch {}
+-  }, [partners]);
+ 
+   const handleOpenAdd = () => {
+     setEditingItem(null);
+@@ -195,6 +184,7 @@
+ 
+   return (
+     <div className="space-y-6 text-left">
++      {(partnersCloud.error || partnersCloud.saving) && <div role="status" className={`rounded-xl border p-3 text-xs font-semibold ${partnersCloud.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>{partnersCloud.error || 'Đang đồng bộ dữ liệu lên Firestore...'}</div>}
+       {/* Top Banner */}
+       <div className="bg-white p-5 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-xs">
+         <div>
+--- a/src/components/operator/RestaurantManagement.tsx
++++ b/src/components/operator/RestaurantManagement.tsx
+@@ -1,3 +1,4 @@
++import {useAdminCloudList} from '../../hooks/useAdminCloudList';
+ import React, { useState, useEffect } from "react";
+ import { Search, Plus, Edit2, Trash2, CheckCircle, Clock, MapPin, Phone, DollarSign, UtensilsCrossed, AlertCircle, RefreshCw } from "lucide-react";
+ 
+@@ -76,14 +77,7 @@
+ ];
+ 
+ export default function RestaurantManagement() {
+-  const [restaurants, setRestaurants] = useState<RestaurantItem[]>(() => {
+-    try {
+-      const saved = localStorage.getItem("mocchau_operator_restaurants");
+-      return saved ? JSON.parse(saved) : INITIAL_RESTAURANTS;
+-    } catch {
+-      return INITIAL_RESTAURANTS;
+-    }
+-  });
++  const [restaurants, setRestaurants, restaurantsCloud] = useAdminCloudList<RestaurantItem>('restaurants','mocchau_operator_restaurants');
+ 
+   const [searchTerm, setSearchTerm] = useState("");
+   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+@@ -101,13 +95,6 @@
+   const [formIsPartner, setFormIsPartner] = useState(false);
+   const [formCommission, setFormCommission] = useState(10);
+ 
+-  useEffect(() => {
+-    try {
+-      localStorage.setItem("mocchau_operator_restaurants", JSON.stringify(restaurants));
+-    } catch (e) {
+-      console.warn("Could not save restaurants to localStorage", e);
+-    }
+-  }, [restaurants]);
+ 
+   const handleOpenAdd = () => {
+     setEditingItem(null);
+@@ -208,6 +195,7 @@
+ 
+   return (
+     <div className="space-y-6">
++      {(restaurantsCloud.error || restaurantsCloud.saving) && <div role="status" className={`rounded-xl border p-3 text-xs font-semibold ${restaurantsCloud.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>{restaurantsCloud.error || 'Đang đồng bộ dữ liệu lên Firestore...'}</div>}
+       {/* Header bar */}
+       <div className="bg-white p-5 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-xs">
+         <div>
+--- a/src/components/operator/TaxiFleetManagement.tsx
++++ b/src/components/operator/TaxiFleetManagement.tsx
+@@ -1,3 +1,4 @@
++import {useAdminCloudList} from '../../hooks/useAdminCloudList';
+ import React, { useState, useEffect } from "react";
+ import { Car, Plus, Edit2, Trash2, Search, CheckCircle2, AlertCircle, Eye, EyeOff, MapPin, Phone, User, DollarSign, Filter } from "lucide-react";
+ 
+@@ -94,23 +95,9 @@
+ export default function TaxiFleetManagement() {
+   const [activeTab, setActiveTab] = useState<"fleet" | "requests">("fleet");
+   
+-  const [fleet, setFleet] = useState<TaxiVehicle[]>(() => {
+-    try {
+-      const saved = localStorage.getItem("mocchau_admin_taxi_fleet");
+-      return saved ? JSON.parse(saved) : INITIAL_TAXI_FLEET;
+-    } catch {
+-      return INITIAL_TAXI_FLEET;
+-    }
+-  });
+-
+-  const [requests, setRequests] = useState<TaxiRequest[]>(() => {
+-    try {
+-      const saved = localStorage.getItem("mocchau_admin_taxi_requests");
+-      return saved ? JSON.parse(saved) : INITIAL_REQUESTS;
+-    } catch {
+-      return INITIAL_REQUESTS;
+-    }
+-  });
++  const [fleet, setFleet, fleetCloud] = useAdminCloudList<TaxiVehicle>('taxi_fleet','mocchau_admin_taxi_fleet');
++
++  const [requests, setRequests, requestsCloud] = useAdminCloudList<TaxiRequest>('taxi_requests_legacy','mocchau_admin_taxi_requests');
+ 
+   const [searchTerm, setSearchTerm] = useState("");
+   const [seatFilter, setSeatFilter] = useState<string>("all");
+@@ -130,14 +117,10 @@
+   const [formStatus, setFormStatus] = useState<TaxiVehicle["status"]>("available");
+ 
+   // Save fleet to localStorage
+-  useEffect(() => {
+-    localStorage.setItem("mocchau_admin_taxi_fleet", JSON.stringify(fleet));
+-  }, [fleet]);
++
+ 
+   // Save requests to localStorage
+-  useEffect(() => {
+-    localStorage.setItem("mocchau_admin_taxi_requests", JSON.stringify(requests));
+-  }, [requests]);
++
+ 
+   const handleOpenVehicleModal = (veh?: TaxiVehicle) => {
+     if (veh) {
+@@ -229,6 +212,9 @@
+ 
+   return (
+     <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 sm:p-8 space-y-6 text-left" id="taxi_fleet_management_root">
++      {(fleetCloud.error || fleetCloud.saving) && <div role="status" className={`rounded-xl border p-3 text-xs font-semibold ${fleetCloud.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>{fleetCloud.error || 'Đang đồng bộ dữ liệu lên Firestore...'}</div>}
++      {(requestsCloud.error || requestsCloud.saving) && <div role="status" className={`rounded-xl border p-3 text-xs font-semibold ${requestsCloud.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>{requestsCloud.error || 'Đang đồng bộ dữ liệu lên Firestore...'}</div>}
++
+       {/* Top Header */}
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-stone-200 pb-4">
+         <div>
+--- a/src/components/operator/ZaloCommunityManagement.tsx
++++ b/src/components/operator/ZaloCommunityManagement.tsx
+@@ -124,8 +124,8 @@
+       };
+ 
+       const nextList = zaloGroups.map(g => g.id === updated.id ? updated : g);
++      await saveZaloGroupToFirebase(updated);
+       onUpdateZaloGroups(nextList);
+-      await saveZaloGroupToFirebase(updated);
+       showToast(`Đã cập nhật nhóm "${updated.name}" thành công!`);
+     } else {
+       // Add new
+@@ -143,8 +143,8 @@
+       };
+ 
+       const nextList = [...zaloGroups, newGroup];
++      await saveZaloGroupToFirebase(newGroup);
+       onUpdateZaloGroups(nextList);
+-      await saveZaloGroupToFirebase(newGroup);
+       showToast(`Đã thêm nhóm mới "${newGroup.name}"!`);
+     }
+ 
+@@ -158,8 +158,8 @@
+       updatedAt: new Date().toISOString()
+     };
+     const nextList = zaloGroups.map(g => g.id === group.id ? updated : g);
++    await saveZaloGroupToFirebase(updated);
+     onUpdateZaloGroups(nextList);
+-    await saveZaloGroupToFirebase(updated);
+     showToast(`Đã ${updated.isActive ? "kích hoạt hiển thị" : "ẩn"} nhóm "${group.name}"!`);
+   };
+ 
+@@ -174,8 +174,8 @@
+       updatedAt: new Date().toISOString()
+     };
+     const nextList = zaloGroups.map(g => g.id === groupId ? updated : g);
+-    onUpdateZaloGroups(nextList);
+     await deleteZaloGroupFromFirebase(groupId);
++    onUpdateZaloGroups(nextList.filter(g=>g.id!==groupId));
+     setDeleteConfirmId(null);
+     showToast(`Đã xóa nhóm "${group.name}" khỏi danh sách công khai.`);
+   };
+@@ -197,9 +197,9 @@
+       return g;
+     });
+ 
+-    onUpdateZaloGroups(nextList);
+     await saveZaloGroupToFirebase(updatedCurrent);
+     await saveZaloGroupToFirebase(updatedTarget);
++    onUpdateZaloGroups(nextList);
+     showToast("Đã cập nhật thứ tự hiển thị nhóm!");
+   };
+ 
+--- a/src/hooks/useAdminCloudList.ts
++++ b/src/hooks/useAdminCloudList.ts
+@@ -0,0 +1,79 @@
++import {useCallback, useEffect, useRef, useState} from 'react';
++import type {Dispatch, SetStateAction} from 'react';
++import {doc, onSnapshot, setDoc, serverTimestamp} from 'firebase/firestore';
++import {db, auth} from '../firebase';
++import {hasOperatorAccess} from '../lib/adminAccess';
++
++/**
++ * Cloud-backed admin list. A Firestore document is authoritative once it exists.
++ * Empty [] is a valid saved state: NEVER reseed sample data after deletion.
++ * Old device-only lists are migrated only after a deliberate edit by the operator.
++ * Saves are serialized, and errors are visible instead of silently local-only.
++ * Do not use for sensitive payments, roles, or wallet transactions.
++ */
++export function useAdminCloudList<T>(key:string, legacyLocalKey:string):[
++  T[],Dispatch<SetStateAction<T[]>>,{saving:boolean;error:string;loaded:boolean}
++]{
++  const readLegacy=():T[]=>{
++    try {const value=JSON.parse(localStorage.getItem(legacyLocalKey)||'null');return Array.isArray(value)?value:[]}
++    catch{return []}
++  };
++  const [items,setItems]=useState<T[]>(readLegacy);
++  const [saving,setSaving]=useState(false);
++  const [error,setError]=useState('');
++  const [loaded,setLoaded]=useState(false);
++  const last=useRef<T[]>(items);
++  const confirmed=useRef<T[]>(items);
++  const queue=useRef<Promise<void>>(Promise.resolve());
++  const pending=useRef(0);
++  const mounted=useRef(true);
++  const target=doc(db,'admin_collections',key);
++
++  useEffect(()=>{
++    mounted.current=true;
++    return ()=>{mounted.current=false};
++  },[]);
++
++  useEffect(()=>onSnapshot(target,snapshot=>{
++    setLoaded(true);
++    if(!snapshot.exists()) return; // Keep legacy local rows until explicit migration.
++    const remote=snapshot.data().items;
++    if(!Array.isArray(remote)) {setError('Dữ liệu quản lý trên máy chủ không hợp lệ.');return}
++    confirmed.current=remote as T[];
++    if(pending.current===0){last.current=remote as T[];setItems(remote as T[])}
++  },err=>{
++    setLoaded(true);
++    setError('Không đồng bộ được dữ liệu Quản lý: '+(err?.message||'Lỗi không xác định'));
++  }),[key]);
++
++  const update=useCallback<Dispatch<SetStateAction<T[]>>>((action)=>{
++    const next=typeof action==='function' ? (action as (value:T[])=>T[])(last.current) : action;
++    last.current=next;
++    setItems(next); // optimistic UI; rollback if write fails
++    setSaving(true);
++    setError('');
++    pending.current++;
++    queue.current=queue.current.catch(()=>{}).then(async()=>{
++      const user=auth.currentUser;
++      if(!user)throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập Admin lại.');
++      const token=await user.getIdTokenResult(true);
++      if(!hasOperatorAccess(token))throw new Error('Không có quyền quản trị. Kiểm tra quyền Firebase của tài khoản này.');
++      await setDoc(doc(db,'admin_collections',key),{
++        items:next, updatedAt:serverTimestamp(), updatedBy:user.uid
++      });
++      confirmed.current=next;
++      try{localStorage.setItem(legacyLocalKey,JSON.stringify(next))}catch{}
++    }).catch(err=>{
++      console.error('Admin cloud write failed:',key,err);
++      if(mounted.current){
++        setError('Lưu thất bại: '+(err?.message||'Không được Firebase cho phép.'));
++        last.current=confirmed.current;
++        setItems(confirmed.current);
++      }
++    }).finally(()=>{
++      pending.current=Math.max(0,pending.current-1);
++      if(mounted.current)setSaving(pending.current>0);
++    });
++  },[key,legacyLocalKey]);
++  return [items,update,{saving,error,loaded}];
++}
+--- a/src/hooks/useFirebaseSync.ts
++++ b/src/hooks/useFirebaseSync.ts
+@@ -1,6 +1,8 @@
+ import { useState, useEffect } from "react";
+ import { collection, doc, onSnapshot, getDocs, setDoc, query, where } from "firebase/firestore";
+ import { onAuthStateChanged } from "firebase/auth";
++import { hasOperatorAccess } from "../lib/adminAccess";
++import { ensureMemberProfile } from "../lib/memberProfile";
+ import { db, auth, handleFirestoreError, OperationType } from "../firebase";
+ import { Booking, BlockedSeat, User, AppNotification, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, Driver, ZaloGroup } from "../types";
+ import { INITIAL_COMBOS } from "../data/combos";
+@@ -20,6 +22,7 @@
+   const [blockedSeats, setBlockedSeats] = useState<BlockedSeat[]>([]);
+   const [users, setUsers] = useState<User[]>([]);
+   const [notifications, setNotifications] = useState<AppNotification[]>([]);
++  const [reportedBookingIds, setReportedBookingIds] = useState<string[]>([]);
+   
+   // Use data from local data defaults or sync config if needed
+   // For simplicity, sticking to initial data arrays for global configs, unless updated by admin
+@@ -45,7 +48,9 @@
+       }
+       try {
+         const token = await firebaseUser.getIdTokenResult();
+-        const isAdmin = token.claims.admin === true || token.claims.operator === true;
++        const isAdmin = hasOperatorAccess(token);
++        // Idempotent: a new UID gets 10 welcome points once; old members keep their balance.
++        try { await ensureMemberProfile(firebaseUser, isAdmin); } catch (err) { console.warn("Member profile sync unavailable", err); }
+         unsubscribeProfile = onSnapshot(doc(db, "users", firebaseUser.uid), snap => {
+           if (snap.exists()) {
+             const profile = snap.data() as User;
+@@ -109,6 +114,7 @@
+     let unsubBlocked = () => {};
+     let unsubConfigs = () => {};
+     let unsubNotifications = () => {};
++    let unsubReports = () => {};
+     let unsubCombosCol = () => {};
+     let unsubAccCol = () => {};
+     let unsubArticlesCol = () => {};
+@@ -117,101 +123,58 @@
+     let unsubZaloGroups = () => {};
+ 
+     if (authReady) {
+-      // Bookings: Public read access now allowed by rules, operator gets all, customers can filter frontend
+-      unsubBookings = onSnapshot(collection(db, "bookings"), (snap) => {
+-        console.log("Bookings snapshot received", snap.size);
+-        const fetchedBookings = snap.docs.map(d => d.data() as Booking);
+-        setAllBookings(fetchedBookings);
+-        const deviceId = getDeviceId();
+-        
+-        if (currentUser?.role === 'operator') {
+-          setBookings(fetchedBookings);
+-        } else {
+-          // Show only bookings from this device
+-          setBookings(fetchedBookings.filter(b => (b as any).deviceId === deviceId));
+-        }
+-      }, (error) => handleFirestoreError(error, OperationType.LIST, "bookings"));
++      // Never subscribe to all passengers' bookings from a public browser.
++      // Guest bookings are stored locally only after a confirmed Firestore write.
++      if (currentUser?.role === 'operator') {
++        unsubBookings = onSnapshot(collection(db, 'bookings'), snap => {
++          const records = snap.docs.map(d => d.data() as Booking);
++          setAllBookings(records);
++          setBookings(records);
++        }, err => handleFirestoreError(err, OperationType.LIST, 'bookings'));
++      } else if (auth.currentUser && currentUser?.id) {
++        unsubBookings = onSnapshot(query(collection(db, 'bookings'), where('userId','==',currentUser.id)), snap => {
++          const remote = snap.docs.map(d => d.data() as Booking);
++          const ownLocal = getLocalList<Booking>('bookings', []).filter(b=>b.userId===currentUser.id);
++          const merged = new Map<string,Booking>(ownLocal.map(b=>[b.id,b]));
++          remote.forEach(b=>merged.set(b.id,{...b,paymentReported:b.paymentReported || merged.get(b.id)?.paymentReported}));
++          setBookings([...merged.values()]);
++          setAllBookings([]);
++        }, err => handleFirestoreError(err, OperationType.LIST, 'bookings'));
++      } else {
++        setAllBookings([]);
++        setBookings(getLocalList<Booking>('bookings', []));
++      }
+ 
+       unsubCombosCol = onSnapshot(collection(db, "tour_combos"), (snap) => {
+-        if (snap.empty) {
+-          setCombos(INITIAL_COMBOS);
+-          if (currentUser?.role === 'operator' && auth.currentUser) {
+-            console.log("Seeding initial combos to tour_combos...");
+-            INITIAL_COMBOS.forEach(item => {
+-              setDoc(doc(db, "tour_combos", item.id), item).catch(() => {});
+-            });
+-          }
+-        } else {
+-          setCombos(snap.docs.map(d => d.data() as TourCombo));
+-        }
++        setCombos(snap.docs.map(d => d.data() as TourCombo));
+       }, (error) => {
+         handleFirestoreError(error, OperationType.LIST, "tour_combos");
+         setCombos(getLocalList<TourCombo>("combos", INITIAL_COMBOS));
+       });
+ 
+       unsubAccCol = onSnapshot(collection(db, "accommodations"), (snap) => {
+-        if (snap.empty) {
+-          setAccommodations(INITIAL_ACCOMMODATIONS);
+-          if (currentUser?.role === 'operator' && auth.currentUser) {
+-            console.log("Seeding initial accommodations...");
+-            INITIAL_ACCOMMODATIONS.forEach(item => {
+-              setDoc(doc(db, "accommodations", item.id), item).catch(() => {});
+-            });
+-          }
+-        } else {
+-          setAccommodations(snap.docs.map(d => d.data() as Accommodation));
+-        }
++        setAccommodations(snap.docs.map(d => d.data() as Accommodation));
+       }, (error) => {
+         handleFirestoreError(error, OperationType.LIST, "accommodations");
+         setAccommodations(getLocalList<Accommodation>("accommodations", INITIAL_ACCOMMODATIONS));
+       });
+ 
+       unsubArticlesCol = onSnapshot(collection(db, "guide_articles"), (snap) => {
+-        if (snap.empty) {
+-          setArticles(INITIAL_ARTICLES);
+-          if (currentUser?.role === 'operator' && auth.currentUser) {
+-            console.log("Seeding initial guide articles...");
+-            INITIAL_ARTICLES.forEach(item => {
+-              setDoc(doc(db, "guide_articles", item.id), item).catch(() => {});
+-            });
+-          }
+-        } else {
+-          setArticles(snap.docs.map(d => d.data() as GuideArticle));
+-        }
++        setArticles(snap.docs.map(d => d.data() as GuideArticle));
+       }, (error) => {
+         handleFirestoreError(error, OperationType.LIST, "guide_articles");
+         setArticles(getLocalList<GuideArticle>("articles", INITIAL_ARTICLES));
+       });
+ 
+       unsubCouponsCol = onSnapshot(collection(db, "coupons"), (snap) => {
+-        if (snap.empty) {
+-          setCoupons(INITIAL_COUPONS);
+-          if (currentUser?.role === 'operator' && auth.currentUser) {
+-            console.log("Seeding initial coupons...");
+-            INITIAL_COUPONS.forEach(item => {
+-              setDoc(doc(db, "coupons", item.id), item).catch(() => {});
+-            });
+-          }
+-        } else {
+-          setCoupons(snap.docs.map(d => d.data() as Coupon));
+-        }
++        setCoupons(snap.docs.map(d => d.data() as Coupon));
+       }, (error) => {
+         handleFirestoreError(error, OperationType.LIST, "coupons");
+         setCoupons(getLocalList<Coupon>("coupons", INITIAL_COUPONS));
+       });
+ 
+       unsubDestinationsCol = onSnapshot(collection(db, "destinations"), (snap) => {
+-        if (snap.empty) {
+-          setDestinations(INITIAL_DESTINATIONS);
+-          if (currentUser?.role === 'operator' && auth.currentUser) {
+-            console.log("Seeding initial destinations...");
+-            INITIAL_DESTINATIONS.forEach(item => {
+-              setDoc(doc(db, "destinations", item.id), item).catch(() => {});
+-            });
+-          }
+-        } else {
+-          setDestinations(snap.docs.map(d => d.data() as Destination));
+-        }
++        setDestinations(snap.docs.map(d => d.data() as Destination));
+       }, (error) => {
+         handleFirestoreError(error, OperationType.LIST, "destinations");
+         setDestinations(getLocalList<Destination>("destinations", INITIAL_DESTINATIONS));
+@@ -247,44 +210,31 @@
+              if (data.locations) setLocations(data.locations);
+              if (data.drivers && Array.isArray(data.drivers)) setDrivers(data.drivers);
+            });
+-         } else {
+-           // Create initial configs document quietly if operator exists (first run)
+-           if (currentUser?.role === 'operator' && auth.currentUser) {
+-             const initialData = {
+-               limousineConfig: DEFAULT_LIMOUSINE_CONFIG,
+-               sharedCarConfig: DEFAULT_SHARED_CAR_CONFIG,
+-               locations: INITIAL_LOCATIONS,
+-               drivers: INITIAL_DRIVERS,
+-             };
+-             Object.entries(initialData).forEach(([key, val]) => {
+-               setDoc(doc(db, "configs", key), { [key]: val }).catch(() => {});
+-             });
+-           }
+          }
++
+       }, (error) => handleFirestoreError(error, OperationType.LIST, "configs"));
+ 
+-      // Notifications
+-      unsubNotifications = onSnapshot(collection(db, "notifications"), (snap) => {
+-        const allNotifs = snap.docs.map(d => d.data() as AppNotification);
+-        const deviceId = getDeviceId();
+-        
+-        const filtered = currentUser?.role === 'operator' 
+-          ? allNotifs 
+-          : allNotifs.filter(n => 
+-              n.deviceId === deviceId || 
+-              n.deviceId === "all" || 
+-              (currentUser?.phone && (n.targetPhone === currentUser.phone || n.metadata?.customerPhone === currentUser.phone))
+-            );
+-
+-        setNotifications(filtered.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+-      }, (error) => handleFirestoreError(error, OperationType.LIST, "notifications"));
++      // Legacy notifications contain customer details; operator-only live feed.
++      if (currentUser?.role === 'operator') {
++        unsubNotifications = onSnapshot(collection(db, 'notifications'), snap => {
++          setNotifications(snap.docs.map(d => d.data() as AppNotification).sort((a,b)=>
++            new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime()));
++        }, err => handleFirestoreError(err, OperationType.LIST, 'notifications'));
++      } else {
++        setNotifications([]);
++      }
++
++      // Reports are independent, append-only signals from guests, not proof of payment.
++      if(currentUser?.role==='operator') {
++        unsubReports=onSnapshot(collection(db,'payment_reports'),snap=>{
++          setReportedBookingIds([...new Set(snap.docs.map(d=>String(d.data().bookingId||'')).filter(Boolean))]);
++        },err=>handleFirestoreError(err,OperationType.LIST,'payment_reports'));
++      } else setReportedBookingIds([]);
+ 
+       // Zalo Groups - public read for community
+       unsubZaloGroups = onSnapshot(collection(db, "zalo_groups"), (snap) => {
+-        if (!snap.empty) {
+-          const list = snap.docs.map(d => d.data() as ZaloGroup);
+-          setZaloGroups(list.sort((a, b) => (a.order || 0) - (b.order || 0)));
+-        }
++        const list = snap.docs.map(d => d.data() as ZaloGroup);
++        setZaloGroups(list.sort((a, b) => (a.order || 0) - (b.order || 0)));
+       }, (error) => {
+         console.warn("Could not read zalo_groups from Firestore, using local defaults:", error);
+         setZaloGroups(getLocalList<ZaloGroup>("zalo_groups", INITIAL_ZALO_GROUPS));
+@@ -296,6 +246,7 @@
+       unsubBlocked();
+       unsubConfigs();
+       unsubNotifications();
++      unsubReports();
+       unsubCombosCol();
+       unsubAccCol();
+       unsubArticlesCol();
+@@ -308,6 +259,7 @@
+   useEffect(() => {
+     const handleUpdate = () => {
+       if (!auth.currentUser) {
++        setBookings(getLocalList<Booking>('bookings',[]));
+         // Read from localStorage fallbacks
+         
+         const localBlocked = getLocalList<BlockedSeat>("blocked_seats", []);
+@@ -361,6 +313,7 @@
+     setUsers,
+     notifications,
+     setNotifications,
++    reportedBookingIds,
+     combos,
+     setCombos,
+     accommodations,
+--- a/src/lib/adminAccess.ts
++++ b/src/lib/adminAccess.ts
+@@ -0,0 +1,11 @@
++import type { IdTokenResult } from 'firebase/auth';
++
++// Legacy owner fallback: verified Firebase identity only. Migrate to server-side
++// Firebase custom claims (admin/operator) before adding other operators.
++export const OWNER_EMAILS = ['hquansl001@gmail.com', 'nhaxe@mocchau.vn'];
++export function hasOperatorAccess(token: IdTokenResult | null | undefined): boolean {
++  if (!token) return false;
++  if (token.claims.admin === true || token.claims.operator === true) return true;
++  const email = String(token.claims.email || '').trim().toLowerCase();
++  return token.claims.email_verified === true && OWNER_EMAILS.includes(email);
++}
+--- a/src/lib/firebaseUtils.ts
++++ b/src/lib/firebaseUtils.ts
+@@ -1,6 +1,6 @@
+-import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
++import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy, runTransaction } from "firebase/firestore";
+ import { db, auth, handleFirestoreError, OperationType } from "../firebase";
+-import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review, ZaloGroup, CommunityQuestion } from "../types";
++import { Booking, User, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review, ZaloGroup, CommunityQuestion } from "../types";
+ 
+ // Let's get things from localStorage
+ export const getDeviceId = (): string => {
+@@ -37,6 +37,7 @@
+     console.log("Review saved to Firebase successfully");
+   } catch (error) {
+     console.error("Error saving review to Firebase:", error);
++    throw error;
+   }
+ };
+ 
+@@ -46,6 +47,7 @@
+     console.log("Review deleted from Firebase successfully");
+   } catch (error) {
+     console.error("Error deleting review from Firebase:", error);
++    throw error;
+   }
+ };
+ 
+@@ -69,66 +71,95 @@
+ };
+ 
+ export const saveBookingToFirebase = async (booking: Booking) => {
+-  // Sync to local first for immediate feedback
+-  const current = getLocalList<Booking>("bookings", []);
+-  const existingIndex = current.findIndex(b => b.id === booking.id);
+-  if (existingIndex > -1) {
+-    current[existingIndex] = booking;
+-  } else {
+-    current.push(booking);
+-  }
+-  setLocalList("bookings", current);
+-
+-  if (true) { // Try saving to Firebase regardless of auth state
+-    console.log("Attempting to save booking to Firebase");
+-    try {
+-      // Remove undefined values and add deviceId
+-      const sanitizedBooking = JSON.parse(JSON.stringify(booking));
+-      sanitizedBooking.deviceId = getDeviceId();
+-      await setDoc(doc(db, "bookings", booking.id), sanitizedBooking);
+-      console.log("Booking saved to Firebase successfully");
+-    } catch (error) {
+-      console.warn("Could not sync booking to Firebase, saved locally:", error);
+-    }
+-  }
+-};
+-
+-export const updateStatusInFirebase = async (id: string, data: any, collectionName: string = "bookings") => {
+-  // Try saving to Firebase regardless of auth state
+-  try {
+-    const sanitizedData = JSON.parse(JSON.stringify(data));
++  // A saved booking must be acknowledged by Firebase before the deposit modal opens.
++  const sanitized = JSON.parse(JSON.stringify(booking));
++  sanitized.deviceId = getDeviceId();
++  if(!sanitized.userId)sanitized.userId = '';
++  const bookingRef=doc(db,'bookings',booking.id);
++  const pointsToSpend=Math.max(0,Math.floor(Number(booking.pointsDeducted||0)));
++  const couponCode=typeof booking.couponCode==='string'?booking.couponCode.trim().toUpperCase():'';
++  try {
++    if(pointsToSpend>0 || couponCode) {
++      const uid=auth.currentUser?.uid;
++      if(!uid || booking.userId!==uid)throw new Error('Cần đăng nhập hội viên để dùng điểm hoặc voucher.');
++      const profileRef=doc(db,'users',uid);
++      await runTransaction(db,async tx=>{
++        const [profileDoc,bookingDoc] = await Promise.all([tx.get(profileRef),tx.get(bookingRef)]);
++        if(bookingDoc.exists())throw new Error('Mã đặt vé đã tồn tại, vui lòng kiểm tra lại.');
++        if(!profileDoc.exists())throw new Error('Không tìm thấy ví điểm hội viên.');
++        const profile=profileDoc.data() as User;
++        const prior=Number(profile.completedBookingsCount||0) || (profile.rewardedBookingIds||[]).length;
++        if(prior < 1)throw new Error('Điểm và voucher chỉ sử dụng từ lần đặt vé thứ hai.');
++        const balance=Math.max(0,Number(profile.points||0));
++        if(pointsToSpend>balance)throw new Error('Số dư điểm không đủ.');
++        const used=Array.isArray(profile.usedCoupons)?profile.usedCoupons:[];
++        if(couponCode && used.includes(couponCode))throw new Error('Voucher đã dùng.');
++        // Voucher pricing must still be verified by Admin at confirmation.
++        const changes:any={};
++        if(pointsToSpend>0)changes.points=balance-pointsToSpend;
++        if(couponCode)changes.usedCoupons=[...used,couponCode];
++        tx.update(profileRef,changes);
++        tx.set(bookingRef,sanitized);
++      });
++    } else {
++      await setDoc(bookingRef,sanitized);
++    }
++    const existing=getLocalList<Booking>('bookings',[]);
++    setLocalList('bookings',[...existing.filter(b=>b.id!==booking.id),sanitized]);
++  } catch(error:any) {
++    console.error('Booking NOT saved:',error);
++    throw new Error(error?.message || 'Chưa lưu được đơn đặt vé lên Firebase. Không chuyển khoản khi chưa có mã đơn.');
++  }
++};
++
++export const updateStatusInFirebase = async (id: string, data: any, collectionName: string = 'bookings') => {
++  const sanitizedData = JSON.parse(JSON.stringify(data));
++  try {
+     await setDoc(doc(db, collectionName, id), sanitizedData, { merge: true });
+-    console.log(`Successfully updated ${id} in ${collectionName}`);
+   } catch (error) {
+-    console.warn(`Could not update ${id} in ${collectionName} to Firebase:`, error);
+-  }
+-
+-  // Also sync locally if it's bookings
+-  if (collectionName === "bookings") {
+-    const current = getLocalList<Booking>("bookings", []);
+-    const existingIndex = current.findIndex(b => b.id === id);
+-    if (existingIndex > -1) {
+-      current[existingIndex] = { ...current[existingIndex], ...data };
+-      setLocalList("bookings", current);
+-    }
+-  }
+-};
+-
+-export const updateBookingStatusInFirebase = async (bookingId: string, booking: Booking) => {
+-  await updateStatusInFirebase(bookingId, booking, "bookings");
+-};
++    console.error(`Firestore update failed: ${collectionName}/${id}`, error);
++    throw error;
++  }
++  if (collectionName === 'bookings') {
++    const current = getLocalList<Booking>('bookings', []);
++    const idx = current.findIndex(b=>b.id===id);
++    if (idx >= 0) {
++      current[idx] = {...current[idx],...data};
++      setLocalList('bookings',current);
++    }
++  }
++};
++
++export const updateBookingStatusInFirebase = async (id: string, booking: Booking) =>
++  updateStatusInFirebase(id, booking, 'bookings');
++
++/** Admin-only status +1-point reward, idempotent on booking ID. */
++export async function updateBookingStatusWithRewards(bookingId:string,status:Booking['status']):Promise<void> {
++  const ref=doc(db,'bookings',bookingId);
++  await runTransaction(db,async transaction=>{
++    const snapshot=await transaction.get(ref);
++    if(!snapshot.exists())throw new Error('Không tìm thấy đơn đặt vé.');
++    const booking=snapshot.data() as Booking;
++    const profileRef=booking.userId?doc(db,'users',booking.userId):null;
++    const profileSnap=profileRef?await transaction.get(profileRef):null;
++    if(profileRef && profileSnap?.exists() && (status==='success'||status==='completed')) {
++      const profile=profileSnap.data() as User;
++      const rewarded=Array.isArray(profile.rewardedBookingIds)?profile.rewardedBookingIds:[];
++      if(!rewarded.includes(bookingId)){
++        transaction.update(profileRef,{
++          points:Math.max(0,Number(profile.points||0))+1,
++          rewardedBookingIds:[...rewarded,bookingId],
++          completedBookingsCount:Math.max(0,Number(profile.completedBookingsCount||0))+1
++        });
++      }
++    }
++    transaction.update(ref,{status});
++  });
++}
+ 
+ export const deleteBookingFromFirebase = async (bookingId: string) => {
+-  const current = getLocalList<Booking>("bookings", []);
+-  const nextList = current.filter(b => b.id !== bookingId);
+-  setLocalList("bookings", nextList);
+-
+-  try {
+-    await deleteDoc(doc(db, "bookings", bookingId));
+-    console.log("Booking deleted from Firebase successfully");
+-  } catch (error) {
+-    console.warn("Could not delete booking from Firebase, removed locally:", error);
+-  }
++  await deleteDoc(doc(db,'bookings',bookingId));
++  setLocalList('bookings',getLocalList<Booking>('bookings',[]).filter(b=>b.id!==bookingId));
+ };
+ 
+ export const saveBlockedSeatToFirebase = async (seat: BlockedSeat) => {
+@@ -167,16 +198,6 @@
+ };
+ 
+ export const saveConfigToFirebase = async (key: string, data: any) => {
+-  try {
+-    const configsStr = localStorage.getItem(`xemc_configs`) || "{}";
+-    const configs = JSON.parse(configsStr);
+-    configs[key] = data;
+-    localStorage.setItem(`xemc_configs`, JSON.stringify(configs));
+-    window.dispatchEvent(new Event("xedimocchau_db_update"));
+-  } catch (e) {
+-    console.error(e);
+-  }
+-
+   // Split storage: Save each key into its own document or collection
+   try {
+     const sanitizedData = JSON.parse(JSON.stringify(data));
+@@ -225,73 +246,44 @@
+     if (error.code === 'permission-denied') {
+        alert(`Lỗi: Bạn không có quyền sửa nội dung này trên máy chủ (Permission Denied).`);
+     } else {
+-       alert(`Lỗi khi lưu ${key} lên máy chủ: ${error.message || 'Lỗi mạng'}. Dữ liệu chỉ được lưu tạm thời trên máy này.`);
++       alert(`Lỗi khi lưu ${key} lên máy chủ: ${error.message || 'Lỗi mạng'}. Không cập nhật dữ liệu trên máy.`);
+     }
+     throw error;
+   }
++  // Cache is updated only after the cloud write succeeded.
++  const configs = JSON.parse(localStorage.getItem('xemc_configs') || '{}');
++  configs[key] = data;
++  localStorage.setItem('xemc_configs',JSON.stringify(configs));
++  window.dispatchEvent(new Event('xedimocchau_db_update'));
+ };
+ 
+ export const saveUserToFirebase = async (userId: string, data: any) => {
+-  const current = getLocalList<any>("users", []);
+-  const existingIndex = current.findIndex(u => u.id === userId);
+-  if (existingIndex > -1) {
+-    current[existingIndex] = { ...current[existingIndex], ...data };
+-  } else {
+-    current.push({ id: userId, ...data });
+-  }
+-  setLocalList("users", current);
+-
+-  if (true) {
+-    try {
+-      await setDoc(doc(db, "users", userId), data, { merge: true });
+-    } catch (error) {
+-      console.warn("Could not save user to Firebase, saved locally:", error);
+-    }
+-  }
++  // Never write role, wallet, email credentials or plaintext passwords from UI.
++  const {name, phone, address, favPickup, favDropoff} = data;
++  await setDoc(doc(db,'users',userId),{name,phone,address:address||'',favPickup:favPickup||'',favDropoff:favDropoff||''},{merge:true});
++  const list = getLocalList<any>('users',[]);
++  const record = {id:userId,name,phone,address,favPickup,favDropoff};
++  const index=list.findIndex(u=>u.id===userId);
++  if(index>=0)list[index]={...list[index],...record};else list.push(record);
++  setLocalList('users',list);
+ };
+ 
+ export const saveNotificationToFirebase = async (notification: AppNotification) => {
+-  if (true) {
+-    try {
+-      // Remove undefined values
+-      const sanitizedNotification = JSON.parse(JSON.stringify(notification));
+-      await setDoc(doc(db, "notifications", notification.id), sanitizedNotification);
+-    } catch (error) {
+-      console.warn("Could not save notification to Firebase:", error);
+-    }
+-  }
++  const sanitized = JSON.parse(JSON.stringify(notification));
++  await setDoc(doc(db,'notifications',notification.id),sanitized);
+ };
+ 
+ export const saveZaloGroupToFirebase = async (group: ZaloGroup) => {
+-  const current = getLocalList<ZaloGroup>("zalo_groups", []);
+-  const existingIdx = current.findIndex(g => g.id === group.id);
+-  if (existingIdx > -1) {
+-    current[existingIdx] = group;
+-  } else {
+-    current.push(group);
+-  }
+-  setLocalList("zalo_groups", current);
+-
+-  try {
+-    const sanitized = JSON.parse(JSON.stringify(group));
+-    await setDoc(doc(db, "zalo_groups", group.id), sanitized, { merge: true });
+-    console.log(`Zalo group ${group.id} saved to Firestore`);
+-  } catch (err) {
+-    console.warn("Could not save zalo_group to Firestore, saved locally:", err);
+-  }
+-};
+-
++  const sanitized=JSON.parse(JSON.stringify(group));
++  try { await setDoc(doc(db,'zalo_groups',group.id),sanitized,{merge:true}); }
++  catch(error){alert('Lưu nhóm Zalo thất bại. Kiểm tra quyền Admin và Firebase.');throw error;}
++  const list=getLocalList<ZaloGroup>('zalo_groups',[]);
++  setLocalList('zalo_groups',[...list.filter(g=>g.id!==group.id),group]);
++};
+ export const deleteZaloGroupFromFirebase = async (id: string) => {
+-  const current = getLocalList<ZaloGroup>("zalo_groups", []);
+-  const updated = current.filter(g => g.id !== id);
+-  setLocalList("zalo_groups", updated);
+-
+-  try {
+-    await deleteDoc(doc(db, "zalo_groups", id));
+-    console.log(`Zalo group ${id} deleted from Firestore`);
+-  } catch (err) {
+-    console.warn("Could not delete zalo_group from Firestore:", err);
+-  }
++  try { await deleteDoc(doc(db,'zalo_groups',id)); }
++  catch(error){alert('Xóa nhóm Zalo thất bại. Kiểm tra quyền Admin và Firebase.');throw error;}
++  setLocalList('zalo_groups',getLocalList<ZaloGroup>('zalo_groups',[]).filter(g=>g.id!==id));
+ };
+ 
+ export const saveCommunityQuestionToFirebase = async (question: CommunityQuestion) => {
+--- a/src/lib/memberProfile.ts
++++ b/src/lib/memberProfile.ts
+@@ -0,0 +1,40 @@
++import type { User as FirebaseAuthUser } from 'firebase/auth';
++import { doc, runTransaction } from 'firebase/firestore';
++import { db } from '../firebase';
++import type { User } from '../types';
++
++/** New accounts only. No backfill for old accounts without verified history. */
++export async function ensureMemberProfile(account: FirebaseAuthUser, isAdmin = false, preferredName = '', preferredPhone = ''): Promise<User> {
++  const memberRef = doc(db, 'users', account.uid);
++  return runTransaction(db, async transaction => {
++    const snapshot = await transaction.get(memberRef);
++    const existing = snapshot.exists() ? snapshot.data() : null;
++    if (!existing) {
++      const profile: User = {
++        id: account.uid,
++        email: account.email || '',
++        name: preferredName || account.displayName || account.email || 'Thành viên',
++        phone: preferredPhone || account.phoneNumber || '',
++        points: isAdmin ? 0 : 10,
++        role: 'customer',
++        ...(!isAdmin ? {welcomeBonusGranted:true, welcomeBonusPoints:10, welcomeBonusAt:new Date().toISOString()} : {})
++      };
++      transaction.set(memberRef,{ ...profile,createdAt:new Date().toISOString() });
++      return {...profile,role:isAdmin ? 'operator' : 'customer'};
++    }
++    const profile: User = {
++      ...(existing as User),
++      id: account.uid,
++      email: account.email || existing.email || '',
++      name: preferredName || existing.name || account.displayName || 'Thành viên',
++      phone: preferredPhone || existing.phone || '',
++      points: Number(existing.points || 0),
++      role: isAdmin ? 'operator' : 'customer'
++    };
++    const changes: Record<string,string> = {};
++    if (preferredName && preferredName !== existing.name) changes.name = preferredName;
++    if (preferredPhone && preferredPhone !== existing.phone) changes.phone = preferredPhone;
++    if (Object.keys(changes).length) transaction.update(memberRef, changes);
++    return profile;
++  });
++}
+--- a/src/lib/siteContent.ts
++++ b/src/lib/siteContent.ts
+@@ -1,6 +1,7 @@
+ import {doc, onSnapshot, setDoc, serverTimestamp} from 'firebase/firestore';
+ import {getStorage, ref, uploadBytes, getDownloadURL} from 'firebase/storage';
+ import {auth, db} from '../firebase';
++import {hasOperatorAccess} from './adminAccess';
+ import {useEffect,useState} from 'react';
+ 
+ export interface HomeTile {id:string; title:string; subtitle:string; icon:string; target:string; visible:boolean}
+@@ -51,7 +52,7 @@
+   const user=auth.currentUser;
+   if(!user) throw new Error('Bạn cần đăng nhập Firebase để xuất bản.');
+   const token=await user.getIdTokenResult(true);
+-  if(token.claims.admin!==true && token.claims.operator!==true) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase (custom claim).');
++  if(!hasOperatorAccess(token)) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase (custom claim).');
+   const secure=(s:string)=>s.startsWith('/')||/^https:\/\//i.test(s);
+   if(!secure(content.logoUrl)||!secure(content.heroImageUrl)||content.stories.some(x=>x.imageUrl&&!secure(x.imageUrl)))throw new Error('Đường dẫn ảnh chỉ được dùng HTTPS hoặc đường dẫn nội bộ.');
+   await setDoc(doc(db,'site_content','public'),{...content,updatedAt:serverTimestamp(),updatedBy:user.uid});
+@@ -62,7 +63,7 @@
+   const user=auth.currentUser;
+   if(!user)throw new Error('Vui lòng đăng nhập Admin.');
+   const token=await user.getIdTokenResult(true);
+-  if(token.claims.admin!==true&&token.claims.operator!==true)throw new Error('Chưa được cấp quyền tải ảnh quản trị.');
++  if(!hasOperatorAccess(token))throw new Error('Chưa được cấp quyền tải ảnh quản trị.');
+   const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-70);
+   const location=ref(getStorage(),`site-media/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safeName}`);
+   await uploadBytes(location,file,{contentType:file.type});
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -77,6 +77,8 @@
+   driverPhone?: string; // Số điện thoại lái xe
+   vehiclePlate?: string; // Biển số xe đưa đón khách
+   status: 'pending' | 'success' | 'completed' | 'cancelled';
++  paymentReported?: boolean;
++  paymentReportedAt?: string;
+   notes?: string;
+   couponCode?: string;
+   pointsDeducted?: number;
+@@ -145,6 +147,11 @@
+   email?: string;
+   role: 'customer' | 'operator';
+   points: number; // Earned points: 1 point = 1,000 VND
++  welcomeBonusGranted?: boolean;
++  welcomeBonusPoints?: number;
++  welcomeBonusAt?: string;
++  rewardedBookingIds?: string[];
++  completedBookingsCount?: number;
+   usedCoupons?: string[];
+   address?: string;
+   favPickup?: string;
+--- a/storage.rules
++++ b/storage.rules
+@@ -4,7 +4,9 @@
+     match /site-media/{fileName} {
+       allow read: if true;
+       allow write: if request.auth != null &&
+-        (request.auth.token.admin == true || request.auth.token.operator == true) &&
++        (request.auth.token.admin == true || request.auth.token.operator == true ||
++         (request.auth.token.email_verified == true &&
++          request.auth.token.email in ['hquansl001@gmail.com','nhaxe@mocchau.vn'])) &&
+         request.resource.size < 5 * 1024 * 1024 &&
+         request.resource.contentType.matches('image/(jpeg|png|webp)');
+     }
