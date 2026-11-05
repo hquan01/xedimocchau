@@ -450,6 +450,11 @@ export const saveCollectionItemsToLocalAndFirebase = async (collectionName: stri
 };
 
 export const saveUserToFirebase = async (userId: string, data: any) => {
+  if(githubMode()){
+    const {gh}=await import('../client/githubApi');
+    await gh.patch('users',userId,data);
+    return;
+  }
   const current = getLocalList<any>("users", []);
   const existingIndex = current.findIndex(u => u.id === userId);
   if (existingIndex > -1) {
@@ -468,6 +473,11 @@ export const saveUserToFirebase = async (userId: string, data: any) => {
 };
 
 export const saveNotificationToFirebase = async (notification: AppNotification) => {
+  if(githubMode()){
+    const {gh}=await import('../client/githubApi');
+    await gh.create('notifications',notification);
+    return;
+  }
   try {
     const sanitizedNotification = JSON.parse(JSON.stringify(notification));
     await setDoc(doc(db, "notifications", notification.id), sanitizedNotification);
@@ -478,6 +488,15 @@ export const saveNotificationToFirebase = async (notification: AppNotification) 
 };
 
 export const saveZaloGroupToFirebase = async (group: ZaloGroup) => {
+  if(githubMode()){
+    const {gh}=await import('../client/githubApi');
+    const list=await gh.list('zalo_groups');
+    const exists=list.items.some((row:any)=>row.id===group.id);
+    if(exists)await gh.patch('zalo_groups',group.id,group);
+    else await gh.create('zalo_groups',group);
+    setLocalList('zalo_groups',list.items.filter((row:any)=>row.id!==group.id).concat(group));
+    return;
+  }
   const current = getLocalList<ZaloGroup>("zalo_groups", []);
   const existingIdx = current.findIndex(g => g.id === group.id);
   if (existingIdx > -1) {
@@ -498,6 +517,12 @@ export const saveZaloGroupToFirebase = async (group: ZaloGroup) => {
 };
 
 export const deleteZaloGroupFromFirebase = async (id: string) => {
+  if(githubMode()){
+    const {gh}=await import('../client/githubApi');
+    await gh.remove('zalo_groups',id);
+    setLocalList('zalo_groups',getLocalList<ZaloGroup>('zalo_groups',[]).filter(x=>x.id!==id));
+    return;
+  }
   const current = getLocalList<ZaloGroup>("zalo_groups", []);
   const updated = current.filter(g => g.id !== id);
   setLocalList("zalo_groups", updated);
@@ -512,6 +537,12 @@ export const deleteZaloGroupFromFirebase = async (id: string) => {
 };
 
 export const saveCommunityQuestionToFirebase = async (question: CommunityQuestion) => {
+  if(githubMode()){
+    const {gh}=await import('../client/githubApi');
+    // Community posts are moderated on the server before publication.
+    await gh.create('community_posts',question);
+    return;
+  }
   const current = getLocalList<CommunityQuestion>("community_questions", []);
   const existingIdx = current.findIndex(q => q.id === question.id);
   if (existingIdx > -1) {
@@ -532,6 +563,11 @@ export const saveCommunityQuestionToFirebase = async (question: CommunityQuestio
 };
 
 export const deleteItemFromCollection = async (collectionName: string, id: string) => {
+  if(githubMode()){
+    const {gh}=await import('../client/githubApi');
+    await gh.remove(githubCollection(collectionName),id);
+    return;
+  }
   try {
     const { doc, deleteDoc } = await import("firebase/firestore");
     await deleteDoc(doc(db, collectionName, id));
