@@ -1,6 +1,9 @@
 import {Fragment,useCallback,useEffect,useMemo,useState} from 'react';
 import {AlertCircle,ArrowLeft,BarChart3,CheckCircle2,ChevronDown,ClipboardCheck,Database,Download,Edit3,Eye,FileJson,KeyRound,Lock,LogOut,Menu,Plus,RefreshCw,Save,Search,ShieldCheck,Trash2,Users,X} from 'lucide-react';
 import {gh} from '../client/githubApi';
+import AdminSidebar from './operator/AdminSidebar';
+import MobileAdminDrawer from './operator/MobileAdminDrawer';
+import AdminTopBar from './operator/AdminTopBar';
 import {ADMIN_NAV_GROUPS,ALL_ADMIN_MODULES} from './operator/AdminNavStructure';
 import {GITHUB_ADMIN_MODULES,PUBLIC_CMS_COLLECTIONS,RECOMMENDED_FIELDS,FIXED_LABELS} from './operator/githubAdminModules';
 import {INITIAL_ARTICLES} from '../data/articles';
@@ -156,21 +159,23 @@ export default function GithubOperatorPanel({account,onLogout}:{account:Row,onLo
    await mutate(()=>gh.replace(section.collection,sample.map(r=>({...r}))),`Đã nhập ${sample.length} bản ghi có sẵn trong ZIP.`);
  };
  const download=()=>{if(!section)return;downloadJSON(`qt-${section.collection}-${new Date().toISOString().slice(0,10)}.json`,items)};
- const liveModules=ADMIN_NAV_GROUPS;
- return <div className="min-h-screen bg-[#f6f8f6] text-stone-900 flex font-sans" data-github-admin="true">
-  {drawer&&<button className="fixed inset-0 z-40 bg-black/30 lg:hidden" aria-label="Đóng menu" onClick={()=>setDrawer(false)}/>}
-  <aside className={`z-50 fixed lg:sticky top-0 h-screen w-[282px] shrink-0 bg-[#163d2b] text-white flex flex-col ${drawer?'left-0':'-left-[300px]'} lg:left-0 transition-[left] duration-200`}>
-    <div className="p-5 border-b border-white/10"><div className="font-extrabold text-lg">QT Limousine</div><div className="text-xs text-white/60 mt-1">QUẢN TRỊ DỮ LIỆU GITHUB</div></div>
-    <div className="overflow-y-auto flex-1 p-3 space-y-5">
-      {liveModules.map(g=><div key={g.id}><div className="uppercase text-[11px] font-black tracking-wider text-white/50 px-3 py-2">{g.title}</div><div className="space-y-1">{g.modules.map(m=><button type="button" key={m.id} onClick={()=>go(m.id)} aria-current={moduleId===m.id?'page':undefined} className={`w-full text-left text-[13px] px-3 py-2.5 rounded-lg transition-colors ${moduleId===m.id?'bg-white text-[#163d2b] font-black':'text-white/85 hover:bg-white/10'}`}>{m.shortName||m.name}</button>)}</div></div>)}
-    </div>
-    <div className="p-4 border-t border-white/10 space-y-2"><button onClick={()=>void onLogout()} className="w-full border border-white/25 rounded-xl py-2.5 flex items-center justify-center gap-2 text-sm"><LogOut size={16}/> Đăng xuất</button><a href="/" className="block text-center text-xs text-white/60 underline">Về website</a></div>
-  </aside>
+ const refreshCurrent=()=>{void (moduleId==='overview'||moduleId==='growth_analytics'?loadStats():load())};
+ return <div className="min-h-screen bg-stone-100 text-stone-900 flex font-sans" data-github-admin="true">
+  <div className="hidden md:flex w-64 shrink-0 sticky top-0 h-screen flex-col bg-stone-900">
+   <div className="flex-1 min-h-0"><AdminSidebar activeModuleId={moduleId} onSelectModule={go} pendingBookingsCount={stats.pending}/></div>
+   <div className="p-3 border-t border-stone-700 bg-stone-950 flex flex-col gap-2 text-xs">
+    <button className="border border-stone-600 text-stone-100 rounded-xl px-3 py-2 flex items-center justify-center gap-2" onClick={()=>void onLogout()}><LogOut size={16}/>Đăng xuất</button>
+    <a className="text-center underline text-stone-300" href="/">Về website</a>
+   </div>
+  </div>
+  <MobileAdminDrawer isOpen={drawer} onClose={()=>setDrawer(false)} activeModuleId={moduleId} onSelectModule={go} pendingBookingsCount={stats.pending}/>
   <div className="min-w-0 flex-1">
-   <header className="sticky top-0 z-20 bg-white border-b border-stone-200 px-4 sm:px-7 py-3 flex items-center gap-3 justify-between">
-    <div className="flex items-center min-w-0 gap-3"><button className="lg:hidden rounded-lg border p-2" onClick={()=>setDrawer(true)} aria-label="Mở menu"><Menu size={21}/></button><div className="min-w-0"><div className="font-black text-base sm:text-lg truncate">{module?.name||'Quản trị'}</div><div className="text-xs text-stone-500 truncate">{module?.description||'GitHub API — không Firebase'}</div></div></div>
-    <div className="flex gap-2 items-center"><span className={`text-xs hidden sm:inline px-2 py-1 rounded-full ${configured?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-800'}`}>{configured===null?'Đang kiểm tra':configured?'GitHub đã cấu hình':'Thiếu cấu hình GitHub'}</span><button type="button" className="border rounded-lg p-2 hover:bg-stone-50" title="Tải lại dữ liệu" disabled={busy} onClick={()=>void(moduleId==='overview'||moduleId==='growth_analytics'?loadStats():load())}><RefreshCw size={19}/></button></div>
-   </header>
+   <AdminTopBar activeModuleId={moduleId} onOpenMobileDrawer={()=>setDrawer(true)} pendingBookingsCount={stats.pending} onRefresh={refreshCurrent} onSelectModule={go}/>
+   <div className="px-4 sm:px-6 pt-3 flex justify-between gap-3 items-center text-xs">
+    <span className="text-stone-500">Quản trị QT Limousine · Đồng bộ qua GitHub (Preview)</span>
+    <span className={`px-2 py-1 rounded-full ${configured?'bg-emerald-50 text-emerald-800':'bg-amber-50 text-amber-800'}`}>{configured===null?'Đang kiểm tra':configured?'GitHub đã cấu hình':'Chưa kết nối GitHub'}</span>
+    <button onClick={()=>void onLogout()} className="md:hidden underline text-stone-700">Đăng xuất</button>
+   </div>
    <main className="p-4 sm:p-6 xl:p-8 max-w-[1480px] mx-auto space-y-5">
     {error&&<div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 flex gap-2"><AlertCircle size={19} className="shrink-0"/>{error}</div>}
     {message&&<div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 flex gap-2"><CheckCircle2 size={19} className="shrink-0"/>{message}</div>}
