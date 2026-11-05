@@ -10,12 +10,14 @@ interface AdminSidebarProps {
   activeModuleId: string;
   onSelectModule: (moduleId: string) => void;
   pendingBookingsCount: number;
+  sourceLabel?: string;
 }
 
 export default function AdminSidebar({
   activeModuleId,
   onSelectModule,
-  pendingBookingsCount
+  pendingBookingsCount,
+  sourceLabel = 'Live Sync'
 }: AdminSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -169,7 +171,7 @@ export default function AdminSidebar({
       <div className="p-3 border-t border-stone-800 bg-stone-950/60 text-[11px] text-stone-400 flex items-center justify-between font-sans">
         <div className="flex items-center space-x-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono text-stone-300">Live Sync</span>
+          <span className="font-mono text-stone-300">{sourceLabel}</span>
         </div>
         <span className="text-[10px] text-stone-500">v2.0 • Admin</span>
       </div>
