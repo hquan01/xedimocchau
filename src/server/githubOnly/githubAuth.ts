@@ -62,7 +62,9 @@ export async function checkPassword(password:string,hash:string) {
   }catch{return false;}
 }
 function publicProfile(doc:Record<string,unknown>){
-  const {passwordHash:_,...safe}=doc;
+  const safe={...doc};
+  // Never return legacy credentials, recovery data or sensitive auth fields.
+  for(const key of ['passwordHash','customPassword','passwordResetToDefault','resetToken','sessionToken','otpSecret','totpSecret'])delete safe[key];
   return safe;
 }
 function sameSecret(a:string,b:string){
