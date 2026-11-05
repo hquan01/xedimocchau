@@ -1,0 +1,188 @@
+import {createHash,randomUUID} from 'node:crypto';
+import {Router as expressRouter,type Request, type Response,type Router} from 'express';
+import {checkCollection,checkId,githubConfig,getDocument,listDocuments,putDocument,deleteDocument,replaceDocuments,atomicWrite,PUBLIC_COLLECTIONS,StoreError,isStoreConfigured,verifyStoreConnectivity,type JsonRecord} from './githubStore';
+import {authMiddleware,requireAdmin} from './githubAuth';
+const GUEST_COOKIE='qt_guest';
+const COOKIE_OPTIONS={httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax' as const,path:'/',maxAge:180*86400000};
+function getGuestCookie(req:Request){return (req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(`${GUEST_COOKIE}=`))?.slice(GUEST_COOKIE.length+1);}
+function ensureGuestCookie(req:Request,res:Response){
+  let cookie=getGuestCookie(req);
+  if(!cookie||!/^[-\w]{20,120}$/.test(cookie)) {cookie=randomUUID().replace(/-/g,'')+randomUUID().replace(/-/g,'');res.cookie(GUEST_COOKIE,cookie,COOKIE_OPTIONS);}
+  return createHash('sha256').update(cookie).digest('hex');
+}
+const forRead=(req:Request,collection:string,id?:string) => {
+  if(req.identity?.role==='operator')return true;
+  if(PUBLIC_COLLECTIONS.has(collection))return true;
+  if(collection==='configs')return id?['limousineConfig','sharedCarConfig','locations'].includes(id):false;
+  if(collection==='users')return !!id && id===req.identity?.uid;
+  if(collection==='bookings'||collection==='service_requests')return true; // Filter each record below
+  if(collection==='notifications')return !!req.identity;
+  return false;
+};
+function owned(req:Request,record:JsonRecord) {
+  if(req.identity?.role==='operator')return true;
+  if(req.identity?.uid && String(record.userId||record.customerUid||'')===req.identity.uid)return true;
+  const token=getGuestCookie(req);
+  const ownHash=token?createHash('sha256').update(token).digest('hex'):'';
+  return !!ownHash && record.guestHash===ownHash;
+}
+function safeRecord(collection:string,data:JsonRecord,req:Request) {
+  const value={...data};
+  delete value.passwordHash;
+  delete value.guestHash;
+  if(collection==='users'&&req.identity?.role!=='operator')delete value.operatorNotes;
+  return value;
+}
+function mayReadRecord(req:Request,collection:string,record:JsonRecord) {
+  if(collection==='bookings'||collection==='service_requests')return owned(req,record);
+  if(collection==='reviews'&&record.moderationStatus==='pending'&&req.identity?.role!=='operator')return false;
+  if(collection==='users')return req.identity?.role==='operator'||req.identity?.uid===record.id;
+  if(collection==='notifications')return req.identity?.role==='operator'||record.userId===req.identity?.uid;
+  return true;
+}
+function requireObject(value:any){
+  if(!value||typeof value!=='object'||Array.isArray(value))throw new StoreError('Dữ liệu JSON phải là đối tượng.',400);
+  if(JSON.stringify(value).length>60000)throw new StoreError('Bản ghi vượt dung lượng cho phép.',413);
+  return value as JsonRecord;
+}
+const validateBooking=(v:JsonRecord)=>{
+  if(typeof v.passengerName!=='string'||v.passengerName.trim().length<2||typeof v.passengerPhone!=='string'||!/^(0|\+84)[35789]\d{8}$/.test(v.passengerPhone.replace(/[\s.-]/g,''))||typeof v.travelDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v.travelDate))
+    throw new StoreError('Thiếu thông tin đặt vé hợp lệ.',400);
+  if(!['limousine','shared_car','combo','charter'].includes(String(v.type||'')))throw new StoreError('Loại vé không hợp lệ.',400);
+  if(!Number.isFinite(Number(v.totalPrice))||Number(v.totalPrice)<0)throw new StoreError('Giá vé không hợp lệ.',400);
+};
+export function githubDataRouter():Router {
+  const r=expressRouter();
+  r.use(authMiddleware);
+  // Cookie-based sessions must never be accepted for cross-origin mutations.
+  r.use((req,res,next)=>{
+    if(['GET','HEAD','OPTIONS'].includes(req.method))return next();
+    const origin=req.headers.origin;
+    const host=req.headers.host;
+    if(origin){
+      try {if(new URL(origin).host!==host)return next(new StoreError('Yêu cầu khác nguồn gốc bị từ chối.',403));}
+      catch{return next(new StoreError('Origin không hợp lệ.',403));}
+    }else if(req.headers['sec-fetch-site']==='cross-site')return next(new StoreError('Yêu cầu khác trang bị từ chối.',403));
+    next();
+  });
+  r.get('/status',async(_req,res)=>{
+    if(!isStoreConfigured())return res.status(503).json({configured:false,provider:'github-encrypted',firebase:false,error:'Thiếu cấu hình GitHub trên Vercel.'});
+    try{await verifyStoreConnectivity();return res.json({configured:true,provider:'github-encrypted',firebase:false});}
+    catch(e){return res.status(503).json({configured:false,provider:'github-encrypted',firebase:false,error:e instanceof Error?e.message:'GitHub không thể kết nối'});}
+  });
+  r.get('/:collection',async(req,res,next)=>{
+    try {
+      const collection=checkCollection(req.params.collection);
+      if(!forRead(req,collection))throw new StoreError('Không có quyền xem danh sách.',403);
+      const documents=await listDocuments(collection);
+      res.setHeader('Cache-Control','no-store');
+      const filtered=documents.filter(x=>mayReadRecord(req,collection,x.data));
+      res.json({items:filtered.map(x=>safeRecord(collection,x.data,req))});
+    }catch(e){next(e);}
+  });
+  r.get('/:collection/:id',async(req,res,next)=>{
+    try {
+      const collection=checkCollection(req.params.collection),id=checkId(req.params.id);
+      if(!forRead(req,collection,id))throw new StoreError('Không có quyền xem dữ liệu.',403);
+      const found=await getDocument(collection,id);
+      if(!found)throw new StoreError('Không tìm thấy dữ liệu.',404);
+      if(!mayReadRecord(req,collection,found.data))throw new StoreError('Không có quyền xem dữ liệu.',403);
+      res.setHeader('Cache-Control','no-store');
+      res.json({item:safeRecord(collection,found.data,req),version:found.sha});
+    }catch(e){next(e);}
+  });
+  r.post('/:collection',async(req,res,next)=>{
+    try {
+      const collection=checkCollection(req.params.collection),value=requireObject(req.body);
+      if(!['bookings','service_requests','reviews','community_posts'].includes(collection))requireAdmin(req);
+      // Guest-supplied IDs must never become public Git paths (could contain a phone).
+      const id=checkId(String(req.identity?.role==='operator'?value.id||'id_'+randomUUID().replace(/-/g,''):'id_'+randomUUID().replace(/-/g,'')));
+      if(await getDocument(collection,id))throw new StoreError('Mã đã tồn tại.',409);
+      const data:JsonRecord={...value,id};
+      if(req.identity?.role!=='operator'){
+        if(collection==='bookings'){
+          validateBooking(data);
+          // Client totals are never authoritative for payment/discount decisions.
+          data.status='pending';data.paymentReported=false;data.paymentReportedAt=null;
+          data.userId=req.identity?.uid||'';
+          data.guestHash=ensureGuestCookie(req,res);
+          data.pointsDeducted=0;data.couponCode='';data.couponId='';data.discountAmount=0;
+          data.pricingReviewRequired=true;
+        }else if(collection==='service_requests'){
+          if(typeof data.customerName!=='string'||typeof data.customerPhone!=='string')throw new StoreError('Thiếu thông tin yêu cầu.',400);
+          data.status='pending';data.customerUid=req.identity?.uid||'';data.guestHash=ensureGuestCookie(req,res);
+          data.quotedPrice=0;data.createdAt=new Date().toISOString();
+        }else if(collection==='reviews'||collection==='community_posts'){
+          // Low-trust public content is flagged for review, never published automatically.
+          if(JSON.stringify(data).length>6000)throw new StoreError('Nội dung quá dài.',413);
+          data.moderationStatus='pending';
+        }
+      }
+      await putDocument(collection,id,data);
+      res.status(201).json({item:safeRecord(collection,data,req)});
+    }catch(e){next(e);}
+  });
+  r.patch('/:collection/:id',async(req,res,next)=>{
+    try {
+      const collection=checkCollection(req.params.collection),id=checkId(req.params.id),patch=requireObject(req.body);
+      const current=await getDocument(collection,id);
+      if(!current)throw new StoreError('Không tìm thấy bản ghi.',404);
+      let changes=patch;
+      if(req.identity?.role!=='operator'){
+        if(collection==='bookings'&&owned(req,current.data)) {
+          // Customer merely reports transfer. Only Admin can confirm payment or change status.
+          if(Object.keys(patch).length<1||Object.keys(patch).some(x=>!['paymentReported'].includes(x))||patch.paymentReported!==true)
+            throw new StoreError('Khách chỉ có thể thông báo đã chuyển cọc, không thể tự duyệt vé.',403);
+          changes={paymentReported:true,paymentReportedAt:new Date().toISOString()};
+        }else if(collection==='users'&&req.identity?.uid===id){
+          const allowed=new Set(['name','phone','gender','birthDate','address','favPickup','favDropoff','avatarDataUrl']);
+          if(Object.keys(patch).some(x=>!allowed.has(x)))throw new StoreError('Không thể tự thay đổi quyền hoặc điểm thưởng.',403);
+        }else throw new StoreError('Không có quyền sửa dữ liệu.',403);
+      }
+      const nextRecord={...current.data,...changes,id};
+      if(collection==='bookings'&&req.identity?.role==='operator'&&patch.status==='success'&&current.data.status!=='success'){
+        // Reward exactly once on confirmation; data branch CAS prevents concurrent double rewards.
+        const uid=String(current.data.userId||'');
+        for(let n=0;n<3;n++){
+          const latestBooking=await getDocument('bookings',id);
+          if(!latestBooking)throw new StoreError('Đơn không còn tồn tại.',409);
+          const latestNext={...latestBooking.data,...changes,id};
+          const changesToWrite:any[]=[{collection:'bookings',id,record:latestNext}];
+          if(uid&&latestBooking.data.status!=='success'){
+            const profile=await getDocument('users',uid);
+            if(profile){
+              const rewarded=Array.isArray(profile.data.rewardedBookingIds)?profile.data.rewardedBookingIds as string[]:[];
+              if(!rewarded.includes(id))changesToWrite.push({collection:'users',id:uid,record:{...profile.data,points:Math.max(0,Number(profile.data.points)||0)+1,rewardedBookingIds:[...rewarded,id],completedBookingsCount:(Number(profile.data.completedBookingsCount)||0)+1}});
+            }
+          }
+          try{await atomicWrite(changesToWrite);return res.json({ok:true});}
+          catch(e){if(!(e instanceof StoreError)||e.status!==409||n===2)throw e;}
+        }
+      }
+      await putDocument(collection,id,nextRecord,current.sha);
+      res.json({ok:true});
+    }catch(e){next(e);}
+  });
+  r.delete('/:collection/:id',async(req,res,next)=>{
+    try {
+      requireAdmin(req);
+      const collection=checkCollection(req.params.collection),id=checkId(req.params.id);
+      const current=await getDocument(collection,id);
+      if(!current)throw new StoreError('Không tìm thấy bản ghi.',404);
+      await deleteDocument(collection,id,current.sha);
+      res.json({ok:true});
+    }catch(e){next(e);}
+  });
+  r.put('/:collection/_replace',async(req,res,next)=>{
+    try {
+      requireAdmin(req);
+      const collection=checkCollection(req.params.collection),records=req.body?.items;
+      if(!Array.isArray(records))throw new StoreError('Thiếu danh sách bản ghi.',400);
+      // Collection replacement is restricted to CMS / inventory, not user, order or finance data.
+      if(!PUBLIC_COLLECTIONS.has(collection)||['coupons'].includes(collection))throw new StoreError('Không được thay toàn bộ dữ liệu nhạy cảm.',403);
+      const changed=await replaceDocuments(collection,records.map(requireObject));
+      res.json({ok:true,...changed});
+    }catch(e){next(e);}
+  });
+  return r;
+}

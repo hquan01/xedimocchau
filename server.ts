@@ -1,5 +1,8 @@
 import express from "express";
 import { phoneAuthRouter } from "./src/server/phoneAuthRoutes";
+import { githubDataRouter } from "./src/server/githubOnly/githubRoutes";
+import { StoreError } from "./src/server/githubOnly/githubStore";
+import { githubAuthRouter } from "./src/server/githubOnly/githubAuth";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -217,6 +220,17 @@ const PORT = 3000;
 // Middleware for parsing JSON JSON and urlencoded
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// GitHub-only API is isolated from the legacy Firebase-backed frontend until
+// end-to-end migration and data validation have been completed.
+app.use("/api/github-auth", githubAuthRouter());
+app.use("/api/github-data", githubDataRouter());
+// These routes must return structured errors; never a fake successful update.
+app.use(['/api/github-auth', '/api/github-data'], (err:any, _req:any, res:any, _next:any) => {
+  const status=err instanceof StoreError?err.status:500;
+  if(status===500)console.error('[Github backend]',err?.message || err);
+  res.status(status).json({error:status===500?'Lỗi máy chủ, thao tác chưa được lưu.':String(err.message||'Không thể lưu dữ liệu.')});
+});
 // Phone/password alias authentication, isolated from public legacy bookings.
 app.use("/api/auth", phoneAuthRouter);
 
