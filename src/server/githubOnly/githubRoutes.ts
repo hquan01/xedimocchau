@@ -3,6 +3,7 @@ import {Router as expressRouter,type Request, type Response,type Router} from 'e
 import {checkCollection,checkId,githubConfig,getDocument,listDocuments,putDocument,deleteDocument,replaceDocuments,atomicWrite,PUBLIC_COLLECTIONS,StoreError,isStoreConfigured,verifyStoreConnectivity,type JsonRecord} from './githubStore';
 import {authMiddleware,requireAdmin} from './githubAuth';
 import {applyBookingReward} from './bookingRewards';
+import {seatConflict} from './seatAvailability';
 const GUEST_COOKIE='qt_guest';
 const COOKIE_OPTIONS={httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax' as const,path:'/',maxAge:180*86400000};
 function getGuestCookie(req:Request){return (req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(`${GUEST_COOKIE}=`))?.slice(GUEST_COOKIE.length+1);}
@@ -48,7 +49,7 @@ function requireObject(value:any){
 const validateBooking=(v:JsonRecord)=>{
   if(typeof v.passengerName!=='string'||v.passengerName.trim().length<2||typeof v.passengerPhone!=='string'||!/^(0|\+84)[35789]\d{8}$/.test(v.passengerPhone.replace(/[\s.-]/g,''))||typeof v.travelDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v.travelDate))
     throw new StoreError('Thiếu thông tin đặt vé hợp lệ.',400);
-  if(!['limousine','shared_car','combo','charter'].includes(String(v.type||'')))throw new StoreError('Loại vé không hợp lệ.',400);
+  if(!['limousine','shared_car','combo','private_charter','charter'].includes(String(v.type||'')))throw new StoreError('Loại vé không hợp lệ.',400);
   if(!Number.isFinite(Number(v.totalPrice))||Number(v.totalPrice)<0)throw new StoreError('Giá vé không hợp lệ.',400);
 };
 export function githubDataRouter():Router {
@@ -117,6 +118,22 @@ export function githubDataRouter():Router {
           if(JSON.stringify(data).length>6000)throw new StoreError('Nội dung quá dài.',413);
           data.moderationStatus='pending';
         }
+      }
+      if(collection==='bookings' && Array.isArray(data.seatNumbers) && data.seatNumbers.length>0) {
+        // Create with a branch-CAS commit: concurrent customers must not
+        // silently be given the same seat on the same journey.
+        for(let attempt=0;attempt<3;attempt++){
+          const [bookings,locks]=await Promise.all([listDocuments('bookings'),listDocuments('blocked_seats')]);
+          const collision=seatConflict(data,bookings.map(b=>b.data),locks.map(b=>b.data));
+          if(collision)throw new StoreError(collision,409);
+          try{
+            await atomicWrite([{collection:'bookings',id,record:data}]);
+            return res.status(201).json({item:safeRecord(collection,data,req)});
+          }catch(error){
+            if(!(error instanceof StoreError)||error.status!==409||attempt===2)throw error;
+          }
+        }
+        throw new StoreError('Chỗ ngồi vừa được thay đổi, vui lòng tải lại.',409);
       }
       await putDocument(collection,id,data);
       res.status(201).json({item:safeRecord(collection,data,req)});
