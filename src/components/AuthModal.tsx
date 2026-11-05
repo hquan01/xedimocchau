@@ -22,6 +22,7 @@ interface AuthModalProps {
 
 type Mode = 'login' | 'register' | 'forgot' | 'admin';
 type LoginMethod = 'email' | 'phone';
+const githubDataPreview=(import.meta as ImportMeta & {env?:Record<string,string>}).env?.VITE_DATA_PROVIDER==='github';
 const normalizePhone = (s: string) => {
   const value = s.replace(/[\s.\-()]/g, '');
   if (/^0[35789]\d{8}$/.test(value)) return '+84' + value.slice(1);
@@ -147,6 +148,25 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, onGithubAdm
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
         throw new Error('Địa chỉ email không hợp lệ (ví dụ: member@gmail.com). Số điện thoại vui lòng nhập ở mục Số điện thoại.');
       }
+      if(githubDataPreview){
+        if(mode==='forgot'){
+          setNotice('Để lấy lại mật khẩu tài khoản GitHub mới, vui lòng liên hệ nhà xe để xác minh và đặt lại. Không gửi mật khẩu qua tin nhắn.');
+          return;
+        }
+        if(mode==='register'){
+          if(name.trim().length<2)throw new Error('Vui lòng nhập họ tên.');
+          const number=normalizePhone(phone);
+          if(!number)throw new Error('Số điện thoại Việt Nam không hợp lệ.');
+          if(password.length<8)throw new Error('Mật khẩu ít nhất 8 ký tự.');
+          const result=await gh.register(cleanEmail,password,name.trim(),number);
+          rememberPhoneEmail(number,cleanEmail);
+          onLoginSuccess({...result.user,phone:number} as User);
+          onClose();return;
+        }
+        const result=await gh.login(cleanEmail,password);
+        onLoginSuccess(result.user as User);
+        onClose();return;
+      }
       if (mode === 'forgot') {
         await sendPasswordResetEmail(auth, cleanEmail);
         setNotice('Hướng dẫn đặt lại mật khẩu đã được gửi đến email ' + cleanEmail);
@@ -208,8 +228,14 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, onGithubAdm
         setNotice('Hướng dẫn đặt lại mật khẩu đã được gửi đến email đăng ký: ' + associatedEmail);
       } else {
         if (!password) throw new Error('Vui lòng nhập mật khẩu.');
-        const account = await signInWithEmailAndPassword(auth, associatedEmail, password);
-        await finish(account.user);
+        if(githubDataPreview) {
+          const result=await gh.login(associatedEmail,password);
+          onLoginSuccess(result.user as User);
+          onClose();
+        }else {
+          const account = await signInWithEmailAndPassword(auth, associatedEmail, password);
+          await finish(account.user);
+        }
       }
     } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
@@ -233,16 +259,39 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, onGithubAdm
   };
 
   const signInGoogle = async () => {
-    setLoading(true); setError('');
-    try { 
-      const result = await signInWithPopup(auth, new GoogleAuthProvider()); 
-      await finish(result.user); 
-    }
-    catch (e) { 
-      setError(errorMessage(e)); 
-    } finally { 
-      setLoading(false); 
-    }
+    setLoading(true);setError('');
+    try {
+      if(githubDataPreview){
+        // GitHub mode must never create accounts in Firebase.
+        const clientId=(import.meta as ImportMeta & {env?:Record<string,string>}).env?.VITE_GOOGLE_CLIENT_ID;
+        if(!clientId)throw new Error('Đăng nhập Google chưa được cấu hình cho hệ thống mới. Vui lòng dùng Email để đăng ký hoặc đăng nhập.');
+        const credential=await new Promise<string>((resolve,reject)=>{
+          const begin=()=>{
+            const google=(window as any).google;
+            if(!google?.accounts?.id)return reject(new Error('Không tải được đăng nhập Google.'));
+            google.accounts.id.initialize({client_id:clientId,callback:(response:any)=>{
+              if(response?.credential)resolve(String(response.credential));
+              else reject(new Error('Google chưa trả thông tin xác minh.'));
+            }});
+            google.accounts.id.prompt((notice:any)=>{
+              if(notice.isNotDisplayed?.()||notice.isSkippedMoment?.())reject(new Error('Trình duyệt chặn cửa sổ Google. Vui lòng dùng Email hoặc cho phép đăng nhập Google.'));
+            });
+          };
+          if((window as any).google?.accounts?.id)return begin();
+          const script=document.createElement('script');
+          script.src='https://accounts.google.com/gsi/client';
+          script.async=true;script.defer=true;
+          script.onload=begin;script.onerror=()=>reject(new Error('Không tải được dịch vụ Google.'));
+          document.head.appendChild(script);
+        });
+        const result=await gh.google(credential);
+        onLoginSuccess(result.user as User);onClose();
+      }else {
+        const result=await signInWithPopup(auth,new GoogleAuthProvider());
+        await finish(result.user);
+      }
+    }catch(e){setError(errorMessage(e));}
+    finally{setLoading(false);}
   };
 
   return (
