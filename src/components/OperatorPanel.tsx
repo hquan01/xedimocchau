@@ -3213,7 +3213,7 @@ export default function OperatorPanel({
       )}
 
       {/* Module: Đơn dịch vụ du lịch (Tour, Combo & Thuê xe) */}
-      {activeModuleId === "service_orders" && <ServiceInquiryManagement />}
+      {activeModuleId === "service_orders" && <ServiceInquiryManagement backend={storageBackend}/>}
       {activeModuleId === "service_orders" && (
         <div className="bg-white rounded-2xl shadow-xs border border-stone-200 p-6 sm:p-8 space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-stone-100 pb-4">
