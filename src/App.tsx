@@ -555,7 +555,6 @@ export default function App() {
     } catch (err) {
       console.error("Firebase signOut error", err);
     }
-    localStorage.removeItem("mock_admin_session");
     localStorage.removeItem("xedimocchau_current_user");
     setCurrentUser(null);
     setActiveTab("explore");
