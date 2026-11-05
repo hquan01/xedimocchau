@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useState} from 'react';
 import OperatorPanel from './OperatorPanel';
+import LegacyContentMigration from './LegacyContentMigration';
 import {gh} from '../client/githubApi';
 import {DEFAULT_LIMOUSINE_CONFIG,DEFAULT_SHARED_CAR_CONFIG} from '../data/config';
 import type {Booking,BlockedSeat,Coupon,LimousineConfig,SharedCarConfig,LocationPoint,TourCombo,Accommodation,Destination,GuideArticle,User,AppNotification,Driver,ZaloGroup} from '../types';
@@ -112,6 +113,7 @@ export default function LegacyGithubOperatorPanel({onLogout}:{onLogout:()=>Promi
     </div>
     {error&&<div role="alert" className="sticky top-0 z-50 bg-red-50 text-red-900 border-b border-red-200 p-3 text-sm font-semibold">{error} <button className="underline ml-2" onClick={()=>setError('')}>Đóng</button></div>}
     {busy&&<div className="fixed bottom-5 left-5 bg-emerald-900 text-white text-xs px-4 py-2 rounded-xl z-50">Đang đồng bộ dữ liệu GitHub…</div>}
+    <LegacyContentMigration onDone={load}/>
     <OperatorPanel
       storageBackend="github"
       onRefreshBackend={load}
