@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BlockedSeat, Booking, Seat, LimousineTrip, TourCombo, LimousineConfig, SharedCarConfig, Coupon, LocationPoint, Accommodation, Destination, GuideArticle, User as UserType, AppNotification, Driver, ZaloGroup } from "../types";
+import { gh } from "../client/githubApi";
 import { Check, X, Shield, Calendar, Clock, ArrowRight, User, Phone, Tag, Trash2, ListFilter, Search, Award, Lock, Unlock, Compass, ShieldCheck, Newspaper, MapPin, Star, Edit3, DollarSign, FileText, Banknote, Calculator, CalendarDays, ArrowUpDown, Layers, Bus, TrendingUp, Car, PhoneCall, UserCheck, MessageSquare } from "lucide-react";
 import { motion } from "motion/react";
 import { getOfficialSchedulesForRoute } from "./LimousineBooking";
@@ -106,6 +107,9 @@ export interface DateGroupData {
 }
 
 interface OperatorPanelProps {
+  /** Keep the original full admin UI; switch its internal writes to GitHub during migration. */
+  storageBackend?: 'firebase'|'github';
+  onRefreshBackend?: ()=>Promise<void>;
   users: UserType[];
   bookings: Booking[];
   onUpdateBookingStatus: (bookingId: string, status: "pending" | "success" | "completed" | "cancelled") => void;
@@ -161,6 +165,8 @@ const INITIAL_SEATS_SHARED: Seat[] = [
 ];
 
 export default function OperatorPanel({
+  storageBackend = 'firebase',
+  onRefreshBackend,
   users,
   bookings,
   onUpdateBookingStatus,
@@ -303,10 +309,10 @@ export default function OperatorPanel({
         vehiclePlate: editVehiclePlate.trim(),
       };
 
-      const { db } = await import("../firebase");
-      const { doc, setDoc } = await import("firebase/firestore");
-      const { getLocalList, setLocalList } = await import("../lib/firebaseUtils");
-      const current = getLocalList<Booking>("bookings", []);
+      const firebase = storageBackend === 'github' ? null : await import('../firebase');
+      const firestore = storageBackend === 'github' ? null : await import('firebase/firestore');
+      const cache = storageBackend === 'github' ? null : await import('../lib/firebaseUtils');
+      const current = cache?.getLocalList<Booking>("bookings", [])||[];
 
       if (applyDriverToEntireTrip) {
         // Find all bookings with same travelDate, departureTime, routeSelection
@@ -326,21 +332,24 @@ export default function OperatorPanel({
               operatorNotes: editOperatorNotes.trim(),
             } : {})
           };
-          await setDoc(doc(db, "bookings", b.id), itemUpdates, { merge: true });
+          if (storageBackend === 'github') await gh.patch('bookings', b.id, itemUpdates);
+          else await firestore!.setDoc(firestore!.doc(firebase!.db, "bookings", b.id), itemUpdates, { merge: true });
           const idx = current.findIndex(item => item.id === b.id);
           if (idx > -1) {
             current[idx] = { ...current[idx], ...itemUpdates };
           }
         }
       } else {
-        await setDoc(doc(db, "bookings", editingDepositBooking.id), updates, { merge: true });
+        if (storageBackend === 'github') await gh.patch('bookings', editingDepositBooking.id, updates);
+        else await firestore!.setDoc(firestore!.doc(firebase!.db, "bookings", editingDepositBooking.id), updates, { merge: true });
         const idx = current.findIndex(b => b.id === editingDepositBooking.id);
         if (idx > -1) {
           current[idx] = { ...current[idx], ...updates };
         }
       }
 
-      setLocalList("bookings", current);
+      if (cache) cache.setLocalList("bookings", current);
+      if (storageBackend === 'github') await onRefreshBackend?.();
       setEditingDepositBooking(null);
     } catch (err) {
       console.error("Error saving deposit, driver and notes:", err);
@@ -367,19 +376,21 @@ export default function OperatorPanel({
         vehiclePlate: tripVehiclePlate.trim(),
       };
 
-      const { db } = await import("../firebase");
-      const { doc, setDoc } = await import("firebase/firestore");
-      const { getLocalList, setLocalList } = await import("../lib/firebaseUtils");
-      const current = getLocalList<Booking>("bookings", []);
+      const firebase = storageBackend === 'github' ? null : await import('../firebase');
+      const firestore = storageBackend === 'github' ? null : await import('firebase/firestore');
+      const cache = storageBackend === 'github' ? null : await import('../lib/firebaseUtils');
+      const current = cache?.getLocalList<Booking>("bookings", [])||[];
 
       for (const b of assigningTripGroup.bookings) {
-        await setDoc(doc(db, "bookings", b.id), updates, { merge: true });
+        if (storageBackend === 'github') await gh.patch('bookings', b.id, updates);
+        else await firestore!.setDoc(firestore!.doc(firebase!.db, "bookings", b.id), updates, { merge: true });
         const idx = current.findIndex(item => item.id === b.id);
         if (idx > -1) {
           current[idx] = { ...current[idx], ...updates };
         }
       }
-      setLocalList("bookings", current);
+      if (cache) cache.setLocalList("bookings", current);
+      if (storageBackend === 'github') await onRefreshBackend?.();
       setAssigningTripGroup(null);
     } catch (err) {
       console.error("Error saving trip driver:", err);
@@ -618,7 +629,8 @@ export default function OperatorPanel({
       ? `trip_custom_${lockTime.replace(":", "_")}` 
       : `shared_car_trip_custom_${lockTime.replace(":", "_")}`;
     return blockedSeats.find(
-      (b) => b.seatId === seatId && b.travelDate === lockDate && b.tripId === pathTripId
+      (b) => b.seatId === seatId && b.travelDate === lockDate && b.tripId === pathTripId &&
+        (storageBackend !== 'github' || !(b as BlockedSeat & {routeFrom?:string}).routeFrom || (b as BlockedSeat & {routeFrom?:string}).routeFrom === lockFrom)
     );
   };
 
@@ -633,7 +645,8 @@ export default function OperatorPanel({
         b.status !== "cancelled" &&
         b.travelDate === lockDate &&
         b.departureTime === lockTime &&
-        b.seatNumbers?.includes(seatNumber)
+        b.seatNumbers?.includes(seatNumber) &&
+        (storageBackend !== 'github' || !(b.routeSelection||'').trim() || (b.routeSelection||'').includes(lockFrom))
     );
   };
 
@@ -645,29 +658,22 @@ export default function OperatorPanel({
     setIsUpdatingSeat(true);
     try {
       if (onlineBooking) {
-        const { db } = await import("../firebase");
-        const { doc, updateDoc } = await import("firebase/firestore");
-        await updateDoc(doc(db, "bookings", onlineBooking.id), {
-          passengerName: seatPassengerName,
-          passengerPhone: seatPassengerPhone,
-          pickupPoint: seatPickupPoint,
-          dropoffPoint: seatDropoffPoint,
-          notes: seatNotes,
-        });
-
-        const { getLocalList, setLocalList } = await import("../lib/firebaseUtils");
-        const current = getLocalList<Booking>("bookings", []);
-        const idx = current.findIndex(b => b.id === onlineBooking.id);
-        if (idx > -1) {
-          current[idx] = {
-            ...current[idx],
-            passengerName: seatPassengerName,
-            passengerPhone: seatPassengerPhone,
-            pickupPoint: seatPickupPoint,
-            dropoffPoint: seatDropoffPoint,
-            notes: seatNotes,
-          };
-          setLocalList("bookings", current);
+        const updates={passengerName:seatPassengerName,passengerPhone:seatPassengerPhone,
+          pickupPoint:seatPickupPoint,dropoffPoint:seatDropoffPoint,notes:seatNotes};
+        if (storageBackend === 'github') {
+          await gh.patch('bookings', onlineBooking.id, updates);
+          await onRefreshBackend?.();
+        } else {
+          const { db } = await import("../firebase");
+          const { doc, updateDoc } = await import("firebase/firestore");
+          await updateDoc(doc(db, "bookings", onlineBooking.id), updates);
+          const { getLocalList, setLocalList } = await import("../lib/firebaseUtils");
+          const current = getLocalList<Booking>("bookings", []);
+          const idx = current.findIndex(b => b.id === onlineBooking.id);
+          if (idx > -1) {
+            current[idx] = {...current[idx],...updates};
+            setLocalList("bookings", current);
+          }
         }
       } else {
         const pathTripId = lockService === "limousine" 
@@ -685,8 +691,18 @@ export default function OperatorPanel({
           note: seatNotes,
         };
 
-        const { saveBlockedSeatToFirebase } = await import("../lib/firebaseUtils");
-        await saveBlockedSeatToFirebase(seatParams);
+
+        if (storageBackend === 'github') {
+          const identifier = ['lock', lockDate, pathTripId, lockFrom, seat.id].join('_').replace(/[^a-zA-Z0-9_-]/g,'_');
+          const existing = getBlockedItemForSeat(seat.id) as (BlockedSeat&{id?:string})|undefined;
+          const record = {...seatParams,id:identifier,routeFrom:lockFrom,routeTo:lockTo};
+          if (existing) await gh.patch('blocked_seats',String(existing.id||identifier),record);
+          else await gh.create('blocked_seats',record);
+          await onRefreshBackend?.();
+        } else {
+          const { saveBlockedSeatToFirebase } = await import("../lib/firebaseUtils");
+          await saveBlockedSeatToFirebase(seatParams);
+        }
       }
       setSelectedSeatForEdit(null);
     } catch (e) {
@@ -707,12 +723,16 @@ export default function OperatorPanel({
         ? `trip_custom_${lockTime.replace(":", "_")}` 
         : `shared_car_trip_custom_${lockTime.replace(":", "_")}`;
 
-      const { deleteBlockedSeatFromFirebase } = await import("../lib/firebaseUtils");
-      await deleteBlockedSeatFromFirebase({
-        seatId: seat.id,
-        travelDate: lockDate,
-        tripId: pathTripId,
-      });
+
+      if (storageBackend === 'github') {
+        const existing = getBlockedItemForSeat(seat.id) as (BlockedSeat&{id?:string})|undefined;
+        if (!existing?.id) throw new Error('Không tìm thấy mã ghế đã khóa trên GitHub. Vui lòng tải lại.');
+        await gh.remove('blocked_seats',existing.id);
+        await onRefreshBackend?.();
+      } else {
+        const { deleteBlockedSeatFromFirebase } = await import("../lib/firebaseUtils");
+        await deleteBlockedSeatFromFirebase({seatId:seat.id,travelDate:lockDate,tripId:pathTripId});
+      }
 
       setSelectedSeatForEdit(null);
     } catch (e) {
