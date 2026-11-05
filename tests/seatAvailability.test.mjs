@@ -24,3 +24,22 @@ test('Shared car seat IDs map to the old 6-seat chart',()=>{
  const hold={seatId:'s2',tripId:'shared_car_trip_custom_08_00',travelDate:'2026-11-10',routeFrom:'Hà Nội'};
  assert.match(seatConflict(client,[],[hold]),/B1/);
 });
+
+test('Nine-seat cabin never sells more than its physical capacity',()=>{
+ const trip={...incoming,seatNumbers:['3 chỗ Limousine'],seatCount:3};
+ const prior={...trip,id:'prior',seatNumbers:['7 chỗ Limousine'],seatCount:7,status:'pending'};
+ assert.match(seatConflict(trip,[prior],[]),/còn 2 chỗ/);
+ assert.equal(seatConflict({...trip,seatCount:2},[prior],[]),null);
+});
+
+test('Booking arrow and dash spellings identify the same trip',()=>{
+ const prior={...incoming,id:'other',routeSelection:'Hà Nội - Mộc Châu',seatNumbers:['A3'],status:'success'};
+ const client={...incoming,routeSelection:'Hà Nội ➔ Mộc Châu'};
+ assert.match(seatConflict(client,[prior],[]),/A3/);
+});
+
+test('Three offline locks reduce cabin capacity by three seats',()=>{
+ const locks=['s3','s4','s5'].map(seatId=>({travelDate:'2026-11-10',tripId:'trip_custom_08_00',routeFrom:'Hà Nội',seatId}));
+ const client={...incoming,seatCount:7,seatNumbers:['7 chỗ Limousine']};
+ assert.match(seatConflict(client,[],locks),/còn 6 chỗ/);
+});
