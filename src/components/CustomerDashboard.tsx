@@ -619,7 +619,7 @@ export default function CustomerDashboard({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5 text-left">
                       <label className="block text-[11px] font-bold text-stone-700">
-                        Mật khẩu mới (tối thiểu 6 ký tự):
+                        Mật khẩu mới (tối thiểu 8 ký tự):
                       </label>
                       <input
                         type="password"
