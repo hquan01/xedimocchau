@@ -10,15 +10,17 @@ import { auth, db } from '../firebase';
 import {getEmailForPhone,hasOperatorAccess,normalizeVietnamPhone,rememberPhoneEmail} from '../lib/simpleAuth';
 import { User } from '../types';
 import { ensureMemberWelcomeBonus } from '../lib/memberWelcomeBonus';
+import { gh } from '../client/githubApi';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: User) => void;
   users?: User[];
+  onGithubAdminSuccess?: (user: User) => void;
 }
 
-type Mode = 'login' | 'register' | 'forgot';
+type Mode = 'login' | 'register' | 'forgot' | 'admin';
 type LoginMethod = 'email' | 'phone';
 const normalizePhone = (s: string) => {
   const value = s.replace(/[\s.\-()]/g, '');
@@ -30,12 +32,13 @@ const normalizePhone = (s: string) => {
 
 /** Only Firebase Auth verifies identities; Admin permissions must come from server-issued claims. */
 
-export default function AuthModal({ isOpen, onClose, onLoginSuccess, users }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, onLoginSuccess, onGithubAdminSuccess, users }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>('login');
   const [method, setMethod] = useState<LoginMethod>('email');
   const phoneReady = true; // Device-local SĐT alias; Firebase verifies all passwords.
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -50,6 +53,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users }: Au
   useEffect(() => {
     if (!isOpen) {
       clearInputs();
+      setAdminPassword('');
       setMode('login');
       setMethod('email');
       setPendingVerification(false);
@@ -210,6 +214,24 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users }: Au
     } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
 
+  const signInGithubAdmin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      if (adminPassword.length < 8) throw new Error('Mật khẩu Admin cần ít nhất 8 ký tự.');
+      const result = await gh.admin(adminPassword);
+      if (result.user?.role !== 'operator') throw new Error('Máy chủ không xác nhận quyền Quản trị.');
+      setAdminPassword('');
+      onGithubAdminSuccess?.({ ...result.user, phone: '' } as User);
+      onClose();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signInGoogle = async () => {
     setLoading(true); setError('');
     try { 
@@ -228,6 +250,20 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users }: Au
       <div className="bg-white w-full max-w-md max-h-[93dvh] overflow-y-auto rounded-3xl p-5 sm:p-7 shadow-2xl text-left relative">
         <button onClick={onClose} aria-label="Đóng" className="absolute top-3 right-3 text-stone-600 p-2 rounded-xl hover:bg-stone-100"><X className="w-5 h-5"/></button>
         
+        {mode === 'admin' ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 pr-8"><ShieldCheck className="w-9 h-9 text-emerald-800"/><div><h2 className="text-xl font-black text-emerald-950">Đăng nhập Quản trị QT Limousine</h2><p className="text-xs text-stone-500 mt-1">Quản lý trực tiếp ngay trên trang chủ</p></div></div>
+            <form onSubmit={signInGithubAdmin} className="space-y-3">
+              <label className="block text-sm font-semibold text-stone-700">Mật khẩu Admin
+                <input required type="password" minLength={8} autoComplete="current-password" value={adminPassword} onChange={e=>setAdminPassword(e.target.value)} placeholder="Tối thiểu 8 ký tự" className="mt-2 w-full rounded-xl border border-stone-300 p-3 focus:ring-2 focus:ring-emerald-600"/>
+              </label>
+              <button type="submit" disabled={loading} className="w-full bg-[#1b4332] text-white font-bold rounded-xl p-3 disabled:opacity-50">{loading?'Đang xác thực…':'Đăng nhập Quản trị'}</button>
+            </form>
+            {error&&<p role="alert" className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-sm">{error}</p>}
+            <p className="text-xs text-stone-500">Xác thực an toàn qua máy chủ GitHub. Không dùng mã PIN công khai hoặc mật khẩu Firebase cũ.</p>
+            <button type="button" onClick={()=>{setMode('login');setError('');setAdminPassword('')}} className="text-sm font-semibold text-emerald-800 underline">← Đăng nhập hội viên</button>
+          </div>
+        ) : (<>
         <div className="flex gap-3 items-center mb-3 pr-9">
           <div className="bg-emerald-50 rounded-2xl p-3 shrink-0"><UserRound className="w-7 h-7 text-emerald-700"/></div>
           <div>
@@ -358,10 +394,12 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, users }: Au
           </button>
         </div>
 
+        <button type="button" onClick={()=>{setMode('admin');setError('');setNotice('');clearInputs()}} className="mt-4 w-full border border-emerald-300 bg-emerald-50 text-emerald-900 rounded-xl p-3 font-bold text-sm flex justify-center items-center gap-2"><ShieldCheck className="w-4 h-4"/> Bạn là chủ xe? Đăng nhập Quản trị</button>
         <p className="mt-3 text-[11px] text-stone-500 leading-relaxed text-center">
           <ShieldCheck className="w-3.5 h-3.5 inline mr-1 text-emerald-700"/>
           Xác thực an toàn qua Firebase Auth. Hỗ trợ Đăng nhập Google, Email và SĐT.
         </p>
+        </>)}
       </div>
     </div>
   );
