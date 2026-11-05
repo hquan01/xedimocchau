@@ -221,6 +221,16 @@ export function githubDataRouter():Router {
               if(reward.changed)tx.push({collection:'users',id:uid,record:reward.profile});
             }
           }
+          if(nextStatus==='cancelled'&&latest.data.couponId&&!latest.data.couponRefunded){
+            const couponId=String(latest.data.couponId);
+            const coupon=await getDocument('coupons',couponId);
+            if(coupon){
+              tx.push({collection:'coupons',id:couponId,record:{
+                ...coupon.data,usageCount:Math.max(0,Number(coupon.data.usageCount||0)-1)
+              }});
+              booking.couponRefunded=true;
+            }
+          }
           try{await atomicWrite(tx);return res.json({ok:true});}
           catch(e){if(!(e instanceof StoreError)||e.status!==409||retry===2)throw e;}
         }
