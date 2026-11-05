@@ -59,3 +59,131 @@ html, body {
   max-width: 100%;
   -webkit-tap-highlight-color: transparent;
 }
+/*
+ * Visitor-facing, three-part appearance. All selectors are scoped under
+ * #app_root: the separate GitHub Admin and the operational Admin keep their
+ * existing controls and contrast. No global Tailwind palette is altered.
+ * Manual choice is stored locally, and automatic mode follows local time.
+ */
+#app_root {
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+/* 12:00–17:59 — a softly toned daytime screen, rather than pure white. */
+#app_root[data-appearance="afternoon"] {
+  background-color: #eef3ed !important;
+}
+#app_root[data-appearance="afternoon"] #explore_mobile_home {
+  background-color: #eef3ed !important;
+}
+#app_root[data-appearance="afternoon"] :is([class~="bg-white"], [class~="bg-stone-50"], [class~="bg-[#f7faf7]"]) {
+  background-color: #f8faf5 !important;
+}
+#app_root[data-appearance="afternoon"] #mobile_bottom_nav,
+#app_root[data-appearance="afternoon"] #main_header {
+  background-color: #fafbf7 !important;
+}
+
+/* 18:00–05:59 — muted green/slate night palette, never #000 or bright white. */
+#app_root[data-appearance="night"] {
+  background-color: #0c1720 !important;
+  color: #e7f0f5;
+  color-scheme: dark;
+}
+#app_root[data-appearance="night"] #explore_mobile_home {
+  background-color: #101d28 !important;
+  color: #e7f0f5 !important;
+}
+#app_root[data-appearance="night"] #main_header,
+#app_root[data-appearance="night"] #mobile_bottom_nav,
+#app_root[data-appearance="night"] #mobile_menu_panel {
+  background: #14222e !important;
+  border-color: #344857 !important;
+  color: #e7f0f5 !important;
+}
+#app_root[data-appearance="night"] :is(
+  [class~="bg-white"], [class~="bg-white/98"],
+  [class~="bg-stone-50"], [class~="bg-stone-50/50"], [class~="bg-stone-50/70"],
+  [class~="bg-stone-100"], [class~="bg-stone-200"],
+  [class~="bg-[#f7faf7]"], [class~="bg-[#f6f8f6]"], [class~="bg-[#f4f7f6]"]
+) {
+  background-color: #192936 !important;
+}
+#app_root[data-appearance="night"] :is(
+  [class~="bg-emerald-50"], [class~="bg-emerald-50/70"],
+  [class~="bg-emerald-50/80"], [class~="bg-emerald-100"],
+  [class~="bg-[#e9f8ef]"]
+) {
+  background-color: #19382f !important;
+}
+#app_root[data-appearance="night"] :is([class~="bg-amber-50"], [class~="bg-amber-100"]) {
+  background-color: #3b3225 !important;
+}
+#app_root[data-appearance="night"] :is([class~="bg-red-50"], [class~="bg-red-100"]) {
+  background-color: #3b2b32 !important;
+}
+#app_root[data-appearance="night"] :is([class~="bg-blue-50"], [class~="bg-blue-100"], [class~="bg-[#edf4fc]"]) {
+  background-color: #1e3546 !important;
+}
+#app_root[data-appearance="night"] :is(
+  [class~="border-stone-100"], [class~="border-stone-200"],
+  [class~="border-stone-200/80"], [class~="border-stone-300"],
+  [class~="border-emerald-100"], [class~="border-emerald-200"],
+  [class~="border-[#e2ebe4]"]
+) {
+  border-color: #36505c !important;
+}
+#app_root[data-appearance="night"] :is(
+  [class~="text-stone-900"], [class~="text-stone-950"],
+  [class~="text-stone-800"], [class~="text-stone-700"],
+  [class~="text-[#17382b]"], [class~="text-[#1b4332]"]
+) {
+  color: #e9f2f6 !important;
+}
+#app_root[data-appearance="night"] :is(
+  [class~="text-stone-600"], [class~="text-stone-500"],
+  [class~="text-stone-400"], [class~="text-stone-300"]
+) {
+  color: #b8cbd5 !important;
+}
+#app_root[data-appearance="night"] :is(
+  [class~="text-emerald-600"], [class~="text-emerald-700"],
+  [class~="text-emerald-800"], [class~="text-emerald-900"],
+  [class~="text-emerald-950"], [class~="text-rose-600"],
+  [class~="text-rose-700"]
+) {
+  color: #9be6bf !important;
+}
+#app_root[data-appearance="night"] :is([class~="text-amber-700"], [class~="text-amber-800"], [class~="text-amber-900"]) {
+  color: #f1ce8c !important;
+}
+#app_root[data-appearance="night"] :is([class~="text-red-600"], [class~="text-red-700"], [class~="text-red-800"]) {
+  color: #ffb2b5 !important;
+}
+/* Interactive form controls, including those whose classes don't specify a bg. */
+#app_root[data-appearance="night"] :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  background-color: #172632;
+  color: #eef5f7;
+  border-color: #45606c;
+}
+#app_root[data-appearance="night"] :is(input, textarea)::placeholder {
+  color: #a4bac6;
+  opacity: 1;
+}
+#app_root[data-appearance="night"] :is(input, select, textarea, button, a):focus-visible {
+  outline: 2px solid #a8efd1;
+  outline-offset: 2px;
+}
+/* Retain contrast on deliberately bright, solid action chips and banners. */
+#app_root[data-appearance="night"] :is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-emerald-400"]) :is([class~="text-stone-900"], [class~="text-stone-950"]) {
+  color: #162326 !important;
+}
+#app_root[data-appearance="night"] [class~="from-[#e2f5eb]"] {
+  background-image: linear-gradient(135deg, #1c3834 0%, #1b2935 100%) !important;
+}
+#app_root[data-appearance="night"] #explore_mobile_home section[aria-label="Khám phá Mộc Châu"] > img {
+  filter: brightness(0.77);
+}
+@media (prefers-reduced-motion: reduce) {
+  #app_root { transition: none; }
+}

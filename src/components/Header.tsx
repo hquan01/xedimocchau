@@ -1,8 +1,9 @@
 import React from "react";
-import { Phone, MapPin, Compass, Sparkles, Ticket, CalendarDays, Menu, X, BookOpen, Bus, Shield, Award, LogOut, LogIn, Users, Search, User as UserIcon } from "lucide-react";
+import { Phone, MapPin, Compass, Sparkles, Ticket, CalendarDays, Menu, X, BookOpen, Bus, Shield, Award, LogOut, LogIn, Users, Search, Sun, Moon, Monitor, User as UserIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { User } from "../types";
 import {useSiteContent} from "../lib/siteContent";
+import { useAppearance } from "../hooks/useAppearance";
 
 interface HeaderProps {
   activeTab: string;
@@ -25,6 +26,11 @@ export default function Header({
 }: HeaderProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const {content:siteContent} = useSiteContent();
+  const { preference, dayPart, effective, cyclePreference } = useAppearance(activeTab);
+  const appearanceLabel = preference === 'auto' ? 'Tự động' : preference === 'dark' ? 'Tối' : 'Sáng';
+  const appliedLabel = effective === 'night' ? 'tối' : effective === 'afternoon' ? 'dịu chiều' : 'sáng';
+  const AppearanceIcon = preference === 'auto' ? Monitor : preference === 'dark' ? Moon : Sun;
+  const appearanceHelp = `Giao diện ${appearanceLabel.toLowerCase()} (hiện ${appliedLabel}). Bấm để đổi giữa Tự động, Tối và Sáng.`;
 
   const menuItems = [
     { id: "explore", label: "Khám Phá", icon: MapPin },
@@ -133,6 +139,17 @@ export default function Header({
 
           {/* Right Action buttons for Desktop */}
           <div className="hidden lg:flex items-center space-x-2.5">
+            <button
+              type="button"
+              id="appearance_desktop_btn"
+              onClick={cyclePreference}
+              aria-label={appearanceHelp}
+              title={appearanceHelp}
+              className="flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-700 hover:border-emerald-500 transition-colors"
+            >
+              <AppearanceIcon className="h-4 w-4" aria-hidden="true" />
+              <span>{appearanceLabel}</span>
+            </button>
             <button
               id="my_bookings_btn"
               onClick={openBookingList}
@@ -329,6 +346,20 @@ export default function Header({
               <span>Đăng nhập thành viên / Quản trị</span>
             </button>
           )}
+
+          {/* Keep the mobile header uncluttered: appearance control lives in the menu. */}
+          <button
+            type="button"
+            id="appearance_mobile_btn"
+            onClick={cyclePreference}
+            aria-label={appearanceHelp}
+            title={appearanceHelp}
+            className="flex w-full items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-left text-xs font-bold text-stone-700"
+          >
+            <AppearanceIcon className="h-5 w-5 text-emerald-700" aria-hidden="true" />
+            <span className="flex-1">Giao diện: {appearanceLabel}</span>
+            <span className="text-[10px] font-medium text-stone-500">Đang {appliedLabel} · Chạm để đổi</span>
+          </button>
 
           {/* Quick Action Grid */}
           <div className="grid grid-cols-2 gap-2 pt-1">
