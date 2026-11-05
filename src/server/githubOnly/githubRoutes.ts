@@ -4,6 +4,7 @@ import {checkCollection,checkId,githubConfig,getDocument,listDocuments,putDocume
 import {authMiddleware,requireAdmin} from './githubAuth';
 import {applyBookingReward} from './bookingRewards';
 import {seatConflict} from './seatAvailability';
+import {quoteBooking} from './bookingPricing';
 const GUEST_COOKIE='qt_guest';
 const COOKIE_OPTIONS={httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax' as const,path:'/',maxAge:180*86400000};
 function getGuestCookie(req:Request){return (req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(`${GUEST_COOKIE}=`))?.slice(GUEST_COOKIE.length+1);}
@@ -130,8 +131,8 @@ export function githubDataRouter():Router {
           data.status='pending';data.paymentReported=false;data.paymentReportedAt=null;
           data.userId=req.identity?.uid||'';
           data.guestHash=ensureGuestCookie(req,res);
-          data.pointsDeducted=0;data.couponCode='';data.couponId='';data.discountAmount=0;
-          data.pricingReviewRequired=true;
+          // Customer-submitted discounts and prices are untrusted;
+          // quoteBooking rechecks published prices, membership and vouchers.
         }else if(collection==='service_requests'){
           if(typeof data.customerName!=='string'||typeof data.customerPhone!=='string')throw new StoreError('Thiếu thông tin yêu cầu.',400);
           data.status='pending';data.customerUid=req.identity?.uid||'';data.guestHash=ensureGuestCookie(req,res);
@@ -142,21 +143,38 @@ export function githubDataRouter():Router {
           data.moderationStatus='pending';
         }
       }
-      if(collection==='bookings' && ['limousine','shared_car'].includes(String(data.type))) {
-        // Create with a branch-CAS commit: concurrent customers must not
-        // silently be given the same seat on the same journey.
+      if(collection==='bookings'&&['limousine','shared_car'].includes(String(data.type))){
+        // One branch CAS commits seat reservation plus any point/voucher debit.
+        // A concurrent modification always restarts both quote and occupancy checks.
         for(let attempt=0;attempt<3;attempt++){
-          const [bookings,locks]=await Promise.all([listDocuments('bookings'),listDocuments('blocked_seats')]);
-          const collision=seatConflict(data,bookings.map(b=>b.data),locks.map(b=>b.data));
+          const [bookings,locks,profile,config,coupons]=await Promise.all([
+            listDocuments('bookings'),listDocuments('blocked_seats'),
+            data.userId?getDocument('users',String(data.userId)):Promise.resolve(null),
+            getDocument('configs',String(data.type)==='limousine'?'limousineConfig':'sharedCarConfig'),
+            listDocuments('coupons')
+          ]);
+          const collision=seatConflict(data,bookings.map(x=>x.data),locks.map(x=>x.data));
           if(collision)throw new StoreError(collision,409);
+          const settings=config?.data[String(data.type)==='limousine'?'limousineConfig':'sharedCarConfig'];
+          const calculated=quoteBooking(data,profile?.data||null,settings&&typeof settings==='object'?settings as JsonRecord:null,coupons.map(x=>x.data));
+          const tx:{collection:string,id:string,record:JsonRecord|null}[]=[{collection:'bookings',id,record:calculated.booking}];
+          if(calculated.updatedUser&&profile)tx.push({collection:'users',id:profile.id,record:calculated.updatedUser});
+          if(calculated.updatedCoupon){
+            const couponId=String(calculated.updatedCoupon.id);
+            tx.push({collection:'coupons',id:couponId,record:calculated.updatedCoupon});
+          }
           try{
-            await atomicWrite([{collection:'bookings',id,record:data}]);
-            return res.status(201).json({item:safeRecord(collection,data,req)});
+            await atomicWrite(tx);
+            return res.status(201).json({item:safeRecord(collection,calculated.booking,req)});
           }catch(error){
             if(!(error instanceof StoreError)||error.status!==409||attempt===2)throw error;
           }
         }
-        throw new StoreError('Chỗ ngồi vừa được thay đổi, vui lòng tải lại.',409);
+        throw new StoreError('Chỗ ngồi hoặc điểm thưởng vừa thay đổi. Vui lòng tải lại.',409);
+      }
+      if(collection==='bookings') {
+        const quote=quoteBooking(data,null,null,[]);
+        Object.assign(data,quote.booking);
       }
       await putDocument(collection,id,data);
       res.status(201).json({item:safeRecord(collection,data,req)});
