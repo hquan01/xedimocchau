@@ -10,7 +10,7 @@ const sources=[
  ['guide_articles','Bài viết / cẩm nang'],['destinations','Địa điểm du lịch'],
  ['restaurants','Nhà hàng / ẩm thực'],['flower_seasons','Mùa hoa / trải nghiệm'],
  ['accommodations','Homestay / khách sạn'],['tour_combos','Combo du lịch'],
- ['drivers','Đội xe / tài xế'],['coupons','Mã khuyến mãi'],
+ ['coupons','Mã khuyến mãi'],
  ['zalo_groups','Cộng đồng Zalo'],['partners','Đối tác'],
  ['taxi_fleet','Đội taxi'],['motorbike_fleet','Đội xe máy'],
  ['ai_faqs','Kho câu hỏi AI'],['configs','Lịch, giá và cấu hình'],
@@ -76,6 +76,7 @@ export default function LegacyContentMigration({onDone}:{onDone:()=>Promise<void
    {open&&<div className="my-3 rounded-xl border border-emerald-200 p-4 space-y-3">
      <h3 className="font-black text-base">Đối chiếu dữ liệu nội dung Firebase → GitHub</h3>
      <p className="text-stone-600">Giữ nguyên bài viết, địa điểm, banner, lịch và giá. Không chuyển khách hàng/đơn đặt vé cũ. Chỉ thêm những mã chưa tồn tại; không xóa hay ghi đè.</p>
+     <p className="text-amber-800">Thông tin tài xế và khách hàng có quyền đọc riêng, không được sao chép qua công cụ công khai. Chủ xe sẽ kiểm tra đội xe sau khi chuyển nội dung.</p>
      <p className="text-amber-800">Lưu ý: cần đọc được các bản ghi Firebase cũ. URL ảnh đang nằm trên Firebase Storage sẽ cần chuyển tệp ảnh riêng trước khi ngắt Firebase hoàn toàn.</p>
      <button disabled={busy} onClick={()=>void inspect()} className="rounded-lg bg-[#1b4332] text-white px-4 py-2 disabled:opacity-50">1. Kiểm tra và so sánh dữ liệu</button>
      {progress&&<p className="text-emerald-800">{progress}</p>}
