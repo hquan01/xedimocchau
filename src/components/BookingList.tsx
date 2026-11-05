@@ -13,61 +13,6 @@ interface BookingListProps {
   onDeleteBooking?: (id: string) => void;
 }
 
-// Simulated real-time centralized cloud reservation database for Xe Di Moc Chau
-const CENTRAL_ONLINE_RESERVATIONS: Booking[] = [
-  {
-    id: "xdmc0324",
-    type: "limousine",
-    bookingDate: "19/05/2026",
-    travelDate: "23/05/2026",
-    passengerName: "Nguyễn Minh Quân",
-    passengerPhone: "0971050324",
-    passengerEmail: "hquansl001@gmail.com",
-    pickupPoint: "Nhà hát Lớn Hà Nội (Quy trình xe du lịch)",
-    dropoffPoint: "Thị trấn thị Mộc Châu (Trả tận nơi Khách sạn/Homestay miễn phí)",
-    totalPrice: 640000,
-    status: "success",
-    seatNumbers: ["A3", "A4"],
-    departureTime: "07:05",
-    routeSelection: "Hà Nội - Mộc Châu"
-  },
-  {
-    id: "xdmc8889",
-    type: "combo",
-    bookingDate: "18/05/2026",
-    travelDate: "26/05/2026",
-    returnDate: "28/05/2026",
-    passengerName: "Trần Tiến Đạt",
-    passengerPhone: "0855368889",
-    passengerEmail: "dat.tran@gmail.com",
-    pickupPoint: "Nhà hát Lớn Hà Nội (Quy trình xe du lịch)",
-    dropoffPoint: "Cổng khu du lịch Rừng thông Bản Áng",
-    totalPrice: 4380000,
-    status: "success",
-    comboId: "combo_1",
-    accommodationName: "Phoenix Mộc Châu Resort",
-    roomTypeName: "Bungalow Deluxe Rừng Thông",
-    roomQuantity: 1,
-    nights: 2
-  },
-  {
-    id: "vip999",
-    type: "limousine",
-    bookingDate: "20/05/2026",
-    travelDate: "24/05/2026",
-    passengerName: "Lê Hoàng Yến",
-    passengerPhone: "0987654321",
-    passengerEmail: "hoangyen@gmail.com",
-    pickupPoint: "Cổng khu du lịch Rừng thông Bản Áng",
-    dropoffPoint: "Nhà hát Lớn Hà Nội (Quy trình xe du lịch)",
-    totalPrice: 320000,
-    status: "pending",
-    seatNumbers: ["B2"],
-    departureTime: "12:15",
-    routeSelection: "Mộc Châu - Hà Nội"
-  }
-];
-
 export default function BookingList({ bookings, allBookings, isOpen, onClose, onCancelBooking, onDeleteBooking }: BookingListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "search">("all");
@@ -91,28 +36,11 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
     );
   });
 
-  // Combine Firestore database bookings and CENTRAL_ONLINE_RESERVATIONS mock fallbacks safely without duplicates
-  const uniqueCloudBookings = [
-    ...(allBookings || []),
-    ...CENTRAL_ONLINE_RESERVATIONS.filter(mock => !(allBookings || []).some(b => b.id === mock.id))
-  ];
-
-  // 2. Matched online database (only when searching)
-  const onlineMatched = cleanQuery
-    ? uniqueCloudBookings.filter((bk) => {
-        // Exclude duplicate key rendering
-        const existsInLocal = bookings.some((l) => (l.id || "").toLowerCase() === (bk.id || "").toLowerCase());
-        if (existsInLocal) return false;
-
-        return (
-          (bk.id || "").toLowerCase().includes(cleanQuery) ||
-          (bk.passengerPhone || "").replace(/[\s\.\-]+/g, "").includes(cleanQuery.replace(/[\s\.\-]+/g, ""))
-        );
-      })
-    : [];
-
-  const combinedResults = [...localMatched, ...onlineMatched];
-  const isSearchActive = cleanQuery.length > 0;
+  // Only expose bookings authorized for the current customer/session.
+  // Search by someone else's phone or ticket code must never reveal their trips.
+  const combinedResults=localMatched;
+  const onlineMatched:Booking[]=[]; // Never search unrelated customers' tickets.
+  const isSearchActive=cleanQuery.length>0;
 
   return (
     <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -152,7 +80,7 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
             <div className="flex-1 text-center sm:text-left">
               <span className="block text-xs font-bold text-[#1b4332] uppercase tracking-wide">Bộ phận Tra Cứu Đơn Vé Điện Tử</span>
               <p className="text-[10px] text-stone-500 font-sans mt-0.5">
-                Nhập số điện thoại (ví dụ: <span className="font-mono font-bold text-emerald-700">0971050324</span>) hoặc Mã GD để kiểm tra thông tin.
+                Nhập số điện thoại (ví dụ: <span className="font-mono font-bold text-emerald-700">SĐT của bạn</span>) hoặc Mã GD để kiểm tra thông tin.
               </p>
             </div>
             <div className="relative w-full sm:w-auto flex items-center">
