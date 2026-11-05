@@ -313,6 +313,7 @@ export function useFirebaseSync() {
     bookings,
     setBookings,
     allBookings,
+    setAllBookings,
     blockedSeats,
     setBlockedSeats,
     users,
