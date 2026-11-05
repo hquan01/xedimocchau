@@ -51,7 +51,7 @@ import {
   getDeviceId
 } from "./lib/firebaseUtils";
 import { gh } from "./client/githubApi";
-import GithubOperatorPanel from "./components/GithubOperatorPanel";
+import LegacyGithubOperatorPanel from "./components/LegacyGithubOperatorPanel";
 import { User } from "./types";
 
 export default function App() {
@@ -647,7 +647,7 @@ export default function App() {
   // Admin signs in ON THE HOMEPAGE, then enters the original-style operator workspace.
   // The old client-side PIN and Firebase-admin bypass are deliberately retired.
   if (activeTab === 'operator' && githubAdmin?.role === 'operator') {
-    return <GithubOperatorPanel account={githubAdmin} onLogout={handleSignOut}/>;
+    return <LegacyGithubOperatorPanel onLogout={handleSignOut}/>;
   }
 
   return (
