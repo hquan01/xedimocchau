@@ -36,6 +36,9 @@ const ServicesHubView = lazy(() => import("./components/ServicesHubView"));
 
 import { Booking, AppNotification } from "./types";
 import { useFirebaseSync } from "./hooks/useFirebaseSync";
+import { useGithubSync } from "./hooks/useGithubSync";
+const githubDataPreview=(import.meta as ImportMeta & {env?:Record<string,string>}).env?.VITE_DATA_PROVIDER==="github";
+const useDataSync=githubDataPreview?useGithubSync:useFirebaseSync;
 import { auth, db } from "./firebase";
 import { signOut } from "firebase/auth";
 import { 
@@ -137,7 +140,7 @@ export default function App() {
     setZaloGroups,
     notifications,
     setNotifications
-  } = useFirebaseSync();
+  } = useDataSync();
 
   // Existing member orders with a Firebase userId sometimes received zero
   // points before the reward implementation. Reconcile on login using a
@@ -347,7 +350,13 @@ export default function App() {
       if (currentUser && currentUser.id) {
          booking.userId = currentUser.id;
       }
-      await saveBookingToFirebase(booking);
+      if(githubDataPreview){
+        const response=await gh.create('bookings',booking);
+        if(!response.item?.id)throw new Error('Máy chủ chưa xác nhận được đơn đặt vé. Vui lòng thử lại.');
+        Object.assign(booking,response.item); // Correct server-issued booking ID for payment/inbox.
+        setBookings(old=>[response.item as Booking,...old]);
+        setAllBookings(old=>[response.item as Booking,...old]);
+      }else await saveBookingToFirebase(booking);
 
       // Create Notification
       const notifTitle = "KHÁCH MỚI ĐẶT VÉ";
@@ -375,7 +384,7 @@ export default function App() {
       };
       
       setNotifications([newNotif, ...notifications].slice(0, 50));
-      await saveNotificationToFirebase(newNotif);
+      if(!githubDataPreview)await saveNotificationToFirebase(newNotif);
 
       // Send system level notification for operator
       if (currentUser?.role === "operator") {
@@ -452,11 +461,18 @@ export default function App() {
   const handleCancelBooking = async (id: string) => {
     const bk = bookings.find(b => b.id === id);
     if (bk) {
-       await updateBookingStatusWithRewards(id,"cancelled");
+       if(githubDataPreview){
+         await gh.patch('bookings',id,{cancellationRequested:true});
+         window.alert('Đã gửi yêu cầu hủy vé. Nhà xe sẽ liên hệ để xác nhận và hoàn cọc theo chính sách.');
+       }else await updateBookingStatusWithRewards(id,"cancelled");
     }
   };
 
   const handleDeleteBooking = async (id: string) => {
+    if(githubDataPreview){
+      window.alert('Để xóa lịch sử vé, vui lòng liên hệ nhà xe. Đơn đặt vé cần được lưu để đối soát tiền cọc.');
+      return;
+    }
     await deleteBookingFromFirebase(id);
   };
 
@@ -474,7 +490,10 @@ export default function App() {
     if (newTotal) {
       bookingToUpdate.totalPrice = newTotal;
     }
-    await updateBookingStatusInFirebase(id, bookingToUpdate);
+    if(githubDataPreview){
+      await gh.patch('bookings',id,{paymentReported:true});
+      setBookings(prev=>prev.map(x=>x.id===id?{...x,paymentReported:true,paymentReportedAt:bookingToUpdate.paymentReportedAt}:x));
+    }else await updateBookingStatusInFirebase(id, bookingToUpdate);
   };
 
   const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all", pickup?: string, dropoff?: string) => {
@@ -539,10 +558,13 @@ export default function App() {
   };
 
   const handleSignOut = async () => {
-    if (githubAdmin) {
+    if (githubDataPreview || githubAdmin) {
       try {
         await gh.logout();
         setGithubAdmin(null);
+        setCurrentUser(null);
+        setBookings([]);
+        setAllBookings([]);
         setActiveTab('explore');
       } catch (err) {
         console.error('Không thể đăng xuất Admin GitHub:', err);
@@ -816,7 +838,12 @@ export default function App() {
             <CustomerDashboard
               currentUser={currentUser}
               onUpdateUser={(updated) => {
-                setCurrentUser(updated);
+                if(githubDataPreview){
+                  const {name,phone,gender,birthDate,address,favPickup,favDropoff,avatarDataUrl}=updated;
+                  void gh.patch('users',updated.id,{name,phone,gender,birthDate,address,favPickup,favDropoff,avatarDataUrl})
+                    .then(()=>setCurrentUser(updated))
+                    .catch(e=>window.alert('Chưa lưu được hồ sơ: '+String(e)));
+                }else setCurrentUser(updated);
               }}
               bookings={bookings}
               onCancelBooking={handleCancelBooking}
@@ -857,7 +884,7 @@ export default function App() {
           onClose={() => setIsAuthOpen(false)}
           onLoginSuccess={(user) => {
             setCurrentUser(user);
-            localStorage.setItem("xedimocchau_current_user", JSON.stringify(user));
+            if(!githubDataPreview)localStorage.setItem("xedimocchau_current_user", JSON.stringify(user));
             if (user.role === "operator") {
               setActiveTab("operator");
             } else {
@@ -871,7 +898,7 @@ export default function App() {
       <Suspense fallback={null}>
         <BookingList
           bookings={bookings}
-          allBookings={allBookings}
+          allBookings={githubDataPreview?bookings:allBookings}
           isOpen={isBookingListOpen}
           onClose={() => setIsBookingListOpen(false)}
           onCancelBooking={handleCancelBooking}
