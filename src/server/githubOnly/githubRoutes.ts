@@ -28,8 +28,7 @@ function owned(req:Request,record:JsonRecord) {
 }
 function safeRecord(collection:string,data:JsonRecord,req:Request) {
   const value={...data};
-  delete value.passwordHash;
-  delete value.guestHash;
+  for(const secret of ['passwordHash','customPassword','passwordResetToDefault','resetToken','sessionToken','otpSecret','totpSecret','guestHash'])delete value[secret];
   if(collection==='users'&&req.identity?.role!=='operator')delete value.operatorNotes;
   return value;
 }
@@ -140,23 +139,50 @@ export function githubDataRouter():Router {
         }else throw new StoreError('Không có quyền sửa dữ liệu.',403);
       }
       const nextRecord={...current.data,...changes,id};
-      if(collection==='bookings'&&req.identity?.role==='operator'&&patch.status==='success'&&current.data.status!=='success'){
-        // Reward exactly once on confirmation; data branch CAS prevents concurrent double rewards.
-        const uid=String(current.data.userId||'');
-        for(let n=0;n<3;n++){
-          const latestBooking=await getDocument('bookings',id);
-          if(!latestBooking)throw new StoreError('Đơn không còn tồn tại.',409);
-          const latestNext={...latestBooking.data,...changes,id};
-          const changesToWrite:any[]=[{collection:'bookings',id,record:latestNext}];
-          if(uid&&latestBooking.data.status!=='success'){
-            const profile=await getDocument('users',uid);
-            if(profile){
-              const rewarded=Array.isArray(profile.data.rewardedBookingIds)?profile.data.rewardedBookingIds as string[]:[];
-              if(!rewarded.includes(id))changesToWrite.push({collection:'users',id:uid,record:{...profile.data,points:Math.max(0,Number(profile.data.points)||0)+1,rewardedBookingIds:[...rewarded,id],completedBookingsCount:(Number(profile.data.completedBookingsCount)||0)+1}});
+      if(collection==='bookings'&&req.identity?.role==='operator'&&Object.hasOwn(patch,'status')){
+        const nextStatus=String(patch.status);
+        if(!['pending','success','completed','cancelled'].includes(nextStatus))throw new StoreError('Trạng thái vé không hợp lệ.',400);
+        // A single branch-CAS commit updates the booking and the member wallet.
+        // Repeated confirmation never adds a duplicate point. Cancellation reverses
+        // one prior point and restores previously spent points exactly once.
+        for(let retry=0;retry<3;retry++){
+          const latest=await getDocument('bookings',id);
+          if(!latest)throw new StoreError('Đơn đặt vé không còn tồn tại.',409);
+          const booking:JsonRecord={...latest.data,...changes,id};
+          const uid=String(latest.data.userId||'');
+          const tx:{collection:string,id:string,record:JsonRecord|null}[]=[{collection:'bookings',id,record:booking}];
+          if(uid) {
+            const currentProfile=await getDocument('users',uid);
+            if(currentProfile) {
+              const profile={...currentProfile.data};
+              const ids=Array.isArray(profile.rewardedBookingIds)?profile.rewardedBookingIds.map(String):[];
+              const hasReward=ids.includes(id);
+              const confirm=nextStatus==='success'||nextStatus==='completed';
+              const cancel=nextStatus==='cancelled';
+              let nextIds=ids;
+              let points=Math.max(0,Number(profile.points)||0);
+              let changed=false;
+              if(confirm&&!hasReward){nextIds=[...ids,id];points+=1;changed=true;}
+              if(cancel&&hasReward){nextIds=ids.filter(i=>i!==id);points=Math.max(0,points-1);changed=true;}
+              if(cancel&&!latest.data.pointsRefunded&&Number(latest.data.pointsDeducted||0)>0){
+                points+=Math.max(0,Math.floor(Number(latest.data.pointsDeducted)||0));
+                booking.pointsRefunded=true;changed=true;
+              }
+              if(cancel&&typeof latest.data.couponCode==='string'&&latest.data.couponCode){
+                const used=Array.isArray(profile.usedCoupons)?profile.usedCoupons as string[]:[];
+                const code=latest.data.couponCode.toUpperCase();
+                if(used.includes(code)){profile.usedCoupons=used.filter(v=>v!==code);changed=true;}
+              }
+              if(changed){
+                profile.points=points;
+                profile.rewardedBookingIds=nextIds;
+                profile.completedBookingsCount=nextIds.length;
+                tx.push({collection:'users',id:uid,record:profile});
+              }
             }
           }
-          try{await atomicWrite(changesToWrite);return res.json({ok:true});}
-          catch(e){if(!(e instanceof StoreError)||e.status!==409||n===2)throw e;}
+          try{await atomicWrite(tx);return res.json({ok:true});}
+          catch(e){if(!(e instanceof StoreError)||e.status!==409||retry===2)throw e;}
         }
       }
       await putDocument(collection,id,nextRecord,current.sha);
