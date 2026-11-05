@@ -107,8 +107,8 @@ export function githubAuthRouter():Router {
     try {
       limitLogin(req);
       const email=normalize(req.body?.email),password=String(req.body?.password||''),name=String(req.body?.name||'').trim().slice(0,120),phone=String(req.body?.phone||'').trim();
-      if(!emailOk(email)||password.length<10||password.length>256||name.length<2||!/^(0|\+84)[35789]\d{8}$/.test(phone))
-        throw new StoreError('Email, họ tên, SĐT hoặc mật khẩu chưa hợp lệ (mật khẩu từ 10 ký tự).',400);
+      if(!emailOk(email)||password.length<8||password.length>256||name.length<2||!/^(0|\+84)[35789]\d{8}$/.test(phone))
+        throw new StoreError('Email, họ tên, SĐT hoặc mật khẩu chưa hợp lệ (mật khẩu từ 8 ký tự).',400);
       const id=customerId(email),existing=await getDocument('users',id);
       if(existing)throw new StoreError('Email đã được đăng ký.',409);
       const profile={id,email,name,phone,role:'customer',points:10,welcomeBonusGranted:true,welcomeBonusPoints:10,createdAt:new Date().toISOString(),provider:'email',passwordHash:await hashPassword(password)};
