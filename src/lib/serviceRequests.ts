@@ -38,6 +38,14 @@ export async function submitServiceInquiry(input: Omit<ServiceInquiry, 'id'|'cre
     throw new Error('Vui lòng kiểm tra ngày nhận/trả, số lượng xe và nơi nhận xe.');
   }
   const values = Object.fromEntries(Object.entries(input).filter(([,v]) => v !== undefined && v !== null));
+  if(import.meta.env.VITE_DATA_PROVIDER==='github'){
+    // Preview migration: customer requests and the operator's inbox share one
+    // encrypted backend. Never report success when the server write fails.
+    const {gh}=await import('../client/githubApi');
+    const saved=await gh.create('service_requests',{...values,customerName:name,customerPhone:phone,kind:input.kind});
+    if(!saved.item?.id)throw new Error('Máy chủ chưa xác nhận đã nhận đơn dịch vụ.');
+    return String(saved.item.id);
+  }
   const payload = {
     ...values,
     customerName: name,
