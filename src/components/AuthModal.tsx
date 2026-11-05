@@ -250,6 +250,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, onGithubAdm
       <div className="bg-white w-full max-w-md max-h-[93dvh] overflow-y-auto rounded-3xl p-5 sm:p-7 shadow-2xl text-left relative">
         <button onClick={onClose} aria-label="Đóng" className="absolute top-3 right-3 text-stone-600 p-2 rounded-xl hover:bg-stone-100"><X className="w-5 h-5"/></button>
         
+        <div className="grid grid-cols-2 gap-2 mb-5 pr-8" role="group" aria-label="Chọn loại tài khoản">
+          <button type="button" onClick={()=>{setMode('login');setError('');setNotice('');setAdminPassword('')}} aria-pressed={mode!=='admin'} className={`rounded-xl border p-2.5 text-sm font-bold ${mode!=='admin'?'bg-emerald-800 border-emerald-800 text-white':'border-stone-200 text-stone-700'}`}>Khách hàng</button>
+          <button type="button" onClick={()=>{setMode('admin');setError('');setNotice('');clearInputs()}} aria-pressed={mode==='admin'} className={`rounded-xl border p-2.5 text-sm font-bold ${mode==='admin'?'bg-emerald-800 border-emerald-800 text-white':'border-stone-200 text-stone-700'}`}>Chủ xe / Quản trị</button>
+        </div>
         {mode === 'admin' ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 pr-8"><ShieldCheck className="w-9 h-9 text-emerald-800"/><div><h2 className="text-xl font-black text-emerald-950">Đăng nhập Quản trị QT Limousine</h2><p className="text-xs text-stone-500 mt-1">Quản lý trực tiếp ngay trên trang chủ</p></div></div>
@@ -394,7 +398,6 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, onGithubAdm
           </button>
         </div>
 
-        <button type="button" onClick={()=>{setMode('admin');setError('');setNotice('');clearInputs()}} className="mt-4 w-full border border-emerald-300 bg-emerald-50 text-emerald-900 rounded-xl p-3 font-bold text-sm flex justify-center items-center gap-2"><ShieldCheck className="w-4 h-4"/> Bạn là chủ xe? Đăng nhập Quản trị</button>
         <p className="mt-3 text-[11px] text-stone-500 leading-relaxed text-center">
           <ShieldCheck className="w-3.5 h-3.5 inline mr-1 text-emerald-700"/>
           Xác thực an toàn qua Firebase Auth. Hỗ trợ Đăng nhập Google, Email và SĐT.
