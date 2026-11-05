@@ -100,6 +100,16 @@ export default function LegacyGithubOperatorPanel({onLogout}:{onLogout:()=>Promi
     </div>
   </section>;
   return <div className="relative" data-admin-layout="original-operator">
+    <div className="bg-emerald-950 text-white px-4 py-2 flex flex-wrap justify-end items-center gap-3 text-xs">
+      <span className="opacity-75">Dữ liệu vận hành: GitHub (bản thử nghiệm)</span>
+      <button type="button" disabled={busy} onClick={()=>{
+        if(!window.confirm('Kiểm tra quyền ghi/đọc/xóa dữ liệu thử trên GitHub? Không ảnh hưởng khách hàng.'))return;
+        setBusy(true);setError('');
+        void gh.writeTest().then(r=>{if(r.ok&&r.read&&r.write&&r.delete)window.alert('Đã kiểm tra: thêm, đọc lại và xóa dữ liệu thử trên GitHub thành công.');else throw new Error('Kết quả không đầy đủ.')})
+        .catch(e=>setError('Kiểm tra quyền ghi thất bại: '+describeError(e)))
+        .finally(()=>setBusy(false));
+      }} className="rounded-lg border border-white/40 px-3 py-1.5 hover:bg-white/10 disabled:opacity-50">Kiểm tra quyền lưu GitHub</button>
+    </div>
     {error&&<div role="alert" className="sticky top-0 z-50 bg-red-50 text-red-900 border-b border-red-200 p-3 text-sm font-semibold">{error} <button className="underline ml-2" onClick={()=>setError('')}>Đóng</button></div>}
     {busy&&<div className="fixed bottom-5 left-5 bg-emerald-900 text-white text-xs px-4 py-2 rounded-xl z-50">Đang đồng bộ dữ liệu GitHub…</div>}
     <OperatorPanel
