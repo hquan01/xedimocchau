@@ -171,9 +171,12 @@ export function githubDataRouter():Router {
       if(req.identity?.role!=='operator'){
         if(collection==='bookings'&&owned(req,current.data)) {
           // Customer merely reports transfer. Only Admin can confirm payment or change status.
-          if(Object.keys(patch).length<1||Object.keys(patch).some(x=>!['paymentReported'].includes(x))||patch.paymentReported!==true)
-            throw new StoreError('Khách chỉ có thể thông báo đã chuyển cọc, không thể tự duyệt vé.',403);
-          changes={paymentReported:true,paymentReportedAt:new Date().toISOString()};
+          if(Object.keys(patch).length!==1||!['paymentReported','cancellationRequested'].includes(Object.keys(patch)[0])||Object.values(patch)[0]!==true)
+            throw new StoreError('Khách chỉ được báo đã chuyển cọc hoặc yêu cầu hủy vé, không thể tự duyệt vé.',403);
+          if(patch.cancellationRequested===true){
+            if(current.data.status==='cancelled'||current.data.status==='completed')throw new StoreError('Không thể yêu cầu hủy đơn đã kết thúc.',409);
+            changes={cancellationRequested:true,cancellationRequestedAt:new Date().toISOString()};
+          }else changes={paymentReported:true,paymentReportedAt:new Date().toISOString()};
         }else if(collection==='users'&&req.identity?.uid===id){
           const allowed=new Set(['name','phone','gender','birthDate','address','favPickup','favDropoff','avatarDataUrl']);
           if(Object.keys(patch).some(x=>!allowed.has(x)))throw new StoreError('Không thể tự thay đổi quyền hoặc điểm thưởng.',403);
