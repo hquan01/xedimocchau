@@ -53,6 +53,7 @@ export default function GithubBackendPreview(){
     if(result)refresh();
   };
   const login=async()=>{
+    if(mode==='register'&&loginPassword.length<8){setNotice('');setError('Mật khẩu đăng ký cần ít nhất 8 ký tự.');return;}
     const result=await execute(()=>mode==='admin'?gh.admin(adminPassword):mode==='member'?gh.login(loginEmail,loginPassword):gh.register(loginEmail,loginPassword,regName,regPhone),'Đăng nhập thành công.');
     if(result){setAccount(result.user);setAdminPassword('');setLoginPassword('');}
   };
@@ -75,7 +76,7 @@ export default function GithubBackendPreview(){
         <h2 className="font-bold flex items-center gap-2"><Lock className="w-4 h-4"/>{mode==='admin'?'Đăng nhập quản trị GitHub':mode==='member'?'Đăng nhập hội viên':'Tạo hội viên (+10 điểm)'}</h2>
         {mode!=='admin'&&<input className="w-full border rounded-xl p-3" placeholder="Email" autoComplete="email" type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}/>}
         {mode==='register'&&<><input className="w-full border rounded-xl p-3" placeholder="Họ tên" value={regName} onChange={e=>setRegName(e.target.value)}/><input className="w-full border rounded-xl p-3" placeholder="Số điện thoại" value={regPhone} onChange={e=>setRegPhone(e.target.value)}/></>}
-        <input className="w-full border rounded-xl p-3" placeholder="Mật khẩu" type="password" autoComplete={mode==='register'?'new-password':'current-password'} value={mode==='admin'?adminPassword:loginPassword} onChange={e=>mode==='admin'?setAdminPassword(e.target.value):setLoginPassword(e.target.value)}/>
+        <input className="w-full border rounded-xl p-3" placeholder={mode==='register'?'Mật khẩu (tối thiểu 8 ký tự)':'Mật khẩu'} type="password" minLength={mode==='register'?8:undefined} maxLength={256} autoComplete={mode==='register'?'new-password':'current-password'} value={mode==='admin'?adminPassword:loginPassword} onChange={e=>mode==='admin'?setAdminPassword(e.target.value):setLoginPassword(e.target.value)}/>
         <button disabled={busy||!ready} onClick={login} className="w-full bg-[#1b4332] text-white rounded-xl p-3 font-bold disabled:opacity-40">{busy?'Đang kiểm tra…':mode==='register'?'Đăng ký':'Đăng nhập'}</button>
         <p className="text-xs text-stone-500">Admin xác thực bằng mật khẩu máy chủ; hội viên dùng tài khoản mới lưu trên GitHub. Tài khoản Firebase cũ chưa được chuyển dữ liệu.</p>
       </section>:<>
