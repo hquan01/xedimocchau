@@ -10,7 +10,7 @@ import {INITIAL_ACCOMMODATIONS} from '../data/accommodations';
 import {INITIAL_ZALO_GROUPS} from '../data/zaloGroups';
 import {INITIAL_RESTAURANTS,INITIAL_FLOWER_SEASONS} from '../data/operatorDefaults';
 import {DEFAULT_LIMOUSINE_CONFIG,DEFAULT_SHARED_CAR_CONFIG,INITIAL_LOCATIONS} from '../data/config';
-import {defaultSiteContent} from '../lib/siteContent';
+import {defaultSiteContent} from '../data/defaultSiteContent';
 
 
 type Row=Record<string,any>;

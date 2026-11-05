@@ -1,9 +1,9 @@
-import { RestaurantItem } from "../components/operator/RestaurantManagement";
-import { FlowerSeasonItem } from "../components/operator/FlowerSeasonManagement";
-import { PartnerItem } from "../components/operator/PartnerManagement";
-import { TaxiVehicle } from "../components/operator/TaxiFleetManagement";
-import { MotorbikeVehicle } from "../components/operator/MotorbikeManagement";
-import { AIKnowledgeItem } from "../components/operator/AIAssistantManagement";
+import type { RestaurantItem } from "../components/operator/RestaurantManagement";
+import type { FlowerSeasonItem } from "../components/operator/FlowerSeasonManagement";
+import type { PartnerItem } from "../components/operator/PartnerManagement";
+import type { TaxiVehicle } from "../components/operator/TaxiFleetManagement";
+import type { MotorbikeVehicle } from "../components/operator/MotorbikeManagement";
+import type { AIKnowledgeItem } from "../components/operator/AIAssistantManagement";
 
 export const INITIAL_RESTAURANTS: RestaurantItem[] = [
   {
