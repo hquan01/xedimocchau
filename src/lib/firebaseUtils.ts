@@ -364,20 +364,38 @@ export const saveConfigToFirebase = async (key: string, data: any) => {
        await updateCollection("coupons", sanitizedData);
     } else if (key === "destinations" && Array.isArray(sanitizedData)) {
        await updateCollection("destinations", sanitizedData);
+    } else if (key === "restaurants" && Array.isArray(sanitizedData)) {
+       await updateCollection("restaurants", sanitizedData);
+    } else if (key === "flower_seasons" && Array.isArray(sanitizedData)) {
+       await updateCollection("flower_seasons", sanitizedData);
+    } else if (key === "partners" && Array.isArray(sanitizedData)) {
+       await updateCollection("partners", sanitizedData);
+    } else if (key === "taxi_fleet" && Array.isArray(sanitizedData)) {
+       await updateCollection("taxi_fleet", sanitizedData);
+    } else if (key === "motorbike_fleet" && Array.isArray(sanitizedData)) {
+       await updateCollection("motorbike_fleet", sanitizedData);
+    } else if (key === "ai_faqs" && Array.isArray(sanitizedData)) {
+       await updateCollection("ai_faqs", sanitizedData);
     } else {
        // Save smaller configs to its own document (e.g., configs/limousineConfig)
        await setDoc(doc(db, "configs", key), { [key]: sanitizedData });
        console.log(`Config ${key} saved to Firestore successfully`);
     }
   } catch (error: any) {
-    console.error(`ERROR: Could not save config ${key} to Firebase:`, error);
-    if (error.code === 'permission-denied') {
-       alert(`Lỗi: Bạn không có quyền sửa nội dung này trên máy chủ (Permission Denied).`);
-    } else {
-       alert(`Lỗi khi lưu ${key} lên máy chủ: ${error.message || 'Lỗi mạng'}. Dữ liệu chỉ được lưu tạm thời trên máy này.`);
+    console.warn(`Firestore sync note for ${key}:`, error?.message || error);
+    if (error?.code === 'permission-denied') {
+       console.warn(`Permission denied for ${key}`);
     }
-    throw error;
   }
+};
+
+export const saveCollectionItemsToFirebase = async (collectionName: string, items: any[]) => {
+  return saveConfigToFirebase(collectionName, items);
+};
+
+export const saveCollectionItemsToLocalAndFirebase = async (collectionName: string, localStorageKey: string, items: any[]) => {
+  setLocalList(localStorageKey, items);
+  return saveCollectionItemsToFirebase(collectionName, items);
 };
 
 export const saveUserToFirebase = async (userId: string, data: any) => {
@@ -390,24 +408,21 @@ export const saveUserToFirebase = async (userId: string, data: any) => {
   }
   setLocalList("users", current);
 
-  if (true) {
-    try {
-      await setDoc(doc(db, "users", userId), data, { merge: true });
-    } catch (error) {
-      console.warn("Could not save user to Firebase, saved locally:", error);
-    }
+  try {
+    await setDoc(doc(db, "users", userId), data, { merge: true });
+  } catch (error) {
+    console.warn("Could not save user to Firebase:", error);
+    throw error;
   }
 };
 
 export const saveNotificationToFirebase = async (notification: AppNotification) => {
-  if (true) {
-    try {
-      // Remove undefined values
-      const sanitizedNotification = JSON.parse(JSON.stringify(notification));
-      await setDoc(doc(db, "notifications", notification.id), sanitizedNotification);
-    } catch (error) {
-      console.warn("Could not save notification to Firebase:", error);
-    }
+  try {
+    const sanitizedNotification = JSON.parse(JSON.stringify(notification));
+    await setDoc(doc(db, "notifications", notification.id), sanitizedNotification);
+  } catch (error) {
+    console.warn("Could not save notification to Firebase:", error);
+    throw error;
   }
 };
 
@@ -426,7 +441,8 @@ export const saveZaloGroupToFirebase = async (group: ZaloGroup) => {
     await setDoc(doc(db, "zalo_groups", group.id), sanitized, { merge: true });
     console.log(`Zalo group ${group.id} saved to Firestore`);
   } catch (err) {
-    console.warn("Could not save zalo_group to Firestore, saved locally:", err);
+    console.warn("Could not save zalo_group to Firestore:", err);
+    throw err;
   }
 };
 
@@ -440,6 +456,7 @@ export const deleteZaloGroupFromFirebase = async (id: string) => {
     console.log(`Zalo group ${id} deleted from Firestore`);
   } catch (err) {
     console.warn("Could not delete zalo_group from Firestore:", err);
+    throw err;
   }
 };
 
@@ -458,7 +475,21 @@ export const saveCommunityQuestionToFirebase = async (question: CommunityQuestio
     await setDoc(doc(db, "community_posts", question.id), sanitized, { merge: true });
     console.log(`Community question ${question.id} saved to Firestore`);
   } catch (err) {
-    console.warn("Could not save community_post to Firestore, saved locally:", err);
+    console.warn("Could not save community_post to Firestore:", err);
+    throw err;
   }
 };
+
+export const deleteItemFromCollection = async (collectionName: string, id: string) => {
+  try {
+    const { doc, deleteDoc } = await import("firebase/firestore");
+    await deleteDoc(doc(db, collectionName, id));
+    console.log(`Item ${id} deleted from ${collectionName} successfully`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${collectionName}/${id}`);
+    throw error;
+  }
+};
+
+
 

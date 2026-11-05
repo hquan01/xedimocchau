@@ -339,7 +339,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
       returnDate: returnDateStr,
       passengerName: trimmedName,
       passengerPhone: trimmedPhone,
-      passengerEmail: trimmedEmail || "contact@client.vn",
+      passengerEmail: trimmedEmail || undefined,
       pickupPoint: pickupPoint || finalPickupPoint,
       dropoffPoint: dropoffPoint || `Sảnh khách sạn: ${selectedAcc.name} (Mộc Châu)`,
       totalPrice: finalPrice,

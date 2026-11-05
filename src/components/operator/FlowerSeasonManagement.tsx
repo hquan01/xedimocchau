@@ -124,29 +124,28 @@ export default function FlowerSeasonManagement() {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return;
 
     const todayStr = new Date().toLocaleDateString("vi-VN");
+    let updated: FlowerSeasonItem[] = [];
 
     if (editingItem) {
-      setSeasons(prev =>
-        prev.map(s =>
-          s.id === editingItem.id
-            ? {
-                ...s,
-                name: formName.trim(),
-                timeRange: formTimeRange.trim(),
-                location: formLocation.trim(),
-                status: formStatus,
-                verificationDate: todayStr,
-                description: formDescription.trim(),
-                bestTimeOfDay: formBestTime.trim(),
-                checkInTips: formTips.trim()
-              }
-            : s
-        )
+      updated = seasons.map(s =>
+        s.id === editingItem.id
+          ? {
+              ...s,
+              name: formName.trim(),
+              timeRange: formTimeRange.trim(),
+              location: formLocation.trim(),
+              status: formStatus,
+              verificationDate: todayStr,
+              description: formDescription.trim(),
+              bestTimeOfDay: formBestTime.trim(),
+              checkInTips: formTips.trim()
+            }
+          : s
       );
     } else {
       const newItem: FlowerSeasonItem = {
@@ -162,21 +161,41 @@ export default function FlowerSeasonManagement() {
         checkInTips: formTips.trim() || "Mang giày thể thao đi lại thuận tiện.",
         published: true
       };
-      setSeasons(prev => [newItem, ...prev]);
+      updated = [newItem, ...seasons];
     }
-    setIsModalOpen(false);
+
+    try {
+      const { saveCollectionItemsToFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToFirebase("flower_seasons", updated);
+      setSeasons(updated);
+      setIsModalOpen(false);
+    } catch (err: any) {
+      alert("Chưa thể lưu thông tin mùa hoa lên máy chủ: " + (err?.message || "Lỗi kết nối"));
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Bạn có chắc chắn muốn xóa mùa hoa này?")) {
-      setSeasons(prev => prev.filter(s => s.id !== id));
+      const updated = seasons.filter(s => s.id !== id);
+      try {
+        const { saveCollectionItemsToFirebase } = await import("../../lib/firebaseUtils");
+        await saveCollectionItemsToFirebase("flower_seasons", updated);
+        setSeasons(updated);
+      } catch (err: any) {
+        alert("Chưa thể xóa mùa hoa trên máy chủ: " + (err?.message || "Lỗi kết nối"));
+      }
     }
   };
 
-  const handleTogglePublish = (id: string) => {
-    setSeasons(prev =>
-      prev.map(s => (s.id === id ? { ...s, published: !s.published } : s))
-    );
+  const handleTogglePublish = async (id: string) => {
+    const updated = seasons.map(s => (s.id === id ? { ...s, published: !s.published } : s));
+    try {
+      const { saveCollectionItemsToFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToFirebase("flower_seasons", updated);
+      setSeasons(updated);
+    } catch (err: any) {
+      alert("Chưa thể cập nhật hiển thị trên máy chủ: " + (err?.message || "Lỗi kết nối"));
+    }
   };
 
   const getStatusBadge = (status: FlowerSeasonItem["status"]) => {

@@ -146,14 +146,15 @@ export default function MotorbikeManagement() {
     setIsModalOpen(true);
   };
 
-  const handleSaveBike = () => {
+  const handleSaveBike = async () => {
     if (!formModel.trim()) {
       alert("Vui lòng nhập tên dòng xe!");
       return;
     }
 
+    let updatedFleet: MotorbikeVehicle[] = [];
     if (editingBike) {
-      setFleet(prev => prev.map(b => b.id === editingBike.id ? {
+      updatedFleet = fleet.map(b => b.id === editingBike.id ? {
         ...b,
         plate: formPlate.trim(),
         model: formModel.trim(),
@@ -163,7 +164,7 @@ export default function MotorbikeManagement() {
         dailyPrice: Number(formPrice) || 150000,
         pickupLocations: formLocations.split(",").map(s => s.trim()).filter(Boolean),
         rentalRequirements: formRequirements.trim()
-      } : b));
+      } : b);
     } else {
       const newBike: MotorbikeVehicle = {
         id: `mb-${Date.now()}`,
@@ -178,24 +179,56 @@ export default function MotorbikeManagement() {
         status: "available",
         isVisible: true
       };
-      setFleet([newBike, ...fleet]);
+      updatedFleet = [newBike, ...fleet];
     }
 
+    setFleet(updatedFleet);
     setIsModalOpen(false);
-  };
 
-  const handleToggleVisible = (id: string) => {
-    setFleet(prev => prev.map(b => b.id === id ? { ...b, isVisible: !b.isVisible } : b));
-  };
-
-  const handleDeleteBike = (id: string) => {
-    if (confirm("Xóa dòng xe máy này khỏi danh sách quản lý?")) {
-      setFleet(prev => prev.filter(b => b.id !== id));
+    try {
+      const { saveCollectionItemsToLocalAndFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToLocalAndFirebase("motorbike_fleet", "mocchau_admin_motorbike_fleet", updatedFleet);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed (saved locally):", err);
     }
   };
 
-  const handleUpdateRequestStatus = (reqId: string, status: MotorbikeBookingRequest["status"]) => {
-    setRequests(prev => prev.map(r => r.id === reqId ? { ...r, status } : r));
+  const handleToggleVisible = async (id: string) => {
+    const updated = fleet.map(b => b.id === id ? { ...b, isVisible: !b.isVisible } : b);
+    setFleet(updated);
+    try {
+      const { saveCollectionItemsToLocalAndFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToLocalAndFirebase("motorbike_fleet", "mocchau_admin_motorbike_fleet", updated);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed:", err);
+    }
+  };
+
+  const handleDeleteBike = async (id: string) => {
+    alert("Nút xóa đã được bấm!");
+    if (confirm("Xóa dòng xe máy này khỏi danh sách quản lý?")) {
+      const updated = fleet.filter(b => b.id !== id);
+      setFleet(updated);
+      try {
+        console.log("Attempting to delete bike:", id);
+        const { deleteItemFromCollection } = await import("../../lib/firebaseUtils");
+        await deleteItemFromCollection("motorbike_fleet", id);
+        console.log("Deletion successful.");
+      } catch (err: any) {
+        console.error("Deletion failed, check Firestore rules:", err);
+      }
+    }
+  };
+
+  const handleUpdateRequestStatus = async (reqId: string, status: MotorbikeBookingRequest["status"]) => {
+    const updated = requests.map(r => r.id === reqId ? { ...r, status } : r);
+    setRequests(updated);
+    try {
+      const { saveCollectionItemsToLocalAndFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToLocalAndFirebase("motorbike_requests", "mocchau_admin_motorbike_requests", updated);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed:", err);
+    }
   };
 
   const filteredFleet = fleet.filter(b => {

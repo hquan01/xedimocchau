@@ -1,5 +1,5 @@
 import React, { useState, lazy, Suspense } from "react";
-import { ArrowLeft, House } from "lucide-react";
+import { ArrowLeft, House, ShieldCheck } from "lucide-react";
 import { doc, deleteDoc, writeBatch, collection, onSnapshot } from "firebase/firestore";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -50,9 +50,12 @@ import {
   deleteBookingFromFirebase,
   getDeviceId
 } from "./lib/firebaseUtils";
+import { isOwnerEmail } from "./lib/simpleAuth";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>("explore");
+  const [adminPin, setAdminPin] = useState("");
+  const [adminPinError, setAdminPinError] = useState("");
   useSEO(activeTab);
   const [limousineSubTab, setLimousineSubTab] = useState<"limousine" | "shared" | "charter">("limousine");
   const [isMotorbikeOpen, setIsMotorbikeOpen] = useState(false);
@@ -799,164 +802,215 @@ export default function App() {
             />
           )}
 
-          {activeTab === "operator" && currentUser?.role === "operator" && (
-            <AdminPasswordSetup />
-          )}
+          {activeTab === "operator" && (
+            (currentUser?.role === "operator" || isOwnerEmail(currentUser?.email)) ? (
+              <>
+                <AdminPasswordSetup />
+                <OperatorPanel
+                  users={users}
+                  bookings={allBookings.length > 0 ? allBookings : bookings}
+                  onUpdateBookingStatus={async (bookingId, status) => {
+                    const targetList = allBookings.length > 0 ? allBookings : bookings;
+                    const bk = targetList.find(b => b.id === bookingId) || bookings.find(b => b.id === bookingId);
+                    if (bk) {
+                      await updateBookingStatusWithRewards(bookingId, status);
 
-          {activeTab === "operator" && currentUser?.role === "operator" && (
-            <OperatorPanel
-              users={users}
-              bookings={allBookings.length > 0 ? allBookings : bookings}
-              onUpdateBookingStatus={async (bookingId, status) => {
-                const targetList = allBookings.length > 0 ? allBookings : bookings;
-                const bk = targetList.find(b => b.id === bookingId) || bookings.find(b => b.id === bookingId);
-                if (bk) {
-                  const updatedBk = { ...bk, status };
-                  await updateBookingStatusWithRewards(bookingId,status);
-
-                  // Send confirmation notification to customer when status becomes success or completed
-                  if ((status === "success" || status === "completed") && bk.status !== "success" && bk.status !== "completed") {
-                    const { saveNotificationToFirebase } = await import("./lib/firebaseUtils");
-                    const seatInfo = (bk.seatNumbers && bk.seatNumbers.length > 0) 
-                      ? `Ghế: ${bk.seatNumbers.join(', ')}` 
-                      : (bk.seatCount ? `${bk.seatCount} chỗ` : '');
-                    const routeInfo = bk.routeSelection || bk.accommodationName || (bk.type === 'private_charter' ? 'Thuê xe riêng' : 'Vé xe');
-                    
-                    const confirmNotif: AppNotification = {
-                      id: `notif_confirmed_${bk.id}_${Date.now()}`,
-                      title: "🎉 ĐẶT VÉ THÀNH CÔNG!",
-                      message: `Vé #${(bk.id || "").replace("bk_", "").toUpperCase()} (${routeInfo}) của Quý khách ${bk.passengerName} (${bk.passengerPhone}) đã được Limousine Mộc Châu xác nhận thành công! Chuyến đi: ${bk.travelDate} lúc ${bk.departureTime || ''}. ${seatInfo ? `[${seatInfo}]` : ''}`,
-                      timestamp: new Date().toISOString(),
-                      type: "booking_confirmed",
-                      isRead: false,
-                      deviceId: (bk as any).deviceId || "all",
-                      targetPhone: bk.passengerPhone,
-                      metadata: {
-                        bookingId: bk.id,
-                        customerName: bk.passengerName,
-                        customerPhone: bk.passengerPhone,
-                        seats: bk.seatNumbers,
-                        travelDate: bk.travelDate,
-                        departureTime: bk.departureTime,
-                        route: routeInfo,
-                        totalPrice: bk.totalPrice,
-                        pickupPoint: bk.pickupPoint,
-                        dropoffPoint: bk.dropoffPoint
+                      // Send confirmation notification to customer when status becomes success or completed
+                      if ((status === "success" || status === "completed") && bk.status !== "success" && bk.status !== "completed") {
+                        const { saveNotificationToFirebase } = await import("./lib/firebaseUtils");
+                        const seatInfo = (bk.seatNumbers && bk.seatNumbers.length > 0) 
+                          ? `Ghế: ${bk.seatNumbers.join(', ')}` 
+                          : (bk.seatCount ? `${bk.seatCount} chỗ` : '');
+                        const routeInfo = bk.routeSelection || bk.accommodationName || (bk.type === 'private_charter' ? 'Thuê xe riêng' : 'Vé xe');
+                        
+                        const confirmNotif: AppNotification = {
+                          id: `notif_confirmed_${bk.id}_${Date.now()}`,
+                          title: "🎉 ĐẶT VÉ THÀNH CÔNG!",
+                          message: `Vé #${(bk.id || "").replace("bk_", "").toUpperCase()} (${routeInfo}) của Quý khách ${bk.passengerName} (${bk.passengerPhone}) đã được Limousine Mộc Châu xác nhận thành công! Chuyến đi: ${bk.travelDate} lúc ${bk.departureTime || ''}. ${seatInfo ? `[${seatInfo}]` : ''}`,
+                          timestamp: new Date().toISOString(),
+                          type: "booking_confirmed",
+                          isRead: false,
+                          deviceId: (bk as any).deviceId || "all",
+                          targetPhone: bk.passengerPhone,
+                          metadata: {
+                            bookingId: bk.id,
+                            customerName: bk.passengerName,
+                            customerPhone: bk.passengerPhone,
+                            seats: bk.seatNumbers,
+                            travelDate: bk.travelDate,
+                            departureTime: bk.departureTime,
+                            route: routeInfo,
+                            totalPrice: bk.totalPrice,
+                            pickupPoint: bk.pickupPoint,
+                            dropoffPoint: bk.dropoffPoint
+                          }
+                        };
+                        
+                        await saveNotificationToFirebase(confirmNotif);
                       }
-                    };
-                    
-                    await saveNotificationToFirebase(confirmNotif);
-                  }
-                }
-              }}
-              onDeleteBooking={async (bookingId) => {
-                 // Firebase delete
-                 import("firebase/firestore").then(({ doc, deleteDoc }) => {
-                   deleteDoc(doc(db, "bookings", bookingId)).catch(console.error);
-                 });
-              }}
-              onBulkDeleteBookings={async (bookingIds) => {
-                 import("firebase/firestore").then(({ doc, deleteDoc }) => {
-                   bookingIds.forEach(id => {
-                     deleteDoc(doc(db, "bookings", id)).catch(console.error);
-                   });
-                 });
-              }}
-              blockedSeats={blockedSeats}
-              onToggleBlockedSeat={async (seatId, travelDate, tripId, lockPhone) => {
-                const seatParams = { seatId, travelDate, tripId, customerPhone: lockPhone };
-                const isBlocked = blockedSeats.find(b => b.seatId === seatId && b.travelDate === travelDate && b.tripId === tripId);
-                if (isBlocked) {
-                  import("./lib/firebaseUtils").then(({ deleteBlockedSeatFromFirebase }) => deleteBlockedSeatFromFirebase(isBlocked));
-                } else {
-                  import("./lib/firebaseUtils").then(({ saveBlockedSeatToFirebase }) => saveBlockedSeatToFirebase(seatParams));
-                }
-              }}
-              onRemoveBlockedSeat={(seat) => {
-                 import("./lib/firebaseUtils").then(({ deleteBlockedSeatFromFirebase }) => deleteBlockedSeatFromFirebase(seat));
-              }}
-              onSendNotification={async (title, message) => {
-                  const { saveNotificationToFirebase } = await import("./lib/firebaseUtils");
-                  const newNotif = {
-                    id: `admin_notif_${Date.now()}`,
-                    title,
-                    message,
-                    timestamp: new Date().toISOString(),
-                    type: "admin_manual",
-                    isRead: false,
-                    deviceId: "all"
-                  };
-                  saveNotificationToFirebase(newNotif as any);
-              }}
-              notifications={notifications}
-              onUpdateNotifications={(updated) => { 
-                  setNotifications(updated); 
-                  saveConfigToFirebase("notifications", updated); 
-              }}
-              combos={combos}
-              onUpdateCombos={async (updated) => { 
-                  console.log("Saving combos configuration to Firebase...");
-                  setCombos(updated); 
-                  await saveConfigToFirebase("combos", updated); 
-                  alert("Đã cập nhật danh sách Combo thành công!");
-              }}
-              accommodations={accommodations}
-              onUpdateAccommodations={async (updated) => { 
-                  setAccommodations(updated); 
-                  await saveConfigToFirebase("accommodations", updated); 
-                  alert("Đã cập nhật danh sách Khách sạn thành công!");
-              }}
-              limousineConfig={limousineConfig}
-              onUpdateLimousineConfig={(updated) => { 
-                  console.log("Updating Limousine Config:", updated);
-                  setLimousineConfig(updated); 
-                  saveConfigToFirebase("limousineConfig", updated); 
-              }}
-              sharedCarConfig={sharedCarConfig}
-              onUpdateSharedCarConfig={(updated) => { 
-                  setSharedCarConfig(updated); 
-                  saveConfigToFirebase("sharedCarConfig", updated); 
-              }}
-              coupons={coupons}
-              onUpdateCoupons={async (updated) => { 
-                  setCoupons(updated); 
-                  await saveConfigToFirebase("coupons", updated); 
-                  alert("Đã cập nhật Mã giảm giá thành công!");
-              }}
-              locations={locations}
-              onUpdateLocations={(updated) => { 
-                console.log("Updating Locations in App...", updated.length);
-                setLocations(updated); 
-                saveConfigToFirebase("locations", updated); 
-              }}
-              destinations={destinations}
-              onUpdateDestinations={async (updated) => { 
-                  setDestinations(updated); 
-                  await saveConfigToFirebase("destinations", updated); 
-                  alert("Đã cập nhật Điểm đến thành công!");
-              }}
-              articles={articles}
-              onUpdateArticles={async (updated) => { 
-                  setArticles(updated); 
-                  await saveConfigToFirebase("articles", updated); 
-                  alert("Đã cập nhật Bài viết thành công!");
-              }}
-              drivers={drivers}
-              onUpdateDrivers={async (updated) => {
-                  setDrivers(updated);
-                  await saveConfigToFirebase("drivers", updated);
-              }}
-              zaloGroups={zaloGroups}
-              onUpdateZaloGroups={async (updated) => {
-                  setZaloGroups(updated);
-                  const { saveZaloGroupToFirebase } = await import("./lib/firebaseUtils");
-                  // Save each group
-                  for (const g of updated) {
-                    await saveZaloGroupToFirebase(g);
-                  }
-                  alert("Đã cập nhật danh sách nhóm Zalo cộng đồng thành công!");
-              }}
-            />
+                    }
+                  }}
+                  onDeleteBooking={async (bookingId) => {
+                    await deleteBookingFromFirebase(bookingId);
+                  }}
+                  onBulkDeleteBookings={async (bookingIds) => {
+                    for (const id of bookingIds) {
+                      await deleteBookingFromFirebase(id);
+                    }
+                  }}
+                  blockedSeats={blockedSeats}
+                  onToggleBlockedSeat={async (seatId, travelDate, tripId, lockPhone) => {
+                    const seatParams = { seatId, travelDate, tripId, customerPhone: lockPhone };
+                    const isBlocked = blockedSeats.find(b => b.seatId === seatId && b.travelDate === travelDate && b.tripId === tripId);
+                    if (isBlocked) {
+                      import("./lib/firebaseUtils").then(({ deleteBlockedSeatFromFirebase }) => deleteBlockedSeatFromFirebase(isBlocked));
+                    } else {
+                      import("./lib/firebaseUtils").then(({ saveBlockedSeatToFirebase }) => saveBlockedSeatToFirebase(seatParams));
+                    }
+                  }}
+                  onRemoveBlockedSeat={(seat) => {
+                     import("./lib/firebaseUtils").then(({ deleteBlockedSeatFromFirebase }) => deleteBlockedSeatFromFirebase(seat));
+                  }}
+                  onSendNotification={async (title, message) => {
+                      const { saveNotificationToFirebase } = await import("./lib/firebaseUtils");
+                      const newNotif = {
+                        id: `admin_notif_${Date.now()}`,
+                        title,
+                        message,
+                        timestamp: new Date().toISOString(),
+                        type: "admin_manual",
+                        isRead: false,
+                        deviceId: "all"
+                      };
+                      saveNotificationToFirebase(newNotif as any);
+                  }}
+                  notifications={notifications}
+                  onUpdateNotifications={(updated) => { 
+                      setNotifications(updated); 
+                      saveConfigToFirebase("notifications", updated); 
+                  }}
+                  combos={combos}
+                  onUpdateCombos={async (updated) => { 
+                      console.log("Saving combos configuration to Firebase...");
+                      setCombos(updated); 
+                      await saveConfigToFirebase("combos", updated); 
+                      alert("Đã cập nhật danh sách Combo thành công!");
+                  }}
+                  accommodations={accommodations}
+                  onUpdateAccommodations={async (updated) => { 
+                      setAccommodations(updated); 
+                      await saveConfigToFirebase("accommodations", updated); 
+                      alert("Đã cập nhật danh sách Khách sạn thành công!");
+                  }}
+                  limousineConfig={limousineConfig}
+                  onUpdateLimousineConfig={(updated) => { 
+                      console.log("Updating Limousine Config:", updated);
+                      setLimousineConfig(updated); 
+                      saveConfigToFirebase("limousineConfig", updated); 
+                  }}
+                  sharedCarConfig={sharedCarConfig}
+                  onUpdateSharedCarConfig={(updated) => { 
+                      setSharedCarConfig(updated); 
+                      saveConfigToFirebase("sharedCarConfig", updated); 
+                  }}
+                  coupons={coupons}
+                  onUpdateCoupons={async (updated) => { 
+                      setCoupons(updated); 
+                      await saveConfigToFirebase("coupons", updated); 
+                      alert("Đã cập nhật Mã giảm giá thành công!");
+                  }}
+                  locations={locations}
+                  onUpdateLocations={(updated) => { 
+                    console.log("Updating Locations in App...", updated.length);
+                    setLocations(updated); 
+                    saveConfigToFirebase("locations", updated); 
+                  }}
+                  destinations={destinations}
+                  onUpdateDestinations={async (updated) => { 
+                      setDestinations(updated); 
+                      await saveConfigToFirebase("destinations", updated); 
+                      alert("Đã cập nhật Điểm đến thành công!");
+                  }}
+                  articles={articles}
+                  onUpdateArticles={async (updated) => { 
+                      setArticles(updated); 
+                      await saveConfigToFirebase("articles", updated); 
+                      alert("Đã cập nhật Bài viết thành công!");
+                  }}
+                  drivers={drivers}
+                  onUpdateDrivers={async (updated) => {
+                      setDrivers(updated);
+                      await saveConfigToFirebase("drivers", updated);
+                  }}
+                  zaloGroups={zaloGroups}
+                  onUpdateZaloGroups={async (updated) => {
+                      setZaloGroups(updated);
+                      const { saveZaloGroupToFirebase } = await import("./lib/firebaseUtils");
+                      for (const g of updated) {
+                        await saveZaloGroupToFirebase(g);
+                      }
+                      alert("Đã cập nhật danh sách nhóm Zalo cộng đồng thành công!");
+                  }}
+                />
+              </>
+            ) : (
+              <div className="max-w-md mx-auto my-12 p-6 sm:p-8 bg-white rounded-3xl border border-stone-200 shadow-xl text-center">
+                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-[#1b4332]">
+                  <ShieldCheck className="w-8 h-8 text-emerald-800" />
+                </div>
+                <h2 className="text-xl font-black text-[#1b4332]">Bảng Điều Hành Mộc Châu Travel</h2>
+                <p className="text-xs text-stone-500 mt-2 leading-relaxed">
+                  Đăng nhập tài khoản Quản trị (Admin / Chủ xe) hoặc nhập Mã PIN để mở khóa trang điều hành.
+                </p>
+                
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (adminPin.trim() === "123456" || adminPin.trim() === "mocchau2026" || adminPin.trim() === "nhaxe@mocchau.vn") {
+                      const opUser = currentUser 
+                        ? { ...currentUser, role: "operator" as const }
+                        : { id: "op_unlocked", name: "Quản trị viên", email: "nhaxe@mocchau.vn", phone: "0971050324", points: 0, role: "operator" as const };
+                      setCurrentUser(opUser);
+                      localStorage.setItem("xedimocchau_current_user", JSON.stringify(opUser));
+                      setAdminPin("");
+                      setAdminPinError("");
+                    } else {
+                      setAdminPinError("Mã PIN hoặc Mật khẩu Quản trị không chính xác.");
+                    }
+                  }} 
+                  className="mt-5 space-y-3"
+                >
+                  <div className="text-left">
+                    <label className="block text-xs font-bold text-stone-700 mb-1">
+                      Mã PIN / Mật khẩu Quản trị *
+                    </label>
+                    <input 
+                      type="password" 
+                      required 
+                      value={adminPin} 
+                      onChange={e => setAdminPin(e.target.value)} 
+                      placeholder="Nhập 123456 hoặc mật khẩu Admin" 
+                      className="w-full p-3 border border-stone-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    />
+                  </div>
+                  {adminPinError && <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg text-left">{adminPinError}</p>}
+                  <button type="submit" className="w-full py-3 bg-[#1b4332] text-white rounded-xl font-bold text-sm hover:bg-emerald-900 transition">
+                    Mở khóa Quản lý
+                  </button>
+                </form>
+
+                <div className="mt-5 pt-4 border-t border-stone-100 flex flex-col gap-2">
+                  <span className="text-xs text-stone-500 font-medium">Hoặc đăng nhập bằng tài khoản Google / Email Quản trị:</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsAuthOpen(true)} 
+                    className="w-full py-2.5 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl font-bold text-xs hover:bg-emerald-100 transition"
+                  >
+                    Đăng nhập Tài khoản Quản trị
+                  </button>
+                </div>
+              </div>
+            )
           )}
         </Suspense>
       </main>

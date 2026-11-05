@@ -92,7 +92,7 @@ export default function AIAssistantManagement() {
     }
   };
 
-  const handleAddFaq = (e: React.FormEvent) => {
+  const handleAddFaq = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuestion.trim() || !newAnswer.trim()) return;
     const item: AIKnowledgeItem = {
@@ -104,22 +104,30 @@ export default function AIAssistantManagement() {
       priority: faqs.length + 1
     };
     const updated = [item, ...faqs];
-    setFaqs(updated);
     try {
-      localStorage.setItem("mocchau_operator_ai_faqs", JSON.stringify(updated));
-    } catch {}
-    setIsAddingFaq(false);
-    setNewTopic("");
-    setNewQuestion("");
-    setNewAnswer("");
+      const { saveCollectionItemsToFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToFirebase("ai_faqs", updated);
+      setFaqs(updated);
+      setIsAddingFaq(false);
+      setNewTopic("");
+      setNewQuestion("");
+      setNewAnswer("");
+    } catch (err: any) {
+      alert("Chưa thể lưu tri thức AI lên máy chủ: " + (err?.message || "Lỗi kết nối"));
+    }
   };
 
-  const handleDeleteFaq = (id: string) => {
-    const updated = faqs.filter(f => f.id !== id);
-    setFaqs(updated);
-    try {
-      localStorage.setItem("mocchau_operator_ai_faqs", JSON.stringify(updated));
-    } catch {}
+  const handleDeleteFaq = async (id: string) => {
+    if (confirm("Xóa tri thức AI này khỏi kho tri thức?")) {
+      const updated = faqs.filter(f => f.id !== id);
+      try {
+        const { saveCollectionItemsToFirebase } = await import("../../lib/firebaseUtils");
+        await saveCollectionItemsToFirebase("ai_faqs", updated);
+        setFaqs(updated);
+      } catch (err: any) {
+        alert("Chưa thể xóa tri thức AI trên máy chủ: " + (err?.message || "Lỗi kết nối"));
+      }
+    }
   };
 
   return (

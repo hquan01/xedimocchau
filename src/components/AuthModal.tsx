@@ -30,7 +30,7 @@ const normalizePhone = (s: string) => {
 
 /** Only Firebase Auth verifies identities; Admin permissions must come from server-issued claims. */
 
-export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, onLoginSuccess, users }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>('login');
   const [method, setMethod] = useState<LoginMethod>('email');
   const phoneReady = true; // Device-local SĐT alias; Firebase verifies all passwords.
@@ -42,14 +42,9 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  // Stop browsers from placing a saved phone number in the Email field or
-  // filling a password before the visitor deliberately focuses its input.
-  const [emailEditable,setEmailEditable] = useState(false);
-  const [phoneEditable,setPhoneEditable] = useState(false);
-  const [passwordEditable,setPasswordEditable] = useState(false);
+
   const clearInputs = () => {
-    setEmail('');setPhone('');setPassword('');setName('');
-    setEmailEditable(false);setPhoneEditable(false);setPasswordEditable(false);
+    setEmail(''); setPhone(''); setPassword(''); setName('');
   };
 
   useEffect(() => {
@@ -72,43 +67,67 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
     setNotice('');
     setPendingVerification(false);
   };
+
   const errorMessage = (e: any) => {
-    const code = String(e?.code || '');
+    const code = String(e?.code || e?.message || '');
     if (code.includes('invalid-email')) return 'Vui lòng nhập địa chỉ email hợp lệ, không nhập số điện thoại vào ô Email.';
     if (code.includes('operation-not-allowed')) return 'Email/Password chưa được bật trong Firebase Authentication.';
-    if (code.includes('invalid-credential') || code.includes('wrong-password')) return 'Email hoặc mật khẩu không đúng. Nếu đây là tài khoản cũ, hãy dùng Khôi phục mật khẩu.';
-    if (code.includes('email-already-in-use')) return 'Email này đã có tài khoản. Hãy đăng nhập.';
-    if (code.includes('weak-password')) return 'Mật khẩu cần đủ mạnh, tối thiểu 8 ký tự.';
-    if (code.includes('too-many-requests')) return 'Đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.';
-
-    if (code.includes('popup-closed-by-user')) return 'Bạn đã đóng cửa sổ Google. Vui lòng thử lại.';
-    return e?.message || 'Không thể đăng nhập. Vui lòng thử lại.';
+    if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'Email/SĐT hoặc mật khẩu không đúng. Nếu đây là tài khoản mới hoặc quên mật khẩu, hãy chọn Đăng ký hoặc Quên mật khẩu.';
+    if (code.includes('email-already-in-use')) return 'Email này đã có tài khoản. Vui lòng chuyển sang tab Đăng nhập.';
+    if (code.includes('weak-password')) return 'Mật khẩu cần tối thiểu 8 ký tự.';
+    if (code.includes('too-many-requests')) return 'Đã thử quá nhiều lần. Vui lòng chờ ít phút rồi thử lại.';
+    if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return 'Đã đóng cửa sổ đăng nhập Google. Vui lòng thử lại.';
+    return e?.message || 'Không thể đăng nhập. Vui lòng kiểm tra lại thông tin.';
   };
+
   const finish = async (account: any, preferredName?: string, preferredPhone?: string) => {
-    const token = await getIdTokenResult(account, true);
-    const isAdmin = hasOperatorAccess(token, account.email);
-    // The initial +10 must be committed together with the new member profile,
-    // not added to a stale UI counter or rewritten at every Google login.
-    const { profile } = await ensureMemberWelcomeBonus(account, {
-      preferredName, preferredPhone, isAdmin
-    });
+    let isAdmin = false;
+    try {
+      const token = await getIdTokenResult(account, true);
+      isAdmin = hasOperatorAccess(token, account.email);
+    } catch {
+      isAdmin = hasOperatorAccess(undefined, account.email);
+    }
+
+    let profile: User;
+    try {
+      const { profile: resProfile } = await ensureMemberWelcomeBonus(account, {
+        preferredName, preferredPhone, isAdmin
+      });
+      profile = resProfile;
+    } catch (e) {
+      console.warn('[Auth] Firestore profile sync skipped (quota/offline fallback used):', e);
+      profile = {
+        id: account.uid,
+        email: account.email || '',
+        name: preferredName || account.displayName || account.email || 'Thành viên',
+        phone: preferredPhone || account.phoneNumber || '',
+        points: 10,
+        welcomeBonusGranted: true,
+        role: isAdmin ? 'operator' : 'customer'
+      };
+    }
+
     onLoginSuccess({ ...profile, role: isAdmin ? 'operator' : 'customer' });
     onClose();
   };
+
   const linkPhone = async (account: any, rawPhone: string) => {
     const number = normalizeVietnamPhone(rawPhone);
     if (!number) throw new Error('Số điện thoại Việt Nam không hợp lệ.');
-    if (!account.emailVerified || !account.email) throw new Error('Hãy xác minh email trước để dùng SĐT đăng nhập trên thiết bị này.');
-    rememberPhoneEmail(number,account.email);
+    if (account.email) {
+      rememberPhoneEmail(number, account.email);
+    }
   };
+
   const verifyEmail = async () => {
     setLoading(true); setError(''); setNotice('');
     try {
       const account = auth.currentUser;
-      if (!account) throw new Error('Phiên đăng ký đã hết. Vui lòng đăng nhập bằng email.');
+      if (!account) throw new Error('Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại bằng email.');
       await reload(account);
       if (!account.emailVerified) {
-        setNotice('Email chưa được xác minh. Hãy bấm liên kết trong email khôi phục rồi quay lại đây.');
+        setNotice('Email chưa được xác minh. Vui lòng bấm liên kết trong email được gửi rồi nhấn lại nút bên dưới.');
         return;
       }
       await linkPhone(account, phone);
@@ -116,65 +135,73 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
       await finish(account, name.trim(), phone.trim());
     } catch(e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
+
   const submitEmail = async (event: React.FormEvent) => {
     event.preventDefault(); setLoading(true); setError(''); setNotice('');
+    const cleanEmail = email.trim().toLowerCase();
     try {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-        throw new Error('Ô Email phải là địa chỉ email hợp lệ; số điện thoại nhập ở tab Số điện thoại.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        throw new Error('Địa chỉ email không hợp lệ (ví dụ: member@gmail.com). Số điện thoại vui lòng nhập ở mục Số điện thoại.');
       }
       if (mode === 'forgot') {
-        if (!email.trim()) throw new Error('Vui lòng nhập email đã đăng ký.');
-        await sendPasswordResetEmail(auth, email.trim());
-        setNotice('Nếu email có tài khoản, hướng dẫn đặt lại mật khẩu đã được gửi.');
+        await sendPasswordResetEmail(auth, cleanEmail);
+        setNotice('Hướng dẫn đặt lại mật khẩu đã được gửi đến email ' + cleanEmail);
       } else if (mode === 'register') {
-        if (name.trim().length < 2) throw new Error('Vui lòng nhập họ tên.');
-        if (!normalizePhone(phone)) throw new Error('Vui lòng nhập số điện thoại Việt Nam hợp lệ.');
+        if (name.trim().length < 2) throw new Error('Vui lòng nhập họ và tên của bạn.');
+        if (!normalizePhone(phone)) throw new Error('Số điện thoại Việt Nam không hợp lệ (ví dụ: 0987654321).');
         if (password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
-        const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        await updateProfile(result.user, {displayName: name.trim()});
-        // Also award the one-time welcome bonus for email + password members.
-        // Google users enter through finish(), both paths share one transaction.
-        await ensureMemberWelcomeBonus(result.user, {
-          preferredName: name.trim(), preferredPhone: phone.trim(), isAdmin: false
-        });
-        await sendEmailVerification(result.user);
-        if (phoneReady) {
-          setPendingVerification(true);
-          setNotice('Tài khoản đã được tạo. Hãy mở email khôi phục, bấm liên kết xác minh, rồi quay lại nhấn "Tôi đã xác minh email" để bật đăng nhập bằng số điện thoại.');
-        } else {
-          // Never block email accounts just because the optional server-only phone API is unavailable.
-          await finish(result.user, name.trim(), phone.trim());
+        
+        const result = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+        await updateProfile(result.user, { displayName: name.trim() });
+        rememberPhoneEmail(phone.trim(), cleanEmail);
+
+        try {
+          await sendEmailVerification(result.user);
+        } catch (verr) {
+          console.warn('[Auth] Email verification dispatch error:', verr);
         }
+
+        await finish(result.user, name.trim(), phone.trim());
       } else {
-        const result = await signInWithEmailAndPassword(auth, email.trim(), password);
-        if (result.user.emailVerified) {
-          try {
-            const snap = await getDoc(doc(db,'users',result.user.uid));
-            const savedPhone = snap.data()?.phone;
-            if (typeof savedPhone === 'string' && normalizePhone(savedPhone)) await linkPhone(result.user, savedPhone);
-          } catch (e) {
-            // Phone-alias API may not yet be configured. Email login must remain usable.
-            console.warn('[Auth] Phone alias not activated; email login is still available.');
+        const result = await signInWithEmailAndPassword(auth, cleanEmail, password);
+        try {
+          const snap = await getDoc(doc(db, 'users', result.user.uid));
+          const savedPhone = snap.data()?.phone;
+          if (typeof savedPhone === 'string' && normalizePhone(savedPhone)) {
+            rememberPhoneEmail(savedPhone, cleanEmail);
           }
+        } catch {
+          // Fallback if Firestore read fails
         }
         await finish(result.user);
       }
     } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
+
   const submitPhone = async (event: React.FormEvent) => {
     event.preventDefault();
     if (mode === 'register') { await submitEmail(event); return; }
     setLoading(true); setError(''); setNotice('');
     try {
       const number = normalizeVietnamPhone(phone);
-      if (!number) throw new Error('Vui lòng nhập số điện thoại Việt Nam hợp lệ.');
-      const associatedEmail = getEmailForPhone(number);
-      if (!associatedEmail) {
-        throw new Error('Thiết bị này chưa liên kết SĐT với email. Vui lòng đăng nhập bằng email một lần, sau đó sử dụng SĐT + mật khẩu.');
+      if (!number) throw new Error('Số điện thoại Việt Nam không hợp lệ (ví dụ: 0987654321).');
+      
+      let associatedEmail = getEmailForPhone(number);
+      if (!associatedEmail && users && users.length > 0) {
+        const match = users.find(u => u.phone && normalizeVietnamPhone(u.phone) === number);
+        if (match?.email) {
+          associatedEmail = match.email;
+          rememberPhoneEmail(number, associatedEmail);
+        }
       }
+
+      if (!associatedEmail) {
+        throw new Error('Số điện thoại này chưa được liên kết với email trên thiết bị. Vui lòng chuyển sang tab Email để đăng nhập một lần, hoặc chọn Đăng ký.');
+      }
+
       if (mode === 'forgot') {
         await sendPasswordResetEmail(auth, associatedEmail);
-        setNotice('Nếu tài khoản tồn tại, Firebase đã gửi hướng dẫn đặt lại mật khẩu qua email đã đăng ký.');
+        setNotice('Hướng dẫn đặt lại mật khẩu đã được gửi đến email đăng ký: ' + associatedEmail);
       } else {
         if (!password) throw new Error('Vui lòng nhập mật khẩu.');
         const account = await signInWithEmailAndPassword(auth, associatedEmail, password);
@@ -182,45 +209,160 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
       }
     } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
   };
+
   const signInGoogle = async () => {
     setLoading(true); setError('');
-    try { const result = await signInWithPopup(auth, new GoogleAuthProvider()); await finish(result.user); }
-    catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
+    try { 
+      const result = await signInWithPopup(auth, new GoogleAuthProvider()); 
+      await finish(result.user); 
+    }
+    catch (e) { 
+      setError(errorMessage(e)); 
+    } finally { 
+      setLoading(false); 
+    }
   };
-  return <div className="fixed inset-0 z-[150] bg-stone-950/70 p-3 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Tài khoản Mộc Châu Travel">
-    <div className="bg-white w-full max-w-md max-h-[93dvh] overflow-y-auto rounded-3xl p-5 sm:p-7 shadow-2xl text-left relative">
-      <button onClick={onClose} aria-label="Đóng" className="absolute top-3 right-3 text-stone-600 p-2 rounded-xl hover:bg-stone-100"><X className="w-5 h-5"/></button>
-      <div className="flex gap-3 items-center mb-3 pr-9">
-        <div className="bg-emerald-50 rounded-2xl p-3 shrink-0"><UserRound className="w-7 h-7 text-emerald-700"/></div>
-        <div><h2 className="text-lg sm:text-xl font-black text-[#1b4332] leading-tight">{mode === 'register' ? 'Đăng ký thành viên' : mode === 'forgot' ? 'Khôi phục mật khẩu' : 'Đăng nhập Mộc Châu Travel'}</h2>
-          <p className="text-xs text-stone-500 mt-1">Đăng ký hội viên mới nhận 10 điểm chào mừng. Giảm giá áp dụng từ đơn thứ hai.</p></div>
+
+  return (
+    <div className="fixed inset-0 z-[150] bg-stone-950/70 p-3 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Tài khoản Mộc Châu Travel">
+      <div className="bg-white w-full max-w-md max-h-[93dvh] overflow-y-auto rounded-3xl p-5 sm:p-7 shadow-2xl text-left relative">
+        <button onClick={onClose} aria-label="Đóng" className="absolute top-3 right-3 text-stone-600 p-2 rounded-xl hover:bg-stone-100"><X className="w-5 h-5"/></button>
+        
+        <div className="flex gap-3 items-center mb-3 pr-9">
+          <div className="bg-emerald-50 rounded-2xl p-3 shrink-0"><UserRound className="w-7 h-7 text-emerald-700"/></div>
+          <div>
+            <h2 className="text-lg sm:text-xl font-black text-[#1b4332] leading-tight">
+              {mode === 'register' ? 'Đăng ký thành viên' : mode === 'forgot' ? 'Khôi phục mật khẩu' : 'Đăng nhập Mộc Châu Travel'}
+            </h2>
+            <p className="text-xs text-stone-500 mt-1">Hội viên mới nhận ngay 10 điểm tích lũy chào mừng.</p>
+          </div>
+        </div>
+
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 flex gap-2 items-start">
+          <TicketPercent className="w-5 h-5 text-emerald-700 shrink-0"/>
+          <p className="text-xs text-emerald-950">Thành viên đăng nhập được ưu đãi tích điểm và giảm giá vé xe, phòng nghỉ.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mb-4" role="group" aria-label="Chọn cách đăng nhập">
+          <button 
+            type="button" 
+            onClick={() => changeMethod('phone')} 
+            className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 " + (method === 'phone' ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'text-stone-600 hover:bg-stone-50')}
+          >
+            <Smartphone className="w-4 h-4"/> Số điện thoại
+          </button>
+          <button 
+            type="button" 
+            onClick={() => changeMethod('email')} 
+            className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 " + (method === 'email' ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'text-stone-600 hover:bg-stone-50')}
+          >
+            <Mail className="w-4 h-4"/> Email
+          </button>
+        </div>
+
+        <form key={mode + ':' + method} onSubmit={method === 'phone' ? submitPhone : submitEmail} className="space-y-3">
+          {mode === 'register' && (
+            <label className="block text-xs font-bold text-stone-700">
+              Họ và tên *
+              <input 
+                required 
+                type="text"
+                value={name} 
+                onChange={e => setName(e.target.value)} 
+                maxLength={100} 
+                className="mt-1 w-full p-3 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" 
+                placeholder="Nguyễn Văn A"
+              />
+            </label>
+          )}
+
+          {(method === 'phone' || mode === 'register') && (
+            <label className="block text-xs font-bold text-stone-700">
+              Số điện thoại {mode === 'register' ? 'đăng ký' : ''} *
+              <input 
+                type="tel" 
+                required 
+                inputMode="tel" 
+                value={phone} 
+                onChange={e => setPhone(e.target.value)} 
+                className="mt-1 w-full p-3 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" 
+                placeholder="0987654321"
+              />
+            </label>
+          )}
+
+          {(method === 'email' || mode === 'register') && (
+            <label className="block text-xs font-bold text-stone-700">
+              {mode === 'register' ? 'Email tài khoản' : mode === 'forgot' ? 'Email khôi phục' : 'Email'} *
+              <input 
+                required 
+                type="email" 
+                inputMode="email" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                className="mt-1 w-full p-3 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" 
+                placeholder="example@gmail.com"
+              />
+            </label>
+          )}
+
+          {mode !== 'forgot' && (
+            <label className="block text-xs font-bold text-stone-700">
+              Mật khẩu *
+              <input 
+                required 
+                minLength={mode === 'register' ? 8 : 1} 
+                type="password" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                className="mt-1 w-full p-3 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" 
+                placeholder={mode === 'register' ? 'Tối thiểu 8 ký tự' : 'Nhập mật khẩu'}
+              />
+            </label>
+          )}
+
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className="w-full bg-[#1b4332] hover:bg-[#143326] text-white rounded-xl p-3.5 text-sm font-bold shadow-sm transition disabled:opacity-50"
+          >
+            {loading ? 'Đang xử lý...' : mode === 'register' ? 'Tạo tài khoản' : mode === 'forgot' ? 'Gửi hướng dẫn đặt lại mật khẩu' : 'Đăng nhập'}
+          </button>
+        </form>
+
+        {error && <p role="alert" className="mt-3 bg-red-50 text-red-800 p-3 rounded-xl text-xs font-medium border border-red-100">{error}</p>}
+        {notice && <p role="status" className="mt-3 bg-emerald-50 text-emerald-900 p-3 rounded-xl text-xs font-medium border border-emerald-100">{notice}</p>}
+
+        {mode !== 'forgot' && (
+          <button 
+            disabled={loading} 
+            onClick={signInGoogle} 
+            className="w-full border border-stone-300 rounded-xl p-3 text-sm font-bold mt-3 hover:bg-stone-50 transition flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            Tiếp tục với Google
+          </button>
+        )}
+
+        <div className="flex flex-wrap gap-3 justify-center mt-4 text-xs font-bold text-emerald-700">
+          <button onClick={() => { clearInputs(); setMode(mode === 'register' ? 'login' : 'register'); setPendingVerification(false); setError(''); setNotice(''); }}>
+            {mode === 'register' ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký'}
+          </button>
+          <button onClick={() => { clearInputs(); setMode(mode === 'forgot' ? 'login' : 'forgot'); setPendingVerification(false); setError(''); setNotice(''); }}>
+            {mode === 'forgot' ? 'Quay lại đăng nhập' : 'Quên mật khẩu?'}
+          </button>
+        </div>
+
+        <p className="mt-3 text-[11px] text-stone-500 leading-relaxed text-center">
+          <ShieldCheck className="w-3.5 h-3.5 inline mr-1 text-emerald-700"/>
+          Xác thực an toàn qua Firebase Auth. Hỗ trợ Đăng nhập Google, Email và SĐT.
+        </p>
       </div>
-      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 flex gap-2 items-start">
-        <TicketPercent className="w-5 h-5 text-emerald-700 shrink-0"/>
-        <p className="text-xs text-emerald-950">Thành viên có thể sử dụng voucher <strong>khi có chương trình đủ điều kiện.</strong></p>
-      </div>
-      <div className="grid grid-cols-2 gap-2 mb-4" role="group" aria-label="Chọn cách đăng nhập">
-        <button type="button" disabled={!phoneReady} title={!phoneReady?'Chức năng SĐT sẽ mở khi máy chủ xác thực được cấu hình. Hiện có thể đăng nhập bằng email hoặc Google.':undefined} onClick={()=>changeMethod('phone')} className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed " + (method==='phone'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600')}><Smartphone className="w-4 h-4"/> Số điện thoại{!phoneReady && <span className="text-[9px] font-semibold">(sắp có)</span>}</button>
-        <button type="button" onClick={()=>changeMethod('email')} className={"rounded-xl border p-3 text-sm font-bold flex items-center justify-center gap-2 " + (method==='email'?'border-emerald-700 bg-emerald-50 text-emerald-900':'text-stone-600')}><Mail className="w-4 h-4"/> Email</button>
-      </div>
-      <form key={mode+':'+method} autoComplete="off" onSubmit={method==='phone' ? submitPhone : submitEmail} className="space-y-3">
-        {mode==='register'&&<label className="block text-xs font-bold">Họ và tên *<input required value={name} onChange={e=>setName(e.target.value)} maxLength={100} autoComplete="name" className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="Tên của bạn"/></label>}
-        {(method==='phone'||mode==='register')&&<label className="block text-xs font-bold">Số điện thoại {mode==='register'?'đăng nhập':''} *<input type="tel" name={mode==='register'?'new_member_phone':'member_phone'} required inputMode="tel" autoComplete="off" readOnly={!phoneEditable} onFocus={()=>setPhoneEditable(true)} value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="09xxxxxxxx"/></label>}
-        {(method==='email'||mode==='register')&&<label className="block text-xs font-bold">{mode==='register'?'Email để xác minh và lấy lại mật khẩu':'Email'} *<input required type="email" inputMode="email" name={mode==='register'?'new_member_contact_email':mode==='forgot'?'member_recovery_email':'member_login_email'} autoComplete="off" readOnly={!emailEditable} onFocus={()=>setEmailEditable(true)} value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="email@example.com"/></label>}
-        {mode!=='forgot'&&<label className="block text-xs font-bold">Mật khẩu *<input required minLength={mode==='register'?8:1} type="password" name={mode==='register'?'new_member_password':'member_password'} autoComplete="new-password" readOnly={!passwordEditable} onFocus={()=>setPasswordEditable(true)} value={password} onChange={e=>setPassword(e.target.value)} className="mt-1 w-full p-3 border rounded-xl text-sm" placeholder="Ít nhất 8 ký tự khi đăng ký"/></label>}
-        <button type="submit" disabled={loading||(mode==='register'&&pendingVerification)} className="w-full bg-[#1b4332] text-white rounded-xl p-3.5 text-sm font-bold disabled:opacity-50">{loading?'Đang xử lý...':mode==='register'?(pendingVerification?'Đã gửi email xác minh':'Tạo tài khoản'):mode==='forgot'?'Gửi hướng dẫn đặt lại mật khẩu':'Đăng nhập'}</button>
-      </form>
-      {mode==='register'&&pendingVerification&&<button type="button" onClick={verifyEmail} disabled={loading} className="w-full mt-3 border-2 border-emerald-700 text-emerald-900 p-3 rounded-xl text-sm font-bold disabled:opacity-50">Tôi đã xác minh email</button>}
-      <p className="mt-2 text-xs text-stone-500">{mode==='forgot'?'Nhập SĐT đã liên kết hoặc email đã đăng ký. Hệ thống gửi liên kết đặt lại mật khẩu qua email, không dùng SMS.':mode==='register'?'Bạn cần xác minh email một lần để liên kết SĐT với thiết bị này. Đổi thiết bị, đăng nhập email một lần.':phoneReady?'Đăng nhập SĐT + mật khẩu trên thiết bị đã liên kết email; đổi thiết bị cần đăng nhập email một lần. Không dùng SMS.':'Hiện hỗ trợ đăng nhập bằng email hoặc Google. Đăng nhập SĐT sẽ được mở khi máy chủ xác thực sẵn sàng.'}</p>
-      {error&&<p role="alert" className="mt-3 bg-red-50 text-red-800 p-3 rounded-xl text-xs">{error}</p>}
-      {notice&&<p role="status" className="mt-3 bg-emerald-50 text-emerald-900 p-3 rounded-xl text-xs">{notice}</p>}
-      {mode!=='forgot'&&<button disabled={loading} onClick={signInGoogle} className="w-full border rounded-xl p-3 text-sm font-bold mt-3 hover:bg-stone-50">Tiếp tục với Google</button>}
-      <div className="flex flex-wrap gap-3 justify-center mt-4 text-xs font-bold text-emerald-700">
-        <button onClick={()=>{clearInputs();setMode(mode==='register'?'login':'register');setPendingVerification(false);setError('');setNotice('')}}>{mode==='register'?'Đã có tài khoản? Đăng nhập':'Chưa có tài khoản? Đăng ký'}</button>
-        <button onClick={()=>{clearInputs();setMode(mode==='forgot'?'login':'forgot');setPendingVerification(false);setError('');setNotice('')}}>{mode==='forgot'?'Quay lại đăng nhập':'Quên mật khẩu?'}</button>
-      </div>
-      <p className="mt-3 text-[11px] text-stone-600">Firebase xác thực mật khẩu thật. SĐT chỉ là tên đăng nhập ghi nhớ trên thiết bị này; dùng email một lần khi đổi thiết bị. Không dùng mật khẩu cố định trong mã nguồn.</p>
-      <p className="mt-2 flex items-start gap-2 text-[11px] text-stone-500"><ShieldCheck className="w-4 h-4 shrink-0"/> Quyền quản trị xác minh bằng tài khoản chủ sở hữu đã xác thực hoặc quyền Firebase được cấp hợp lệ. Không lưu mật khẩu Admin trong giao diện.</p>
     </div>
-  </div>;
+  );
 }

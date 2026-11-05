@@ -72,7 +72,7 @@ export async function ensureMemberWelcomeBonus(
       !(existing.usedCoupons?.length);
     const needsFirstTimeRepair = !isAdmin &&
       existing.welcomeBonusGranted !== true &&
-      noPreviousRewards && recentlyCreated(account);
+      noPreviousRewards;
 
     const changes: Partial<User> = {};
     if (preferredName && preferredName !== existing.name) changes.name = preferredName;

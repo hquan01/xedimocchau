@@ -166,14 +166,15 @@ export default function TaxiFleetManagement() {
     setIsVehicleModalOpen(true);
   };
 
-  const handleSaveVehicle = () => {
+  const handleSaveVehicle = async () => {
     if (!formPlate.trim() || !formModel.trim()) {
       alert("Vui lòng nhập biển số xe và tên dòng xe!");
       return;
     }
 
+    let updatedFleet: TaxiVehicle[] = [];
     if (editingVehicle) {
-      setFleet(prev => prev.map(v => v.id === editingVehicle.id ? {
+      updatedFleet = fleet.map(v => v.id === editingVehicle.id ? {
         ...v,
         plate: formPlate.trim(),
         model: formModel.trim(),
@@ -184,7 +185,7 @@ export default function TaxiFleetManagement() {
         routeQuote: formRouteQuote.trim(),
         serviceArea: formServiceArea.trim(),
         status: formStatus
-      } : v));
+      } : v);
     } else {
       const newVeh: TaxiVehicle = {
         id: `taxi-${Date.now()}`,
@@ -199,24 +200,55 @@ export default function TaxiFleetManagement() {
         status: formStatus,
         isVisible: true
       };
-      setFleet([newVeh, ...fleet]);
+      updatedFleet = [newVeh, ...fleet];
     }
 
+    // Update local state immediately for instant feedback
+    setFleet(updatedFleet);
     setIsVehicleModalOpen(false);
-  };
 
-  const handleToggleVisible = (id: string) => {
-    setFleet(prev => prev.map(v => v.id === id ? { ...v, isVisible: !v.isVisible } : v));
-  };
-
-  const handleDeleteVehicle = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa phương tiện này?")) {
-      setFleet(prev => prev.filter(v => v.id !== id));
+    // Sync to Firebase in background
+    try {
+      const { saveCollectionItemsToFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToFirebase("taxi_fleet", updatedFleet);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed (saved locally):", err);
     }
   };
 
-  const handleUpdateRequestStatus = (reqId: string, status: TaxiRequest["status"]) => {
-    setRequests(prev => prev.map(r => r.id === reqId ? { ...r, status } : r));
+  const handleToggleVisible = async (id: string) => {
+    const updated = fleet.map(v => v.id === id ? { ...v, isVisible: !v.isVisible } : v);
+    setFleet(updated);
+    try {
+      const { saveCollectionItemsToFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToFirebase("taxi_fleet", updated);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed:", err);
+    }
+  };
+
+  const handleDeleteVehicle = async (id: string) => {
+    if (confirm("Bạn có chắc chắn muốn xóa phương tiện này?")) {
+      const updated = fleet.filter(v => v.id !== id);
+      setFleet(updated);
+      try {
+        const { deleteItemFromCollection } = await import("../../lib/firebaseUtils");
+        await deleteItemFromCollection("taxi_fleet", id);
+      } catch (err: any) {
+        console.warn("Background Firebase deletion failed:", err);
+      }
+    }
+  };
+
+  const handleUpdateRequestStatus = async (reqId: string, status: TaxiRequest["status"]) => {
+    const updated = requests.map(r => r.id === reqId ? { ...r, status } : r);
+    setRequests(updated);
+    try {
+      const { saveCollectionItemsToFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToFirebase("taxi_requests", updated);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed:", err);
+    }
   };
 
   const filteredFleet = fleet.filter(v => {

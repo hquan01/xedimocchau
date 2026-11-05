@@ -134,29 +134,29 @@ export default function PartnerManagement() {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return;
 
+    let updated: PartnerItem[] = [];
+
     if (editingItem) {
-      setPartners(prev =>
-        prev.map(p =>
-          p.id === editingItem.id
-            ? {
-                ...p,
-                name: formName.trim(),
-                category: formCategory,
-                contactPerson: formContactPerson.trim(),
-                phone: formPhone.trim(),
-                address: formAddress.trim(),
-                contractCode: formContractCode.trim(),
-                commissionRate: Number(formCommissionRate) || 0,
-                status: formStatus,
-                bankAccount: formBankAccount.trim(),
-                notes: formNotes.trim()
-              }
-            : p
-        )
+      updated = partners.map(p =>
+        p.id === editingItem.id
+          ? {
+              ...p,
+              name: formName.trim(),
+              category: formCategory,
+              contactPerson: formContactPerson.trim(),
+              phone: formPhone.trim(),
+              address: formAddress.trim(),
+              contractCode: formContractCode.trim(),
+              commissionRate: Number(formCommissionRate) || 0,
+              status: formStatus,
+              bankAccount: formBankAccount.trim(),
+              notes: formNotes.trim()
+            }
+          : p
       );
     } else {
       const newItem: PartnerItem = {
@@ -172,14 +172,30 @@ export default function PartnerManagement() {
         bankAccount: formBankAccount.trim(),
         notes: formNotes.trim()
       };
-      setPartners(prev => [newItem, ...prev]);
+      updated = [newItem, ...partners];
     }
+
+    setPartners(updated);
     setIsModalOpen(false);
+
+    try {
+      const { saveCollectionItemsToLocalAndFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToLocalAndFirebase("partners", "mocchau_operator_partners", updated);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed (saved locally):", err);
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Bạn có chắc chắn muốn xóa đối tác này?")) {
-      setPartners(prev => prev.filter(p => p.id !== id));
+      const updated = partners.filter(p => p.id !== id);
+      setPartners(updated);
+      try {
+        const { saveCollectionItemsToLocalAndFirebase } = await import("../../lib/firebaseUtils");
+        await saveCollectionItemsToLocalAndFirebase("partners", "mocchau_operator_partners", updated);
+      } catch (err: any) {
+        console.warn("Background Firebase sync failed:", err);
+      }
     }
   };
 

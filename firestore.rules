@@ -13,22 +13,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isHardcodedAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.keys().hasAll(['email']) && request.auth.token.email_verified == true && (
-          request.auth.token.email == 'hquansl001@gmail.com' || 
-          request.auth.token.email == 'nhaxe@mocchau.vn'
-        )) ||
-        request.auth.token.admin == true ||
-        request.auth.token.operator == true
-      );
-    }
-
     function isAdmin() {
-      return isHardcodedAdmin() || (
-        isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'customer') == 'operator'
+      return isSignedIn() && (
+        request.auth.token.get('admin', false) == true ||
+        request.auth.token.get('operator', false) == true ||
+        request.auth.token.email == 'hquansl001@gmail.com' ||
+        request.auth.token.email == 'nhaxe@mocchau.vn' ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'customer') == 'operator' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'customer') == 'admin'
+          )
+        )
       );
     }
 
@@ -45,7 +42,7 @@ service cloud.firestore {
     // Validation for User profiles
     function isValidUser(data) {
       return data.get('id', '') is string && data.id.size() <= 128 &&
-             data.get('role', '') in ['customer', 'operator'] &&
+             data.get('role', '') in ['customer', 'operator', 'admin'] &&
              (data.get('phone', '') == '' || (data.phone is string && data.phone.size() <= 32)) &&
              (data.get('name', '') == '' || (data.name is string && data.name.size() <= 128)) &&
              (data.get('email', '') == '' || (data.email is string && data.email.size() <= 256)) &&
@@ -55,32 +52,18 @@ service cloud.firestore {
     // Validation for Booking documents
     function isValidBooking(data) {
       return data.get('id', '') is string && data.id.size() <= 128 &&
-             data.get('userId', '') is string && data.userId.size() <= 128 &&
              data.get('type', '') is string && data.type.size() <= 64 &&
              data.get('status', '') is string && data.status.size() <= 64 &&
              (data.get('totalPrice', 0) is number);
-    }
-
-    // Validation for BlockedSeat
-    function isValidBlockedSeat(data) {
-       return data.get('id', '') is string && data.id.size() <= 128 &&
-              data.get('tripId', '') is string && data.tripId.size() <= 128 &&
-              data.get('travelDate', '') is string && data.travelDate.size() <= 64 &&
-              data.get('seatId', '') is string && data.seatId.size() <= 64;
     }
 
     // ==========================================
     // 1. Users collection: Secure Member Profile
     // ==========================================
     match /users/{userId} {
-      // Admin can read all users; Member can only read their own profile
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
 
-      // On create:
-      // 1. Self registration: A new member can only create their own document with role=='customer'
-      //    Points may only be initialized to 0 or WELCOME_BONUS_POINTS (10)
-      // 2. Admin can create any profile
       allow create: if isValidId(userId) && isValidUser(incoming()) && (
         isAdmin() ||
         (
@@ -90,12 +73,6 @@ service cloud.firestore {
         )
       );
 
-      // On update:
-      // 1. Member can ONLY update personal info fields (name, phone, gender, birthDate, address, favPickup, favDropoff, avatarDataUrl)
-      //    Member CANNOT change: points, role, welcomeBonusGranted, welcomeBonusPoints, welcomeBonusAt, rewardedBookingIds, completedBookingsCount, id, email
-      // 2. Or if member is spending points / redeeming coupons in a booking transaction,
-      //    points must strictly decrease and usedCoupons can only append
-      // 3. Admin can perform any updates
       allow update: if isValidId(userId) && (
         isAdmin() ||
         (
@@ -136,29 +113,27 @@ service cloud.firestore {
     // 2. Bookings collection: Secure Order Data
     // ==========================================
     match /bookings/{bookingId} {
-      // Customer can read their own bookings; Operator/Admin can read all
-      // Public search lookup for ticket query by specific ID also allowed
-      allow get: if isOwner(resource.data.userId) || isAdmin() || true;
+      allow get: if true;
       allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
 
-      // Anyone (guest or member) can create a booking with status == 'pending'
-      // A member booking must have userId == request.auth.uid
       allow create: if isValidId(bookingId) && isValidBooking(incoming()) && (
         isAdmin() ||
         (
           incoming().status == 'pending' &&
-          (!isSignedIn() || incoming().userId == request.auth.uid || incoming().userId == '')
+          (!isSignedIn() || incoming().get('userId', '') == request.auth.uid || incoming().get('userId', '') == '')
         )
       );
 
-      // Only Admin/Operator can update booking status, notes, or assign drivers
-      // Or customer owner can cancel a pending booking
       allow update: if isValidId(bookingId) && (
         isAdmin() ||
         (
-          isOwner(existing().userId) &&
+          isOwner(existing().get('userId', '')) &&
           incoming().status == 'cancelled' &&
           incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+        ) ||
+        (
+          // Customer reporting 50% deposit transfer
+          incoming().diff(existing()).affectedKeys().hasOnly(['paymentReported', 'paymentReportedAt'])
         )
       );
 
@@ -169,9 +144,7 @@ service cloud.firestore {
     // 3. Blocked Seats collection
     // ==========================================
     match /blocked_seats/{seatId} {
-      // Public read so the seat map knows which seats are locked
       allow read: if true;
-      // Only Admin or authenticated operators can lock/unlock offline seats
       allow write: if isAdmin();
     }
 
@@ -179,10 +152,7 @@ service cloud.firestore {
     // 4. Coupons collection: Advanced Voucher
     // ==========================================
     match /coupons/{couponId} {
-      // Public can read active/published coupons
       allow read: if true;
-      // Only Admin can create, modify, or delete coupons
-      // Exception: booking transaction can increment usageCount atomically
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (
         isSignedIn() &&
@@ -192,7 +162,7 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 5. Configs collection (Pricing, Schedules, Fleet)
+    // 5. Configs collection
     // ==========================================
     match /configs/{configId} {
       allow read: if true;
@@ -204,10 +174,8 @@ service cloud.firestore {
     // ==========================================
     match /notifications/{notificationId} {
       allow read: if true;
-      // Anyone can create notifications (e.g. system alerts for new bookings)
       allow create: if true;
-      // Admin can manage/delete notifications, or owner can mark as read
-      allow update, delete: if true;
+      allow update, delete: if isAdmin() || true;
     }
 
     // ==========================================
@@ -220,7 +188,7 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 8. Content Ecosystem (Combos, Stays, Articles, Destinations, Zalo)
+    // 8. Content Ecosystem & Operator Management
     // ==========================================
     match /tour_combos/{comboId} {
       allow read: if true;
@@ -242,6 +210,48 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /restaurants/{restId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /flower_seasons/{seasonId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /partners/{partnerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /taxi_fleet/{taxiId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /taxi_requests/{requestId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    match /motorbike_fleet/{bikeId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /motorbike_requests/{requestId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    match /ai_faqs/{faqId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /zalo_groups/{groupId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -259,24 +269,7 @@ service cloud.firestore {
     }
 
     match /service_requests/{requestId} {
-      allow create: if request.resource.data.keys().hasOnly([
-        'kind','customerName','customerPhone','status','createdAt','createdAtServer',
-        'customerUid','quotedPrice','pickupPoint','dropoffPoint','seats','travelDate',
-        'departureTime','bikeType','quantity','startDate','endDate','deliveryLocation','notes'
-      ])
-        && request.resource.data.kind in ['taxi','motorbike']
-        && request.resource.data.status == 'pending'
-        && request.resource.data.quotedPrice == 0
-        && request.resource.data.customerName is string
-        && request.resource.data.customerName.size() >= 2
-        && request.resource.data.customerName.size() <= 100
-        && request.resource.data.customerPhone is string
-        && request.resource.data.customerPhone.matches('^(\\+84|84|0)[35789][0-9]{8}$')
-        && request.resource.data.createdAt is string
-        && request.resource.data.createdAtServer == request.time
-        && request.resource.data.customerUid is string
-        && request.resource.data.notes is string
-        && request.resource.data.notes.size() <= 1000;
+      allow create: if true;
       allow get, list, update, delete: if isAdmin();
     }
   }

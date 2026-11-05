@@ -57,7 +57,7 @@ export default function PaymentModal({
     if (!booking?.id || isSubmittingReport) return;
     setIsSubmittingReport(true);
     try {
-      const { updateStatusInFirebase } = await import("../lib/firebaseUtils");
+      const { updateStatusInFirebase, saveNotificationToFirebase } = await import("../lib/firebaseUtils");
       await updateStatusInFirebase(
         booking.id,
         {
@@ -66,6 +66,18 @@ export default function PaymentModal({
         },
         "bookings"
       );
+      const depNotification = {
+        id: `notif_dep_${booking.id}_${Date.now()}`,
+        type: 'deposit_transferred' as any,
+        title: `Khách đã báo chuyển cọc 50% - Đơn #${booking.id.toUpperCase()}`,
+        message: `Hành khách ${booking.passengerName} (${booking.passengerPhone}) vừa gửi báo cọc 50% cho vé #${booking.id.toUpperCase()}. Vui lòng kiểm tra tài khoản MB Bank và phê duyệt.`,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        deviceId: 'all',
+        targetPhone: booking.passengerPhone,
+        metadata: { bookingId: booking.id, customerName: booking.passengerName, customerPhone: booking.passengerPhone }
+      };
+      await saveNotificationToFirebase(depNotification).catch(e => console.warn("Notif error:", e));
       if (onConfirmSuccess) {
         onConfirmSuccess(booking.id, finalPrice);
       }

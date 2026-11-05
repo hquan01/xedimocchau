@@ -137,7 +137,7 @@ export default function RestaurantManagement() {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return;
 
@@ -146,24 +146,23 @@ export default function RestaurantManagement() {
       .map(s => s.trim())
       .filter(Boolean);
 
+    let updated: RestaurantItem[] = [];
     if (editingItem) {
-      setRestaurants(prev =>
-        prev.map(r =>
-          r.id === editingItem.id
-            ? {
-                ...r,
-                name: formName.trim(),
-                category: formCategory,
-                address: formAddress.trim(),
-                phone: formPhone.trim(),
-                priceRange: formPriceRange.trim(),
-                openHours: formOpenHours.trim(),
-                specialties: specs.length > 0 ? specs : r.specialties,
-                isPartner: formIsPartner,
-                commissionRate: Number(formCommission) || 0
-              }
-            : r
-        )
+      updated = restaurants.map(r =>
+        r.id === editingItem.id
+          ? {
+              ...r,
+              name: formName.trim(),
+              category: formCategory,
+              address: formAddress.trim(),
+              phone: formPhone.trim(),
+              priceRange: formPriceRange.trim(),
+              openHours: formOpenHours.trim(),
+              specialties: specs.length > 0 ? specs : r.specialties,
+              isPartner: formIsPartner,
+              commissionRate: Number(formCommission) || 0
+            }
+          : r
       );
     } else {
       const newItem: RestaurantItem = {
@@ -180,21 +179,42 @@ export default function RestaurantManagement() {
         status: "active",
         rating: 5.0
       };
-      setRestaurants(prev => [newItem, ...prev]);
+      updated = [newItem, ...restaurants];
     }
+
+    setRestaurants(updated);
     setIsModalOpen(false);
-  };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa cơ sở ẩm thực này?")) {
-      setRestaurants(prev => prev.filter(r => r.id !== id));
+    try {
+      const { saveCollectionItemsToLocalAndFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToLocalAndFirebase("restaurants", "mocchau_operator_restaurants", updated);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed (saved locally):", err);
     }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setRestaurants(prev =>
-      prev.map(r => (r.id === id ? { ...r, status: r.status === "active" ? "hidden" : "active" } : r))
-    );
+  const handleDelete = async (id: string) => {
+    if (confirm("Bạn có chắc chắn muốn xóa cơ sở ẩm thực này?")) {
+      const updated = restaurants.filter(r => r.id !== id);
+      setRestaurants(updated);
+      try {
+        const { saveCollectionItemsToLocalAndFirebase } = await import("../../lib/firebaseUtils");
+        await saveCollectionItemsToLocalAndFirebase("restaurants", "mocchau_operator_restaurants", updated);
+      } catch (err: any) {
+        console.warn("Background Firebase sync failed:", err);
+      }
+    }
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    const updated = restaurants.map(r => (r.id === id ? { ...r, status: r.status === "active" ? "hidden" : "active" } as RestaurantItem : r));
+    setRestaurants(updated);
+    try {
+      const { saveCollectionItemsToLocalAndFirebase } = await import("../../lib/firebaseUtils");
+      await saveCollectionItemsToLocalAndFirebase("restaurants", "mocchau_operator_restaurants", updated);
+    } catch (err: any) {
+      console.warn("Background Firebase sync failed:", err);
+    }
   };
 
   const filtered = restaurants.filter(r => {

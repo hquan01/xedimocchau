@@ -64,3 +64,4 @@ export function hasOperatorAccess(token?: IdTokenResult | null, directEmail?: st
   return isOwnerEmail(tokenEmail) || isOwnerEmail(rawEmail);
 }
 
+

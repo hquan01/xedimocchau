@@ -89,9 +89,6 @@
         "audience": { "type": "string" },
         "validFrom": { "type": "string" },
         "validUntil": { "type": "string" },
-        "birthdayWindow": { "type": "string" },
-        "minAge": { "type": "number" },
-        "maxAge": { "type": "number" },
         "usageLimit": { "type": "number" },
         "usageCount": { "type": "number" },
         "isActive": { "type": "boolean" },
@@ -99,11 +96,136 @@
       },
       "required": ["id", "code", "discountPercentage"]
     },
-    "Config": {
-       "title": "Config",
-       "description": "Global config models for coupons, combos, articles, etc",
-       "type": "object",
-       "properties": {}
+    "Restaurant": {
+      "title": "Restaurant",
+      "description": "Local restaurant and dining options",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "priceRange": { "type": "string" },
+        "openHours": { "type": "string" },
+        "isPartner": { "type": "boolean" },
+        "commissionRate": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "FlowerSeason": {
+      "title": "FlowerSeason",
+      "description": "Seasonal flower bloom schedule and tips",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "timeRange": { "type": "string" },
+        "location": { "type": "string" },
+        "status": { "type": "string" },
+        "published": { "type": "boolean" }
+      },
+      "required": ["id", "name"]
+    },
+    "Partner": {
+      "title": "Partner",
+      "description": "Tourism business partner directory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "contactPerson": { "type": "string" },
+        "phone": { "type": "string" },
+        "contractCode": { "type": "string" },
+        "commissionRate": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "TaxiVehicle": {
+      "title": "TaxiVehicle",
+      "description": "Taxi and private vehicle fleet unit",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "plate": { "type": "string" },
+        "model": { "type": "string" },
+        "seats": { "type": "number" },
+        "provider": { "type": "string" },
+        "phone": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "status": { "type": "string" },
+        "isVisible": { "type": "boolean" }
+      },
+      "required": ["id", "plate", "model", "seats"]
+    },
+    "TaxiRequest": {
+      "title": "TaxiRequest",
+      "description": "Customer taxi service booking request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "pickupPoint": { "type": "string" },
+        "dropoffPoint": { "type": "string" },
+        "seats": { "type": "number" },
+        "travelDate": { "type": "string" },
+        "quotedPrice": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "customerName", "customerPhone", "status"]
+    },
+    "MotorbikeVehicle": {
+      "title": "MotorbikeVehicle",
+      "description": "Motorbike rental fleet model",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "plate": { "type": "string" },
+        "model": { "type": "string" },
+        "type": { "type": "string", "enum": ["manual", "scooter"] },
+        "totalQuantity": { "type": "number" },
+        "availableQuantity": { "type": "number" },
+        "dailyPrice": { "type": "number" },
+        "status": { "type": "string" },
+        "isVisible": { "type": "boolean" }
+      },
+      "required": ["id", "model", "type", "dailyPrice"]
+    },
+    "MotorbikeBookingRequest": {
+      "title": "MotorbikeBookingRequest",
+      "description": "Customer motorbike rental request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "bikeType": { "type": "string" },
+        "quantity": { "type": "number" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "deliveryLocation": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "customerName", "customerPhone", "status"]
+    },
+    "AIKnowledgeItem": {
+      "title": "AIKnowledgeItem",
+      "description": "AI Travel Assistant FAQ knowledge base entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "topic": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "category": { "type": "string" },
+        "priority": { "type": "number" }
+      },
+      "required": ["id", "question", "answer"]
     },
     "Review": {
       "title": "Review",
@@ -114,7 +236,6 @@
         "destinationId": { "type": "string" },
         "userName": { "type": "string" },
         "userEmail": { "type": "string" },
-        "userAvatar": { "type": "string" },
         "rating": { "type": "number" },
         "comment": { "type": "string" },
         "timestamp": { "type": "string" }
@@ -129,44 +250,68 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "topic": { "type": "string" },
-        "description": { "type": "string" },
         "zaloUrl": { "type": "string" },
-        "iconEmoji": { "type": "string" },
-        "order": { "type": "number" },
-        "isActive": { "type": "boolean" },
-        "createdAt": { "type": "string" }
+        "isActive": { "type": "boolean" }
       },
       "required": ["id", "name", "zaloUrl", "isActive"]
     }
   },
   "firestore": {
     "users": {
-        "schema": { "$ref": "#/entities/User" },
-        "description": "List of user profiles."
+      "schema": { "$ref": "#/entities/User" },
+      "description": "List of user profiles."
     },
     "bookings": {
-        "schema": { "$ref": "#/entities/Booking" },
-        "description": "List of bookings."
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "List of bookings."
     },
     "blocked_seats": {
-         "schema": { "$ref": "#/entities/BlockedSeat" },
-         "description": "List of currently locked seats on travels."
+      "schema": { "$ref": "#/entities/BlockedSeat" },
+      "description": "List of currently locked seats on travels."
     },
     "coupons": {
-         "schema": { "$ref": "#/entities/Coupon" },
-         "description": "List of discount coupons and vouchers."
+      "schema": { "$ref": "#/entities/Coupon" },
+      "description": "List of discount coupons and vouchers."
     },
-    "configs": {
-         "schema": { "$ref": "#/entities/Config" },
-         "description": "Global configs."
+    "restaurants": {
+      "schema": { "$ref": "#/entities/Restaurant" },
+      "description": "List of local restaurants and dining options."
+    },
+    "flower_seasons": {
+      "schema": { "$ref": "#/entities/FlowerSeason" },
+      "description": "Seasonal flower bloom schedule and tips."
+    },
+    "partners": {
+      "schema": { "$ref": "#/entities/Partner" },
+      "description": "List of tourism business partners."
+    },
+    "taxi_fleet": {
+      "schema": { "$ref": "#/entities/TaxiVehicle" },
+      "description": "Taxi and private vehicle fleet."
+    },
+    "taxi_requests": {
+      "schema": { "$ref": "#/entities/TaxiRequest" },
+      "description": "Customer taxi service requests."
+    },
+    "motorbike_fleet": {
+      "schema": { "$ref": "#/entities/MotorbikeVehicle" },
+      "description": "Motorbike rental fleet."
+    },
+    "motorbike_requests": {
+      "schema": { "$ref": "#/entities/MotorbikeBookingRequest" },
+      "description": "Customer motorbike rental requests."
+    },
+    "ai_faqs": {
+      "schema": { "$ref": "#/entities/AIKnowledgeItem" },
+      "description": "AI Travel Assistant FAQ knowledge base."
     },
     "reviews": {
-         "schema": { "$ref": "#/entities/Review" },
-         "description": "Customer reviews for destinations."
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Customer reviews for destinations."
     },
     "zalo_groups": {
-         "schema": { "$ref": "#/entities/ZaloGroup" },
-         "description": "List of public and admin-managed Zalo communities."
+      "schema": { "$ref": "#/entities/ZaloGroup" },
+      "description": "List of public and admin-managed Zalo communities."
     }
   }
 }

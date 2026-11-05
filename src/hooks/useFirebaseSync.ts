@@ -3,7 +3,7 @@ import { collection, doc, onSnapshot, getDocs, setDoc, query, where } from "fire
 import { onAuthStateChanged } from "firebase/auth";
 import { hasOperatorAccess } from "../lib/simpleAuth";
 import { ensureMemberWelcomeBonus } from "../lib/memberWelcomeBonus";
-import { db, auth, handleFirestoreError, OperationType } from "../firebase";
+import { db, auth } from "../firebase";
 import { Booking, BlockedSeat, User, AppNotification, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, Driver, ZaloGroup } from "../types";
 import { INITIAL_COMBOS } from "../data/combos";
 import { INITIAL_ACCOMMODATIONS } from "../data/accommodations";
@@ -12,19 +12,33 @@ import { INITIAL_DESTINATIONS } from "../data/destinations";
 import { INITIAL_ARTICLES } from "../data/articles";
 import { INITIAL_DRIVERS } from "../data/drivers";
 import { INITIAL_ZALO_GROUPS } from "../data/zaloGroups";
-import { getLocalList, getDeviceId } from "../lib/firebaseUtils";
+import { 
+  INITIAL_RESTAURANTS, 
+  INITIAL_FLOWER_SEASONS, 
+  INITIAL_PARTNERS, 
+  INITIAL_TAXI_FLEET, 
+  INITIAL_MOTORBIKES, 
+  INITIAL_AI_FAQS 
+} from "../data/operatorDefaults";
+import { RestaurantItem } from "../components/operator/RestaurantManagement";
+import { FlowerSeasonItem } from "../components/operator/FlowerSeasonManagement";
+import { PartnerItem } from "../components/operator/PartnerManagement";
+import { TaxiVehicle, TaxiRequest } from "../components/operator/TaxiFleetManagement";
+import { MotorbikeVehicle, MotorbikeBookingRequest } from "../components/operator/MotorbikeManagement";
+import { AIKnowledgeItem } from "../components/operator/AIAssistantManagement";
+import { getLocalList, setLocalList, getDeviceId } from "../lib/firebaseUtils";
+
+const SEED_KEY = "xemc_seed_completed_v1";
 
 export function useFirebaseSync() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
-  const [blockedSeats, setBlockedSeats] = useState<BlockedSeat[]>([]);
+  const [blockedSeats, setBlockedSeats] = useState<BlockedSeat[]>(() => getLocalList<BlockedSeat>("blocked_seats", []));
   const [users, setUsers] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   
-  // Use data from local data defaults or sync config if needed
-  // For simplicity, sticking to initial data arrays for global configs, unless updated by admin
   const [combos, setCombos] = useState<TourCombo[]>(INITIAL_COMBOS);
   const [accommodations, setAccommodations] = useState<Accommodation[]>(INITIAL_ACCOMMODATIONS);
   const [limousineConfig, setLimousineConfig] = useState<LimousineConfig>(DEFAULT_LIMOUSINE_CONFIG);
@@ -35,6 +49,16 @@ export function useFirebaseSync() {
   const [articles, setArticles] = useState<GuideArticle[]>(INITIAL_ARTICLES);
   const [drivers, setDrivers] = useState<Driver[]>(() => getLocalList<Driver>("drivers", INITIAL_DRIVERS));
   const [zaloGroups, setZaloGroups] = useState<ZaloGroup[]>(() => getLocalList<ZaloGroup>("zalo_groups", INITIAL_ZALO_GROUPS));
+
+  // Additional operator entities persistent in Firestore
+  const [restaurants, setRestaurants] = useState<RestaurantItem[]>(() => getLocalList("restaurants", INITIAL_RESTAURANTS));
+  const [flowerSeasons, setFlowerSeasons] = useState<FlowerSeasonItem[]>(() => getLocalList("flower_seasons", INITIAL_FLOWER_SEASONS));
+  const [partners, setPartners] = useState<PartnerItem[]>(() => getLocalList("partners", INITIAL_PARTNERS));
+  const [taxiFleet, setTaxiFleet] = useState<TaxiVehicle[]>(() => getLocalList("taxi_fleet", INITIAL_TAXI_FLEET));
+  const [taxiRequests, setTaxiRequests] = useState<TaxiRequest[]>(() => getLocalList("taxi_requests", []));
+  const [motorbikeFleet, setMotorbikeFleet] = useState<MotorbikeVehicle[]>(() => getLocalList("motorbike_fleet", INITIAL_MOTORBIKES));
+  const [motorbikeRequests, setMotorbikeRequests] = useState<MotorbikeBookingRequest[]>(() => getLocalList("motorbike_requests", []));
+  const [aiFaqs, setAiFaqs] = useState<AIKnowledgeItem[]>(() => getLocalList("ai_faqs", INITIAL_AI_FAQS));
 
   useEffect(() => {
     let unsubscribeProfile = () => {};
@@ -47,11 +71,9 @@ export function useFirebaseSync() {
       }
       try {
         const token = await firebaseUser.getIdTokenResult();
-        const isAdmin = hasOperatorAccess(token, firebaseUser.email || undefined);
-        if (!isAdmin) {
+        const hasClaim = hasOperatorAccess(token, firebaseUser.email || undefined);
+        if (!hasClaim) {
           try {
-            // Also runs on refresh for an already-signed-in first-time Google
-            // user whose zero-point profile was created before this release.
             await ensureMemberWelcomeBonus(firebaseUser);
           } catch (error) {
             console.warn('[Member] Could not create/reconcile welcome reward:', error);
@@ -60,291 +82,229 @@ export function useFirebaseSync() {
         unsubscribeProfile = onSnapshot(doc(db, "users", firebaseUser.uid), snap => {
           if (snap.exists()) {
             const profile = snap.data() as User;
-            // The UI role must not trust a self-editable Firestore role field.
-            setCurrentUser({...profile, id:firebaseUser.uid, role:isAdmin ? 'operator' : 'customer'});
+            const isOperator = hasClaim || (profile.role as string) === 'operator' || (profile.role as string) === 'admin';
+            setCurrentUser({ ...profile, id: firebaseUser.uid, role: isOperator ? 'operator' : 'customer' });
           } else {
-            setCurrentUser({id:firebaseUser.uid,email:firebaseUser.email||'',name:firebaseUser.displayName||'Thành viên',phone:firebaseUser.phoneNumber||'',points:0,role:isAdmin?'operator':'customer'});
+            setCurrentUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              name: firebaseUser.displayName || 'Thành viên',
+              phone: firebaseUser.phoneNumber || '',
+              points: 0,
+              role: hasClaim ? 'operator' : 'customer'
+            });
           }
           setAuthReady(true);
         }, error => {
           console.warn('Could not load profile from Firestore (using fallback):', error);
-          setCurrentUser({id:firebaseUser.uid,email:firebaseUser.email||'',name:firebaseUser.displayName||'Thành viên',phone:firebaseUser.phoneNumber||'',points:0,role:isAdmin?'operator':'customer'});
+          setCurrentUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            name: firebaseUser.displayName || 'Thành viên',
+            phone: firebaseUser.phoneNumber || '',
+            points: 0,
+            role: hasClaim ? 'operator' : 'customer'
+          });
           setAuthReady(true);
         });
-      } catch (error) {console.error('Auth claim lookup failed',error);setCurrentUser(null);setAuthReady(true)}
+      } catch (error) {
+        console.error('Auth claim lookup failed', error);
+        setCurrentUser(null);
+        setAuthReady(true);
+      }
     });
-    return () => {unsubAuth();unsubscribeProfile()};
+    return () => { unsubAuth(); unsubscribeProfile(); };
   }, []);
 
   useEffect(() => {
-    // Only fetch real-time public/protected data once auth is ready (even for unauthenticated users if your rules allow)
-    // Bookings (customer sees theirs, admin sees all)
-    let unsubBookings = () => {};
-    let unsubBlocked = () => {};
-    let unsubConfigs = () => {};
-    let unsubNotifications = () => {};
-    let unsubCombosCol = () => {};
-    let unsubAccCol = () => {};
-    let unsubArticlesCol = () => {};
-    let unsubCouponsCol = () => {};
-    let unsubDestinationsCol = () => {};
-    let unsubZaloGroups = () => {};
+    const handleDbUpdate = () => {
+      setBlockedSeats(getLocalList<BlockedSeat>("blocked_seats", []));
+    };
+    window.addEventListener("xedimocchau_db_update", handleDbUpdate);
+    return () => window.removeEventListener("xedimocchau_db_update", handleDbUpdate);
+  }, []);
 
-    if (authReady) {
-      // Bookings: Public read access now allowed by rules, operator gets all, customers can filter frontend
-      unsubBookings = onSnapshot(collection(db, "bookings"), (snap) => {
-        console.log("Bookings snapshot received", snap.size);
-        const fetchedBookings = snap.docs.map(d => d.data() as Booking);
-        setAllBookings(fetchedBookings);
-        const deviceId = getDeviceId();
-        
-        if (currentUser?.role === 'operator') {
-          setBookings(fetchedBookings);
-        } else {
-          // Show only bookings from this device
-          setBookings(fetchedBookings.filter(b => (b as any).deviceId === deviceId));
-        }
-      }, (error) => {
-        console.warn("Bookings snapshot error, using local fallback:", error);
-        const localList = getLocalList<Booking>("bookings", []);
-        setAllBookings(localList);
-        const deviceId = getDeviceId();
-        if (currentUser?.role === 'operator') {
-          setBookings(localList);
-        } else {
-          setBookings(localList.filter(b => (b as any).deviceId === deviceId));
-        }
-      });
+  useEffect(() => {
+    if (!authReady) return;
 
-      unsubCombosCol = onSnapshot(collection(db, "tour_combos"), (snap) => {
-        if (snap.empty) {
-          setCombos(INITIAL_COMBOS);
-          if (currentUser?.role === 'operator' && auth.currentUser) {
-            console.log("Seeding initial combos to tour_combos...");
-            INITIAL_COMBOS.forEach(item => {
-              setDoc(doc(db, "tour_combos", item.id), item).catch(console.error);
-            });
-          }
-        } else {
-          setCombos(snap.docs.map(d => d.data() as TourCombo));
-        }
-      }, (error) => {
-        console.warn("Tour combos error, using local defaults:", error);
-        setCombos(getLocalList<TourCombo>("combos", INITIAL_COMBOS));
-      });
+    const isSeeded = localStorage.getItem(SEED_KEY) === "true";
 
-      unsubAccCol = onSnapshot(collection(db, "accommodations"), (snap) => {
-        if (snap.empty) {
-          setAccommodations(INITIAL_ACCOMMODATIONS);
-          if (currentUser?.role === 'operator' && auth.currentUser) {
-            console.log("Seeding initial accommodations...");
-            INITIAL_ACCOMMODATIONS.forEach(item => {
-              setDoc(doc(db, "accommodations", item.id), item).catch(console.error);
-            });
-          }
+    const handleEmptyCollection = <T>(
+      snapEmpty: boolean,
+      docs: T[],
+      initialData: T[],
+      colName: string,
+      setter: (val: T[]) => void
+    ) => {
+      if (snapEmpty) {
+        if (!isSeeded && currentUser?.role === 'operator' && auth.currentUser) {
+          console.log(`Seeding initial data for ${colName}...`);
+          initialData.forEach((item: any) => {
+            if (item.id) {
+              setDoc(doc(db, colName, item.id), item).catch(console.error);
+            }
+          });
+          setter(initialData);
+        } else if (isSeeded) {
+          // If already seeded in the past and collection is empty now, it means admin deleted all items.
+          // DO NOT auto-reseed! Respect empty state.
+          setter([]);
         } else {
-          setAccommodations(snap.docs.map(d => d.data() as Accommodation));
+          setter(initialData);
         }
-      }, (error) => {
-        console.warn("Accommodations error, using local defaults:", error);
-        setAccommodations(getLocalList<Accommodation>("accommodations", INITIAL_ACCOMMODATIONS));
-      });
-
-      unsubArticlesCol = onSnapshot(collection(db, "guide_articles"), (snap) => {
-        if (snap.empty) {
-          setArticles(INITIAL_ARTICLES);
-          if (currentUser?.role === 'operator' && auth.currentUser) {
-            console.log("Seeding initial guide articles...");
-            INITIAL_ARTICLES.forEach(item => {
-              setDoc(doc(db, "guide_articles", item.id), item).catch(console.error);
-            });
-          }
-        } else {
-          setArticles(snap.docs.map(d => d.data() as GuideArticle));
-        }
-      }, (error) => {
-        console.warn("Guide articles error, using local defaults:", error);
-        setArticles(getLocalList<GuideArticle>("articles", INITIAL_ARTICLES));
-      });
-
-      unsubCouponsCol = onSnapshot(collection(db, "coupons"), (snap) => {
-        if (snap.empty) {
-          setCoupons(INITIAL_COUPONS);
-          if (currentUser?.role === 'operator' && auth.currentUser) {
-            console.log("Seeding initial coupons...");
-            INITIAL_COUPONS.forEach(item => {
-              setDoc(doc(db, "coupons", item.id), item).catch(console.error);
-            });
-          }
-        } else {
-          setCoupons(snap.docs.map(d => d.data() as Coupon));
-        }
-      }, (error) => {
-        console.warn("Coupons error, using local defaults:", error);
-        setCoupons(getLocalList<Coupon>("coupons", INITIAL_COUPONS));
-      });
-
-      unsubDestinationsCol = onSnapshot(collection(db, "destinations"), (snap) => {
-        if (snap.empty) {
-          setDestinations(INITIAL_DESTINATIONS);
-          if (currentUser?.role === 'operator' && auth.currentUser) {
-            console.log("Seeding initial destinations...");
-            INITIAL_DESTINATIONS.forEach(item => {
-              setDoc(doc(db, "destinations", item.id), item).catch(console.error);
-            });
-          }
-        } else {
-          setDestinations(snap.docs.map(d => d.data() as Destination));
-        }
-      }, (error) => {
-        console.warn("Destinations error, using local defaults:", error);
-        setDestinations(getLocalList<Destination>("destinations", INITIAL_DESTINATIONS));
-      });
-      
-      if (currentUser?.role === 'operator' && auth.currentUser) {
-         const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-           setUsers(snap.docs.map(d => d.data() as User));
-         }, (error) => {
-           console.warn("Users list error, using local cache:", error);
-           setUsers(getLocalList<User>("users", []));
-         });
-         
-         const originalUnsubBookings = unsubBookings;
-         unsubBookings = () => { originalUnsubBookings(); unsubUsers(); };
+      } else {
+        setter(docs);
+        localStorage.setItem(SEED_KEY, "true");
       }
+    };
 
-      // Blocked seats - public for reading to see availability
-      unsubBlocked = onSnapshot(collection(db, "blocked_seats"), (snap) => {
-         setBlockedSeats(snap.docs.map(d => d.data() as BlockedSeat));
-      }, (error) => {
-         console.warn("Blocked seats error, using local cache:", error);
-         setBlockedSeats(getLocalList<BlockedSeat>("blocked_seats", []));
-      });
+    const unsubBookings = onSnapshot(collection(db, "bookings"), (snap) => {
+      const fetchedBookings = snap.docs.map(d => d.data() as Booking);
+      setAllBookings(fetchedBookings);
+      const deviceId = getDeviceId();
+      if (currentUser?.role === 'operator') {
+        setBookings(fetchedBookings);
+      } else {
+        setBookings(fetchedBookings.filter(b => (b as any).deviceId === deviceId));
+      }
+    }, (error) => {
+      console.warn("Bookings snapshot error:", error);
+      const localList = getLocalList<Booking>("bookings", []);
+      setAllBookings(localList);
+      const deviceId = getDeviceId();
+      setBookings(currentUser?.role === 'operator' ? localList : localList.filter(b => (b as any).deviceId === deviceId));
+    });
 
-      // Configurations - public read from configs collection for global static params
-      unsubConfigs = onSnapshot(collection(db, "configs"), (snap) => {
-         if (!snap.empty) {
-           snap.docs.forEach(docSnap => {
-             const data = docSnap.data();
-             if (data.limousineConfig) setLimousineConfig({ ...DEFAULT_LIMOUSINE_CONFIG, ...data.limousineConfig });
-             if (data.sharedCarConfig) setSharedCarConfig({ ...DEFAULT_SHARED_CAR_CONFIG, ...data.sharedCarConfig });
-             if (data.locations) setLocations(data.locations);
-             if (data.drivers && Array.isArray(data.drivers)) setDrivers(data.drivers);
-           });
-         } else {
-           // Create initial configs document quietly if operator exists (first run)
-           if (currentUser?.role === 'operator' && auth.currentUser) {
-             const initialData = {
-               limousineConfig: DEFAULT_LIMOUSINE_CONFIG,
-               sharedCarConfig: DEFAULT_SHARED_CAR_CONFIG,
-               locations: INITIAL_LOCATIONS,
-               drivers: INITIAL_DRIVERS,
-             };
-             Object.entries(initialData).forEach(([key, val]) => {
-               setDoc(doc(db, "configs", key), { [key]: val }).catch(console.error);
-             });
-           }
-         }
-      }, (error) => {
-         console.warn("Configs error, using local fallbacks:", error);
-         try {
-           const configsStr = localStorage.getItem("xemc_configs");
-           if (configsStr) {
-             const parsed = JSON.parse(configsStr);
-             if (parsed.limousineConfig) setLimousineConfig(parsed.limousineConfig);
-             if (parsed.sharedCarConfig) setSharedCarConfig(parsed.sharedCarConfig);
-             if (parsed.locations) setLocations(parsed.locations);
-             if (parsed.drivers) setDrivers(parsed.drivers);
-           }
-         } catch (e) {
-           // ignore
-         }
-      });
+    const unsubCombos = onSnapshot(collection(db, "tour_combos"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as TourCombo), INITIAL_COMBOS, "tour_combos", setCombos);
+    }, () => setCombos(getLocalList("combos", INITIAL_COMBOS)));
 
-      // Notifications
-      unsubNotifications = onSnapshot(collection(db, "notifications"), (snap) => {
-        const allNotifs = snap.docs.map(d => d.data() as AppNotification);
-        const deviceId = getDeviceId();
-        
-        const filtered = currentUser?.role === 'operator' 
-          ? allNotifs 
-          : allNotifs.filter(n => 
-              n.deviceId === deviceId || 
-              n.deviceId === "all" || 
-              (currentUser?.phone && (n.targetPhone === currentUser.phone || n.metadata?.customerPhone === currentUser.phone))
-            );
+    const unsubAcc = onSnapshot(collection(db, "accommodations"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as Accommodation), INITIAL_ACCOMMODATIONS, "accommodations", setAccommodations);
+    }, () => setAccommodations(getLocalList("accommodations", INITIAL_ACCOMMODATIONS)));
 
-        setNotifications(filtered.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-      }, (error) => {
-        console.warn("Notifications error, using local cache:", error);
-        setNotifications(getLocalList<AppNotification>("notifications", []));
-      });
+    const unsubArticles = onSnapshot(collection(db, "guide_articles"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as GuideArticle), INITIAL_ARTICLES, "guide_articles", setArticles);
+    }, () => setArticles(getLocalList("articles", INITIAL_ARTICLES)));
 
-      // Zalo Groups - public read for community
-      unsubZaloGroups = onSnapshot(collection(db, "zalo_groups"), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as ZaloGroup);
-          setZaloGroups(list.sort((a, b) => (a.order || 0) - (b.order || 0)));
-        }
-      }, (error) => console.warn("Could not read zalo_groups from Firestore, using local defaults:", error));
+    const unsubCoupons = onSnapshot(collection(db, "coupons"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as Coupon), INITIAL_COUPONS, "coupons", setCoupons);
+    }, () => setCoupons(getLocalList("coupons", INITIAL_COUPONS)));
+
+    const unsubDestinations = onSnapshot(collection(db, "destinations"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as Destination), INITIAL_DESTINATIONS, "destinations", setDestinations);
+    }, () => setDestinations(getLocalList("destinations", INITIAL_DESTINATIONS)));
+
+    const unsubRestaurants = onSnapshot(collection(db, "restaurants"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as RestaurantItem), INITIAL_RESTAURANTS, "restaurants", setRestaurants);
+    }, () => setRestaurants(getLocalList("restaurants", INITIAL_RESTAURANTS)));
+
+    const unsubFlowerSeasons = onSnapshot(collection(db, "flower_seasons"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as FlowerSeasonItem), INITIAL_FLOWER_SEASONS, "flower_seasons", setFlowerSeasons);
+    }, () => setFlowerSeasons(getLocalList("flower_seasons", INITIAL_FLOWER_SEASONS)));
+
+    const unsubPartners = onSnapshot(collection(db, "partners"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as PartnerItem), INITIAL_PARTNERS, "partners", setPartners);
+    }, () => setPartners(getLocalList("partners", INITIAL_PARTNERS)));
+
+    const unsubTaxiFleet = onSnapshot(collection(db, "taxi_fleet"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as TaxiVehicle), INITIAL_TAXI_FLEET, "taxi_fleet", setTaxiFleet);
+    }, () => setTaxiFleet(getLocalList("taxi_fleet", INITIAL_TAXI_FLEET)));
+
+    const unsubTaxiReqs = onSnapshot(collection(db, "taxi_requests"), (snap) => {
+      setTaxiRequests(snap.docs.map(d => d.data() as TaxiRequest));
+    }, () => setTaxiRequests(getLocalList("taxi_requests", [])));
+
+    const unsubMotorbikeFleet = onSnapshot(collection(db, "motorbike_fleet"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as MotorbikeVehicle), INITIAL_MOTORBIKES, "motorbike_fleet", setMotorbikeFleet);
+    }, () => setMotorbikeFleet(getLocalList("motorbike_fleet", INITIAL_MOTORBIKES)));
+
+    const unsubMotorbikeReqs = onSnapshot(collection(db, "motorbike_requests"), (snap) => {
+      setMotorbikeRequests(snap.docs.map(d => d.data() as MotorbikeBookingRequest));
+    }, () => setMotorbikeRequests(getLocalList("motorbike_requests", [])));
+
+    const unsubAiFaqs = onSnapshot(collection(db, "ai_faqs"), (snap) => {
+      handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as AIKnowledgeItem), INITIAL_AI_FAQS, "ai_faqs", setAiFaqs);
+    }, () => setAiFaqs(getLocalList("ai_faqs", INITIAL_AI_FAQS)));
+
+    const unsubBlocked = onSnapshot(collection(db, "blocked_seats"), (snap) => {
+      if (!snap.empty) {
+        const remote = snap.docs.map(d => d.data() as BlockedSeat);
+        setBlockedSeats(remote);
+        setLocalList("blocked_seats", remote);
+      }
+    }, (error) => {
+      console.warn("Blocked seats snapshot error:", error);
+      setBlockedSeats(getLocalList("blocked_seats", []));
+    });
+
+    const unsubConfigs = onSnapshot(collection(db, "configs"), (snap) => {
+      if (!snap.empty) {
+        snap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.limousineConfig) setLimousineConfig({ ...DEFAULT_LIMOUSINE_CONFIG, ...data.limousineConfig });
+          if (data.sharedCarConfig) setSharedCarConfig({ ...DEFAULT_SHARED_CAR_CONFIG, ...data.sharedCarConfig });
+          if (data.locations) setLocations(data.locations);
+          if (data.drivers && Array.isArray(data.drivers)) setDrivers(data.drivers);
+        });
+      }
+    }, (error) => console.warn("Configs snapshot error (using defaults):", error));
+
+    const unsubNotifications = onSnapshot(collection(db, "notifications"), (snap) => {
+      const allNotifs = snap.docs.map(d => d.data() as AppNotification);
+      const deviceId = getDeviceId();
+      const filtered = currentUser?.role === 'operator' 
+        ? allNotifs 
+        : allNotifs.filter(n => 
+            n.deviceId === deviceId || 
+            n.deviceId === "all" || 
+            (currentUser?.phone && (n.targetPhone === currentUser.phone || n.metadata?.customerPhone === currentUser.phone))
+          );
+      setNotifications(filtered.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+    }, (error) => {
+      console.warn("Notifications snapshot error:", error);
+      setNotifications(getLocalList("notifications", []));
+    });
+
+    const unsubZaloGroups = onSnapshot(collection(db, "zalo_groups"), (snap) => {
+      if (!snap.empty) {
+        const list = snap.docs.map(d => d.data() as ZaloGroup);
+        setZaloGroups(list.sort((a, b) => (a.order || 0) - (b.order || 0)));
+      }
+    }, (error) => {
+      console.warn("Zalo groups snapshot error:", error);
+      setZaloGroups(getLocalList("zalo_groups", INITIAL_ZALO_GROUPS));
+    });
+
+    let unsubUsers = () => {};
+    if (currentUser?.role === 'operator' && auth.currentUser) {
+      unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+        setUsers(snap.docs.map(d => d.data() as User));
+      }, () => setUsers(getLocalList("users", [])));
     }
 
     return () => {
       unsubBookings();
+      unsubCombos();
+      unsubAcc();
+      unsubArticles();
+      unsubCoupons();
+      unsubDestinations();
+      unsubRestaurants();
+      unsubFlowerSeasons();
+      unsubPartners();
+      unsubTaxiFleet();
+      unsubTaxiReqs();
+      unsubMotorbikeFleet();
+      unsubMotorbikeReqs();
+      unsubAiFaqs();
       unsubBlocked();
       unsubConfigs();
       unsubNotifications();
-      unsubCombosCol();
-      unsubAccCol();
-      unsubArticlesCol();
-      unsubCouponsCol();
-      unsubDestinationsCol();
       unsubZaloGroups();
+      unsubUsers();
     };
   }, [authReady, currentUser?.role, currentUser?.id]);
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      if (!auth.currentUser) {
-        // Read from localStorage fallbacks
-        
-        const localBlocked = getLocalList<BlockedSeat>("blocked_seats", []);
-        setBlockedSeats(localBlocked);
-        
-        const localUsers = getLocalList<User>("users", []);
-        setUsers(localUsers);
-
-        const localDrivers = getLocalList<Driver>("drivers", INITIAL_DRIVERS);
-        setDrivers(localDrivers);
-
-        try {
-          const configsStr = localStorage.getItem("xemc_configs");
-          if (configsStr) {
-            const parsed = JSON.parse(configsStr);
-            if (parsed.limousineConfig) setLimousineConfig(parsed.limousineConfig);
-            if (parsed.sharedCarConfig) setSharedCarConfig(parsed.sharedCarConfig);
-            if (parsed.combos) setCombos(parsed.combos);
-            if (parsed.accommodations) setAccommodations(parsed.accommodations);
-            if (parsed.coupons) setCoupons(parsed.coupons);
-            if (parsed.locations) setLocations(parsed.locations);
-            if (parsed.destinations) setDestinations(parsed.destinations);
-            if (parsed.articles) setArticles(parsed.articles);
-            if (parsed.drivers) setDrivers(parsed.drivers);
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
-    };
-
-    window.addEventListener("xedimocchau_db_update", handleUpdate);
-    // Initial read
-    handleUpdate();
-
-    return () => {
-      window.removeEventListener("xedimocchau_db_update", handleUpdate);
-    };
-  }, [authReady, currentUser]);
 
   return {
     currentUser,
@@ -378,6 +338,22 @@ export function useFirebaseSync() {
     drivers,
     setDrivers,
     zaloGroups,
-    setZaloGroups
+    setZaloGroups,
+    restaurants,
+    setRestaurants,
+    flowerSeasons,
+    setFlowerSeasons,
+    partners,
+    setPartners,
+    taxiFleet,
+    setTaxiFleet,
+    taxiRequests,
+    setTaxiRequests,
+    motorbikeFleet,
+    setMotorbikeFleet,
+    motorbikeRequests,
+    setMotorbikeRequests,
+    aiFaqs,
+    setAiFaqs
   };
 }

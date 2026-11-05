@@ -441,7 +441,7 @@ export default function SharedCarBooking({
       travelDate: date,
       passengerName: trimmedName,
       passengerPhone: trimmedPhone,
-      passengerEmail: passengerEmail.trim() || "sharedcar@client.vn",
+      passengerEmail: passengerEmail.trim() || undefined,
       pickupPoint: pickupDetail,
       dropoffPoint: dropoffDetail,
       totalPrice: finalPrice,

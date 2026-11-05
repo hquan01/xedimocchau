@@ -405,7 +405,7 @@ export default function LimousineBooking({
         travelDate: date,
         passengerName: trimmedName,
         passengerPhone: trimmedPhone,
-        passengerEmail: trimmedEmail || "contact@client.vn",
+        passengerEmail: trimmedEmail || undefined,
         pickupPoint: finalPickupPoint,
         dropoffPoint: finalDropoffPoint,
         totalPrice: finalPrice,
@@ -428,9 +428,9 @@ export default function LimousineBooking({
       setSeatCount(1);
       setUsePoints(false);
       setSpamAnswer("");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Critical booking failure:", err);
-      setErrorMsg("Có lỗi xảy ra khi xử lý đặt vé. Vui lòng thử lại.");
+      setErrorMsg("Chưa lưu được đơn đặt vé lên máy chủ: " + (err?.message || "Lỗi kết nối. Vui lòng thử lại."));
     } finally {
       setIsSubmitting(false);
     }

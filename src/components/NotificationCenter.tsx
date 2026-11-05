@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Bell, X, Check, Calendar, Clock, User, ArrowRight, Settings } from "lucide-react";
+import { Bell, X, Check, Calendar, Clock, User, ArrowRight, Settings, CreditCard } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { AppNotification } from "../types";
 
@@ -155,12 +155,16 @@ export default function NotificationCenter({
                           <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${
                             n.type === 'booking_confirmed' 
                               ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-700/20' 
+                              : (n.type as string) === 'deposit_transferred'
+                              ? 'bg-amber-500 text-white shadow-sm shadow-amber-600/20'
                               : n.type === 'booking_new' 
                               ? 'bg-emerald-100 text-emerald-700' 
                               : 'bg-stone-100 text-stone-600'
                           }`}>
                             {n.type === 'booking_confirmed' ? (
                               <Check className="w-5 h-5 stroke-[2.5]" />
+                            ) : (n.type as string) === 'deposit_transferred' ? (
+                              <CreditCard className="w-5 h-5 stroke-[2.5]" />
                             ) : n.type === 'booking_new' ? (
                               <Calendar className="w-5 h-5" />
                             ) : (
