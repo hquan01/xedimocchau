@@ -142,7 +142,7 @@ export function githubDataRouter():Router {
           data.moderationStatus='pending';
         }
       }
-      if(collection==='bookings' && Array.isArray(data.seatNumbers) && data.seatNumbers.length>0) {
+      if(collection==='bookings' && ['limousine','shared_car'].includes(String(data.type))) {
         // Create with a branch-CAS commit: concurrent customers must not
         // silently be given the same seat on the same journey.
         for(let attempt=0;attempt<3;attempt++){
