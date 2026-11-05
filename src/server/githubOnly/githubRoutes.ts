@@ -95,6 +95,22 @@ export function githubDataRouter():Router {
     try{await verifyStoreConnectivity();return res.json({configured:true,provider:'github-encrypted',firebase:false});}
     catch(e){return res.status(503).json({configured:false,provider:'github-encrypted',firebase:false,error:e instanceof Error?e.message:'GitHub không thể kết nối'});}
   });
+  // Only anonymized offline seat locks are readable without authentication.
+  // Never return names, phones, addresses, booking IDs or customer IDs.
+  r.get('/_public-seat-status',async(_req,res,next)=>{
+    try{
+      const list=await listDocuments('blocked_seats');
+      const items=list.map(({data})=>({
+        seatId:String(data.seatId||''),
+        tripId:String(data.tripId||''),
+        travelDate:String(data.travelDate||''),
+        routeFrom:String(data.routeFrom||''),
+        routeTo:String(data.routeTo||'')
+      })).filter(x=>x.seatId&&x.tripId&&x.travelDate);
+      res.setHeader('Cache-Control','no-store');
+      res.json({items});
+    }catch(e){next(e)}
+  });
   r.get('/:collection',async(req,res,next)=>{
     try {
       const collection=checkCollection(req.params.collection);
