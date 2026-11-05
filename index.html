@@ -49,6 +49,18 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="mask-icon" href="/logo.png" color="#1b4332">
     <meta name="theme-color" content="#1b4332">
+    <!-- Avoid a bright white flash before React mounts after sunset. -->
+    <script>
+      (function () {
+        try {
+          var preference = localStorage.getItem('qt_limousine_appearance_v1');
+          var hour = new Date().getHours();
+          var dark = preference === 'dark' || (preference !== 'light' && (hour >= 18 || hour < 6));
+          document.documentElement.dataset.qtPrepaint = dark ? 'night' : 'day';
+        } catch (error) { /* Storage may be disabled. */ }
+      })();
+    </script>
+    <style>html[data-qt-prepaint="night"],html[data-qt-prepaint="night"] body{background:#0c1720}</style>
 
     <!-- Accurate organization and service details for search engines following Google Structured Data guidelines. -->
     <script type="application/ld+json">
