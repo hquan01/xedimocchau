@@ -90,7 +90,7 @@ export default function GithubOperatorPanel({account,onLogout}:{account:Row,onLo
  const [message,setMessage]=useState('');
  const [error,setError]=useState('');
  const [drawer,setDrawer]=useState(false);
- const [stats,setStats]=useState({bookings:0,pending:0,reported:0,customers:0,service:0,revenue:0});
+ const [stats,setStats]=useState({bookings:0,pending:0,reported:0,customers:0,service:0,revenue:0,confirmedSeats:0,blockedSeats:0,hnMc:0,mcHn:0,combos:0,todayTrips:0});
  const [configured,setConfigured]=useState<boolean|null>(null);
  const [refreshedAt,setRefreshedAt]=useState('');
  const module=ALL_ADMIN_MODULES.find(m=>m.id===moduleId);
@@ -108,9 +108,24 @@ export default function GithubOperatorPanel({account,onLogout}:{account:Row,onLo
  },[section?.collection,section?.configId]);
  const loadStats=useCallback(async()=>{
   setBusy(true);setError('');
-  try{const [b,u,s]=await Promise.all([gh.list('bookings'),gh.list('users'),gh.list('service_requests')]);
+  try{const [b,u,s,blocked]=await Promise.all([gh.list('bookings'),gh.list('users'),gh.list('service_requests'),gh.list('blocked_seats')]);
    const bookings=b.items||[];
-   setStats({bookings:bookings.length,pending:bookings.filter(x=>x.status==='pending').length,reported:bookings.filter(x=>x.paymentReported&&x.status==='pending').length,customers:(u.items||[]).length,service:(s.items||[]).length,revenue:bookings.filter(x=>x.status==='success'||x.status==='completed').reduce((sum,x)=>sum+Number(x.totalPrice||0),0)});
+   const confirmed=bookings.filter(x=>x.status==='success'||x.status==='completed');
+   const route=(x:Row)=>String(x.routeSelection||x.route||x.routeName||'').toLocaleLowerCase('vi-VN');
+   const routes=confirmed.filter(x=>x.type==='limousine'||!x.type);
+   const currentDate=new Date();const dateLocal=[currentDate.getFullYear(),String(currentDate.getMonth()+1).padStart(2,'0'),String(currentDate.getDate()).padStart(2,'0')].join('-');
+   setStats({
+     bookings:bookings.length,pending:bookings.filter(x=>x.status==='pending').length,
+     reported:bookings.filter(x=>x.paymentReported&&x.status==='pending').length,
+     customers:(u.items||[]).length,service:(s.items||[]).length,
+     revenue:confirmed.reduce((sum,x)=>sum+Number(x.totalPrice||0),0),
+     confirmedSeats:confirmed.reduce((sum,x)=>sum+(Array.isArray(x.seatNumbers)?x.seatNumbers.length:Number(x.seatCount||0)),0),
+     blockedSeats:(blocked.items||[]).length,
+     hnMc:routes.filter(x=>route(x).includes('hà nội')&&route(x).includes('mộc châu')&&route(x).indexOf('hà nội')<route(x).indexOf('mộc châu')).length,
+     mcHn:routes.filter(x=>route(x).includes('hà nội')&&route(x).includes('mộc châu')&&route(x).indexOf('mộc châu')<route(x).indexOf('hà nội')).length,
+     combos:confirmed.filter(x=>x.type==='combo').length,
+     todayTrips:confirmed.filter(x=>x.travelDate===dateLocal&&(x.type==='limousine'||!x.type)).length
+   });
    setRefreshedAt(new Date().toLocaleTimeString('vi-VN'));
   }catch(e){setError('Không đọc được thống kê GitHub: '+showError(e))}finally{setBusy(false)};
  },[]);
@@ -181,11 +196,45 @@ export default function GithubOperatorPanel({account,onLogout}:{account:Row,onLo
     {message&&<div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 flex gap-2"><CheckCircle2 size={19} className="shrink-0"/>{message}</div>}
     {configured===false&&<div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm"><strong>Chưa thể thao tác thực tế.</strong> Máy chủ cần các biến GITHUB_DATA_REPO, GITHUB_DATA_BRANCH=main, GITHUB_DATA_TOKEN, GITHUB_DATA_ENCRYPTION_KEY, GITHUB_SESSION_SECRET và GITHUB_ADMIN_PASSWORD. Không nhập bí mật vào giao diện khách.</div>}
     {(moduleId==='overview'||moduleId==='growth_analytics') ? <>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">{[
-       ['Tổng đơn đặt vé',stats.bookings,'limousine_bookings'],['Chờ xác nhận',stats.pending,'limousine_bookings'],['Khách báo đã cọc',stats.reported,'limousine_bookings'],
-       ['Hội viên',stats.customers,'limousine_customers'],['Yêu cầu dịch vụ',stats.service,'service_orders'],['Giá trị đơn xác nhận',money(stats.revenue),'limousine_bookings']
-      ].map(([title,value,target])=><button key={title} className="rounded-2xl bg-white border border-stone-200 shadow-sm p-4 sm:p-6 text-left hover:border-emerald-400" onClick={()=>go(String(target))}><div className="text-xs text-stone-500">{title}</div><div className="text-2xl font-black mt-2 text-[#1b4332]">{value}</div></button>)}</div>
-      <div className="bg-white border rounded-2xl p-5 space-y-3"><h2 className="font-black">{moduleId==='growth_analytics'?'Thống kê thực từ dữ liệu đơn hàng':'Thao tác nhanh'}</h2><p className="text-sm text-stone-600">Chỉ thống kê những bản ghi thực sự đọc được từ GitHub. Không tự tạo lượt xem hoặc doanh thu giả. Lần cập nhật: {refreshedAt||'Chưa có'}.</p><div className="flex flex-wrap gap-2">{[['Đơn chưa duyệt','limousine_bookings'],['Bài viết','articles_guide'],['Địa điểm','destinations'],['Hội viên','limousine_customers'],['Voucher','limousine_coupons']].map(([name,id])=><button key={id} onClick={()=>go(id)} className="px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-sm font-semibold">{name}</button>)}</div></div>
+      <section className="rounded-3xl bg-gradient-to-r from-stone-900 via-emerald-950 to-[#1b4332] text-white p-5 sm:p-8 shadow-lg border border-emerald-900 space-y-6">
+        <div className="flex flex-wrap items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/10 p-3 rounded-2xl border border-white/15"><ShieldCheck size={24} className="text-emerald-300"/></div>
+            <div><span className="text-[10px] bg-emerald-700 px-2 py-1 rounded-full uppercase font-black tracking-wide">Điều hành trực tuyến · GitHub Data</span>
+              <h2 className="text-lg sm:text-xl font-black mt-2">Tổng Quan Vận Hành & Doanh Số</h2></div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={()=>go('limousine_bookings')} className="rounded-xl bg-white text-stone-900 px-4 py-2 font-bold text-xs">Quản lý đơn đặt ({stats.bookings})</button>
+            <button onClick={()=>go('limousine_seatlock')} className="rounded-xl bg-emerald-600 text-white px-4 py-2 font-bold text-xs">Khóa ghế</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {([
+            ['Giá trị vé đã xác nhận',money(stats.revenue),'text-amber-300'],
+            ['Yêu cầu chưa xác nhận',stats.pending+' đơn mới','text-emerald-300'],
+            ['Số ghế online đã duyệt',stats.confirmedSeats+' ghế xếp','text-white'],
+            ['Số ghế bị khóa offline',stats.blockedSeats+' ghế khóa','text-teal-300']
+          ] as const).map(([title,value,color])=><div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-white/70 text-xs">{title}</p><div className={`text-xl sm:text-2xl font-black font-mono mt-2 ${color}`}>{value}</div><div className="h-1 mt-3 bg-white/10 rounded-full"><div className="h-full w-1/2 bg-emerald-400 rounded-full"/></div></div>)}
+        </div>
+        <p className="text-[11px] text-white/70">Số liệu chỉ tính bản ghi GitHub đã đọc được. Giá trị vé không đồng nghĩa tiền đã thu; chủ xe kiểm tra cọc 50% thủ công.</p>
+      </section>
+      <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 space-y-4">
+        <div className="flex items-center gap-3"><ClipboardCheck className="text-emerald-800"/><div><h3 className="text-sm font-black text-emerald-950 uppercase">Nhắc nhở hành trình hôm nay</h3><p className="text-xs text-emerald-700">{new Date().toLocaleDateString('vi-VN')}</p></div></div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2"><p className="font-black uppercase text-xs text-emerald-900 border-b border-emerald-200 pb-2">Chuyến xe xuất phát</p><p className="text-sm text-stone-700">{stats.todayTrips>0?`Hôm nay có ${stats.todayTrips} đơn Limousine đã duyệt.`:'Hôm nay chưa có đơn Limousine đã duyệt.'}</p></div>
+          <div className="space-y-2"><p className="font-black uppercase text-xs text-amber-900 border-b border-amber-200 pb-2">Đặt phòng & Combo</p><p className="text-sm text-stone-700">{stats.combos>0?`Có ${stats.combos} combo được xác nhận trong hệ thống.`:'Chưa có combo được xác nhận.'}</p></div>
+        </div>
+      </section>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {([
+         ['Hà Nội → Mộc Châu',stats.hnMc+' đơn vé','Khách khởi hành lên cao nguyên'],
+         ['Mộc Châu → Hà Nội',stats.mcHn+' đơn vé','Khách về lại thủ đô'],
+         ['Combo du lịch',stats.combos+' gói','Vé xe và lưu trú']
+        ] as const).map(([title,value,sub])=><button key={title} onClick={()=>go('limousine_bookings')} className="rounded-2xl border border-stone-200 bg-white p-5 text-left hover:border-emerald-500 shadow-sm">
+           <div className="text-xs font-black uppercase text-stone-500">{title}</div><div className="text-2xl font-black mt-3 font-mono">{value}</div><p className="text-xs text-stone-400 mt-1">{sub}</p><p className="text-xs font-bold text-emerald-800 mt-4 pt-3 border-t">Xem danh sách chuyến →</p>
+         </button>)}
+      </div>
+      <div className="bg-white border border-stone-200 rounded-2xl p-5 space-y-3"><h3 className="font-black text-stone-900">Truy cập nhanh</h3><div className="flex flex-wrap gap-2">{[['Đơn chưa duyệt','limousine_bookings'],['Bài viết','articles_guide'],['Địa điểm','destinations'],['Hội viên','limousine_customers'],['Voucher','limousine_coupons']].map(([name,id])=><button key={id} onClick={()=>go(id)} className="px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-sm font-semibold">{name}</button>)}</div><p className="text-xs text-stone-500">Lần cập nhật: {refreshedAt||'Chưa có'}</p></div>
     </> : <>
      {moduleId==='security_config'&&<div className="bg-white border rounded-2xl p-5 space-y-2"><h2 className="font-bold flex gap-2 items-center"><ShieldCheck size={18}/> Kiểm tra bảo mật</h2><p className="text-sm text-stone-600">Khóa mã hóa, token GitHub và mật khẩu Admin chỉ được thay trong Vercel Environment Variables. Không hiển thị hoặc sửa bí mật trong trình duyệt.</p><p className="text-xs text-stone-500">Tài khoản đang dùng: {account.email||account.name||'Admin'}. Dữ liệu khách được lưu riêng và mã hóa.</p></div>}
      <div className="bg-white rounded-2xl border p-4 flex flex-wrap items-center gap-2 justify-between">
