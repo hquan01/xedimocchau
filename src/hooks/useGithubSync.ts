@@ -109,7 +109,7 @@ export function useGithubSync(){
   },[]);
   useEffect(()=>{if(authReady)void load();},[authReady,currentUser?.id,load]);
   return {
-    currentUser,setCurrentUser,authReady,bookings,setBookings,allBookings,blockedSeats,setBlockedSeats,
+    currentUser,setCurrentUser,authReady,bookings,setBookings,allBookings,setAllBookings,blockedSeats,setBlockedSeats,
     users,setUsers,notifications,setNotifications,combos,setCombos,accommodations,setAccommodations,
     limousineConfig,setLimousineConfig,sharedCarConfig,setSharedCarConfig,
     coupons,setCoupons,locations,setLocations,destinations,setDestinations,articles,setArticles,
