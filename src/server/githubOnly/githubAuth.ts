@@ -96,7 +96,7 @@ export function githubAuthRouter():Router {
       limitLogin(req);
       const password=String(req.body?.password||'');
       const expected=process.env.GITHUB_ADMIN_PASSWORD||'';
-      if(expected.length<20)throw new StoreError('Admin chưa cấu hình GITHUB_ADMIN_PASSWORD mạnh.',503);
+      if(expected.length<8)throw new StoreError('Mật khẩu Admin phải có ít nhất 8 ký tự trong GITHUB_ADMIN_PASSWORD.',503);
       if(!sameSecret(password,expected))throw new StoreError('Sai mật khẩu quản trị.',401);
       const email=process.env.GITHUB_ADMIN_EMAIL||'admin@local.invalid';
       setSession(res,{uid:'github_admin',email,role:'operator',provider:'admin'});
