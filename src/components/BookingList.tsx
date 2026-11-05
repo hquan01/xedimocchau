@@ -39,6 +39,7 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
   // Only expose bookings authorized for the current customer/session.
   // Search by someone else's phone or ticket code must never reveal their trips.
   const combinedResults=localMatched;
+  const onlineMatched:Booking[]=[]; // Never search unrelated customers' tickets.
   const isSearchActive=cleanQuery.length>0;
 
   return (
