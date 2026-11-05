@@ -2,6 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {Router as expressRouter,type Request, type Response,type Router} from 'express';
 import {checkCollection,checkId,githubConfig,getDocument,listDocuments,putDocument,deleteDocument,replaceDocuments,atomicWrite,PUBLIC_COLLECTIONS,StoreError,isStoreConfigured,verifyStoreConnectivity,type JsonRecord} from './githubStore';
 import {authMiddleware,requireAdmin} from './githubAuth';
+import {applyBookingReward} from './bookingRewards';
 const GUEST_COOKIE='qt_guest';
 const COOKIE_OPTIONS={httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax' as const,path:'/',maxAge:180*86400000};
 function getGuestCookie(req:Request){return (req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(`${GUEST_COOKIE}=`))?.slice(GUEST_COOKIE.length+1);}
@@ -154,31 +155,9 @@ export function githubDataRouter():Router {
           if(uid) {
             const currentProfile=await getDocument('users',uid);
             if(currentProfile) {
-              const profile={...currentProfile.data};
-              const ids=Array.isArray(profile.rewardedBookingIds)?profile.rewardedBookingIds.map(String):[];
-              const hasReward=ids.includes(id);
-              const confirm=nextStatus==='success'||nextStatus==='completed';
-              const cancel=nextStatus==='cancelled';
-              let nextIds=ids;
-              let points=Math.max(0,Number(profile.points)||0);
-              let changed=false;
-              if(confirm&&!hasReward){nextIds=[...ids,id];points+=1;changed=true;}
-              if(cancel&&hasReward){nextIds=ids.filter(i=>i!==id);points=Math.max(0,points-1);changed=true;}
-              if(cancel&&!latest.data.pointsRefunded&&Number(latest.data.pointsDeducted||0)>0){
-                points+=Math.max(0,Math.floor(Number(latest.data.pointsDeducted)||0));
-                booking.pointsRefunded=true;changed=true;
-              }
-              if(cancel&&typeof latest.data.couponCode==='string'&&latest.data.couponCode){
-                const used=Array.isArray(profile.usedCoupons)?profile.usedCoupons as string[]:[];
-                const code=latest.data.couponCode.toUpperCase();
-                if(used.includes(code)){profile.usedCoupons=used.filter(v=>v!==code);changed=true;}
-              }
-              if(changed){
-                profile.points=points;
-                profile.rewardedBookingIds=nextIds;
-                profile.completedBookingsCount=nextIds.length;
-                tx.push({collection:'users',id:uid,record:profile});
-              }
+              const reward=applyBookingReward(booking,currentProfile.data,id,nextStatus);
+              Object.assign(booking,reward.booking);
+              if(reward.changed)tx.push({collection:'users',id:uid,record:reward.profile});
             }
           }
           try{await atomicWrite(tx);return res.json({ok:true});}
