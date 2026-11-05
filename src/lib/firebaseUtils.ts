@@ -315,7 +315,52 @@ export const deleteBlockedSeatFromFirebase = async (seat: BlockedSeat) => {
   }
 };
 
+/** PREVIEW ONLY. Original Admin screens stay unchanged while their writes
+ * are moved to the server-mediated encrypted GitHub store.
+ * Never silently swallow errors or write to localStorage before a confirmed API write.
+ */
+const githubMode=()=>(import.meta as ImportMeta & {env?:Record<string,string>}).env?.VITE_DATA_PROVIDER==='github';
+const githubCollection=(key:string)=>({
+  combos:'tour_combos',articles:'guide_articles'
+} as Record<string,string>)[key]||key;
+async function writeGithubCollection(key:string,items:any[]){
+  const {gh}=await import('../client/githubApi');
+  const collectionName=githubCollection(key);
+  const response=await gh.list(collectionName);
+  const old=new Map((response.items||[]).map((v:any)=>[String(v.id),v]));
+  const latest=new Map<string,any>();
+  for(const item of items){
+    const id=String(item.id||'');
+    if(!/^[\\w-]{1,128}$/.test(id))throw new Error('Dữ liệu không có mã hợp lệ: '+key);
+    if(latest.has(id))throw new Error('Danh mục có mã trùng: '+id);
+    latest.set(id,item);
+  }
+  // Do not silently overwrite data if source was not hydrated from GitHub.
+  const known=Array.isArray(items)?items:[];
+  if(old.size>0&&known.length===0&&!window.confirm(
+    'Danh mục '+key+' có '+old.size+' bản ghi trên GitHub. Bạn có chắc muốn XÓA HẾT không?'
+  ))throw new Error('Đã hủy thao tác xóa toàn bộ.');
+  for(const [id,item] of latest){
+    if(!old.has(id))await gh.create(collectionName,item);
+    else if(JSON.stringify(old.get(id))!==JSON.stringify(item))await gh.patch(collectionName,id,item);
+  }
+  for(const id of old.keys())if(!latest.has(id))await gh.remove(collectionName,id);
+}
 export const saveConfigToFirebase = async (key: string, data: any) => {
+  if(githubMode()){
+    if(Array.isArray(data))await writeGithubCollection(key,data);
+    else {
+      const {gh}=await import('../client/githubApi');
+      const payload={id:key,[key]:data};
+      try{await gh.patch('configs',key,payload);}
+      catch(error){
+        if(!(error instanceof Error)||!error.message.includes('404')&&!error.message.includes('Không tìm thấy'))throw error;
+        await gh.create('configs',payload);
+      }
+    }
+    return;
+  }
+
   try {
     const configsStr = localStorage.getItem(`xemc_configs`) || "{}";
     const configs = JSON.parse(configsStr);
@@ -394,6 +439,12 @@ export const saveCollectionItemsToFirebase = async (collectionName: string, item
 };
 
 export const saveCollectionItemsToLocalAndFirebase = async (collectionName: string, localStorageKey: string, items: any[]) => {
+  // When running on GitHub, keep the old UI but require real server confirmation.
+  if(githubMode()) {
+    await saveCollectionItemsToFirebase(collectionName, items);
+    setLocalList(localStorageKey, items);
+    return;
+  }
   setLocalList(localStorageKey, items);
   return saveCollectionItemsToFirebase(collectionName, items);
 };
