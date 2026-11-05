@@ -8,6 +8,7 @@ export async function githubApi<T>(route:string, init:RequestInit={}):Promise<T>
 }
 export const gh={
   status:()=>githubApi<{configured:boolean;provider:string}>('/api/github-data/status'),
+  writeTest:()=>githubApi<{ok:boolean;read:boolean;write:boolean;delete:boolean}>('/api/github-data/_write-test',{method:'POST',body:'{}'}),
   me:()=>githubApi<{user:any}>('/api/github-auth/me'),
   login:(email:string,password:string)=>githubApi<{user:any}>('/api/github-auth/login',{method:'POST',body:JSON.stringify({email,password})}),
   admin:(password:string)=>githubApi<{user:any}>('/api/github-auth/admin-login',{method:'POST',body:JSON.stringify({password})}),
