@@ -1,11 +1,16 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
-import GithubBackendPreview from './components/GithubBackendPreview.tsx';
+// All sign-in (including Admin) now starts in the existing homepage.
 import './index.css';
 
+// Old /quan-tri links used to open a disconnected GitHub console.
+// Bring those visitors to the same homepage authentication entry point.
+if (['/quan-tri','/admin-github'].includes(window.location.pathname.replace(/\/$/,''))) {
+  window.history.replaceState(null,'','/');
+}
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {(new URLSearchParams(window.location.search).has('github-preview') || ['/quan-tri','/admin-github'].includes(window.location.pathname.replace(/\/$/,''))) ? <GithubBackendPreview/> : <App />}
+    <App />
   </StrictMode>,
 );
