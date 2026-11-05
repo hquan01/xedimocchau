@@ -42,16 +42,6 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
   const isSearchActive=cleanQuery.length>0;
 
   return (
-          (bk.id || "").toLowerCase().includes(cleanQuery) ||
-          (bk.passengerPhone || "").replace(/[\s\.\-]+/g, "").includes(cleanQuery.replace(/[\s\.\-]+/g, ""))
-        );
-      })
-    : [];
-
-  const combinedResults = [...localMatched, ...onlineMatched];
-  const isSearchActive = cleanQuery.length > 0;
-
-  return (
     <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
