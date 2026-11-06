@@ -21,7 +21,7 @@ export default function LiveWeatherManagement() {
       setWeatherData(data);
       setLastCheckTime(new Date().toLocaleTimeString("vi-VN"));
     } catch (e: any) {
-      setError(e.message || "Không thể kết nối trạm thời tiết");
+      setError(e.message || "Không kết nối được nguồn dự báo Open-Meteo");
     } finally {
       setLoading(false);
     }
@@ -111,7 +111,7 @@ export default function LiveWeatherManagement() {
 
           <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs text-center">
             <Cloud className="w-4 h-4 text-amber-600 mx-auto mb-1" />
-            <span className="text-[10px] text-stone-400 font-bold uppercase block">Lượng mưa</span>
+            <span className="text-[10px] text-stone-400 font-bold uppercase block">Lượng mưa mô hình</span>
             <span className="text-2xl font-black text-amber-700 font-mono mt-1 block">{current.precipitation} mm</span>
             <span className="text-[10px] text-stone-500 font-sans">Trạng thái: {current.conditionText}</span>
           </div>
