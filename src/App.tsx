@@ -55,6 +55,7 @@ import { isOwnerEmail } from "./lib/simpleAuth";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>("explore");
+  const [openedGuideArticleId,setOpenedGuideArticleId] = useState<string | null>(null);
   const [adminPin, setAdminPin] = useState("");
   const [adminPinError, setAdminPinError] = useState("");
   useSEO(activeTab);
@@ -705,7 +706,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === "explore" && <ExploreLanding setActiveTab={setActiveTab} onOpenLimousineBooking={openLimousineBooking} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
+          {activeTab === "explore" && <ExploreLanding setActiveTab={tab=>{setOpenedGuideArticleId(null);setActiveTab(tab)}} onOpenArticle={id=>{setOpenedGuideArticleId(id);setActiveTab('guide');window.scrollTo({top:0,behavior:'smooth'})}} onOpenLimousineBooking={openLimousineBooking} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
           {activeTab === "explore_legacy" && (
             <ExploreMocChau 
               destinations={destinations} 
@@ -716,7 +717,7 @@ export default function App() {
               }}
             />
           )}
-          {activeTab === "guide" && <TravelGuide articles={articles} />}
+          {activeTab === "guide" && <TravelGuide articles={articles} initialArticleId={openedGuideArticleId} />}
           {activeTab === "ai" && <AIPlanner />}
 
           {activeTab === "trip" && (
