@@ -1,5 +1,6 @@
 import express from "express";
 import { phoneAuthRouter } from "./src/server/phoneAuthRoutes";
+import { growthMetricsRouter } from "./src/server/growthMetricsRoutes";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -219,12 +220,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Phone/password alias authentication, isolated from public legacy bookings.
 app.use("/api/auth", phoneAuthRouter);
+// Server-validated content counters; never fake engagement in the browser.
+app.use("/api/content", growthMetricsRouter);
 
 // Initialize Google Gen AI
 let aiClient: GoogleGenAI | null = null;
-const KNOWN_SUSPENDED_KEYS = new Set([
-  "AIzaSyBc1uWwhDDAfdHsldrlyVZqL_9VCpi7l8U"
-]);
+// Keep disabled key fingerprints out of public source code.
+const KNOWN_SUSPENDED_KEYS = new Set(
+  (process.env.GEMINI_SUSPENDED_API_KEYS || '').split(',').map(x=>x.trim()).filter(Boolean)
+);
 let isGeminiAvailable = true;
 
 function canUseGemini(): boolean {
@@ -843,48 +847,30 @@ app.post("/api/ai/parse-prompt", async (req, res) => {
   }
 });
 
-// Automated SEO Sitemap & Robots.txt for top search engine indexing
-app.get("/sitemap.xml", (req, res) => {
-  res.header('Content-Type', 'application/xml');
-  const baseUrl = "https://xedimocchau.com";
-  const routes = [
-    "",
-    "/limousine",
-    "/combo",
-    "/shared",
-    "/private",
-    "/guide",
-    "/explore",
-    "/homestay",
-    "/nha-hang",
-    "/dia-diem",
-    "/thoi-tiet",
-    "/mua-hoa",
-    "/lich-trinh",
-    "/dac-san",
-    "/trai-nghiem",
-    "/cong-dong",
-    "/di-chuyen",
-    "/chi-phi",
-    "/ho-tro-247"
+// Curated SEO sitemap. Never advertise client tabs without real public URLs.
+// Vercel serves the generated static sitemap where available; this Express
+// fallback has the same finite set of crawlable pages.
+app.get("/sitemap.xml", (_req, res) => {
+  const origin="https://xedimocchau.com";
+  const paths=[
+    "/",
+    "/cam-nang/kinh-nghiem-du-lich-moc-chau-tu-tuc",
+    "/cam-nang/dia-diem-check-in-moc-chau",
+    "/cam-nang/an-gi-o-moc-chau-dac-san",
+    "/cam-nang/mua-hoa-man-moc-chau",
+    "/dich-vu/xe-limousine-ha-noi-moc-chau",
+    "/dich-vu/xe-ghep-ha-noi-moc-chau",
+    "/dich-vu/thue-xe-may-moc-chau",
+    "/dich-vu/taxi-du-lich-moc-chau"
   ];
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${routes.map(r => `  <url>
-    <loc>${baseUrl}${r}</loc>
-    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>${r === "" ? "1.0" : "0.8"}</priority>
-  </url>`).join("\n")}
-</urlset>`;
-  res.send(xml);
+  const xml='<?xml version="1.0" encoding="UTF-8"?>\n'+
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'+
+    paths.map(p=>'<url><loc>'+origin+p+'</loc></url>').join('\n')+
+    '\n</urlset>';
+  res.type('application/xml').set('Cache-Control','public,max-age=3600').send(xml);
 });
-
-app.get("/robots.txt", (req, res) => {
-  res.header('Content-Type', 'text/plain');
-  res.send(`User-agent: *
-Allow: /
-Sitemap: https://xedimocchau.com/sitemap.xml`);
+app.get("/robots.txt", (_req, res) => {
+  res.type('text/plain').send('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://xedimocchau.com/sitemap.xml');
 });
 
 // Serve frontend build static files and setup Vite configuration in development

@@ -14,6 +14,7 @@ import {submitServiceInquiry} from "./lib/serviceRequests";
 import CategoryDirectoryView from "./components/CategoryDirectoryView";
 import CategoryItemDetail from "./components/CategoryItemDetail";
 import { useSEO } from "./hooks/useSEO";
+import {articlePublicUrl,SEO_ARTICLE_SLUGS} from './lib/articleSeo';
 
 import NotificationCenter from "./components/NotificationCenter";
 
@@ -54,8 +55,11 @@ import {
 import { isOwnerEmail } from "./lib/simpleAuth";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<string>("explore");
-  const [openedGuideArticleId,setOpenedGuideArticleId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(()=>
+    new URLSearchParams(window.location.search).has('bai-viet')?'guide':
+      new URLSearchParams(window.location.search).get('dat-xe')==='1'?'limousine':'explore');
+  const [openedGuideArticleId,setOpenedGuideArticleId] = useState<string | null>(()=>
+    new URLSearchParams(window.location.search).get('bai-viet'));
   const [adminPin, setAdminPin] = useState("");
   const [adminPinError, setAdminPinError] = useState("");
   useSEO(activeTab);
@@ -706,7 +710,10 @@ export default function App() {
             />
           )}
 
-          {activeTab === "explore" && <ExploreLanding setActiveTab={tab=>{setOpenedGuideArticleId(null);setActiveTab(tab)}} onOpenArticle={id=>{setOpenedGuideArticleId(id);setActiveTab('guide');window.scrollTo({top:0,behavior:'smooth'})}} onOpenLimousineBooking={openLimousineBooking} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
+          {activeTab === "explore" && <ExploreLanding articles={articles} setActiveTab={tab=>{setOpenedGuideArticleId(null);setActiveTab(tab)}} onOpenArticle={id=>{
+            if(SEO_ARTICLE_SLUGS[id]){window.location.assign(articlePublicUrl(id));return;}
+            setOpenedGuideArticleId(id);setActiveTab('guide');window.scrollTo({top:0,behavior:'smooth'});
+          }} onOpenLimousineBooking={openLimousineBooking} openMotorbike={() => setIsMotorbikeOpen(true)} openAuth={() => setIsAuthOpen(true)} isSignedIn={!!currentUser} />}
           {activeTab === "explore_legacy" && (
             <ExploreMocChau 
               destinations={destinations} 
@@ -717,7 +724,7 @@ export default function App() {
               }}
             />
           )}
-          {activeTab === "guide" && <TravelGuide articles={articles} initialArticleId={openedGuideArticleId} />}
+          {activeTab === "guide" && <TravelGuide articles={articles} initialArticleId={openedGuideArticleId} onBookLimousine={openLimousineBooking} />}
           {activeTab === "ai" && <AIPlanner />}
 
           {activeTab === "trip" && (

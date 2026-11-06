@@ -6,16 +6,22 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { GuideArticle } from "../types";
+import {articlePublicUrl} from '../lib/articleSeo';
+import {trackContentEvent,getContentMetrics,EMPTY_METRICS,type MetricsSnapshot} from '../lib/growthMetrics';
 
 interface TravelGuideProps {
   articles: GuideArticle[];
   initialArticleId?: string | null;
+  onBookLimousine?:()=>void;
 }
 
-export default function TravelGuide({ articles, initialArticleId }: TravelGuideProps) {
+export default function TravelGuide({ articles, initialArticleId, onBookLimousine }: TravelGuideProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "checkin" | "food" | "tips" | "season">("all");
   const [readingArticle, setReadingArticle] = useState<GuideArticle | null>(null);
+  const [metrics,setMetrics]=useState<MetricsSnapshot>(EMPTY_METRICS);
+  React.useEffect(()=>{let alive=true;getContentMetrics(30).then(data=>{if(alive)setMetrics(data)});return()=>{alive=false}},[]);
+  React.useEffect(()=>{if(readingArticle?.id)trackContentEvent(readingArticle.id,'view')},[readingArticle?.id]);
   const openedInitialId = React.useRef<string | null>(null);
   // A banner opens the actual article reader, not just the guide index.
   React.useEffect(() => {
@@ -42,38 +48,36 @@ export default function TravelGuide({ articles, initialArticleId }: TravelGuideP
 
   const toggleLike = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setLikedArticles(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
+    if(!likedArticles[id])trackContentEvent(id,'like');
+    setLikedArticles(prev => ({...prev,[id]:!prev[id]}));
   };
 
   const toggleSave = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSavedArticles(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
+    if(!savedArticles[id])trackContentEvent(id,'save');
+    setSavedArticles(prev => ({...prev,[id]:!prev[id]}));
   };
 
-  const handleShare = (article: GuideArticle, e: React.MouseEvent) => {
+  const handleShare = async (article: GuideArticle, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (navigator.share) {
-      navigator.share({
-        title: article.title,
-        text: article.excerpt,
-        url: window.location.href,
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      alert("Đã sao chép liên kết bài viết!");
-    }
+    const url=new URL(articlePublicUrl(article.id),window.location.origin).toString();
+    try {
+      if(navigator.share){
+        await navigator.share({title:article.title,text:article.excerpt,url});
+      }else if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(url);
+        alert('Đã sao chép đường dẫn bài viết!');
+      }else {
+        window.prompt('Sao chép liên kết bài viết:',url);
+        return;
+      }
+      // Count a confirmed native share or successful link copy, not a cancelled share sheet.
+      trackContentEvent(article.id,'share');
+    }catch{/* User cancelled share or clipboard permission was blocked. */}
   };
 
   const handleReadArticle = (article: GuideArticle) => {
     setReadingArticle(article);
-    // Simulate updating view count locally
-    article.views += 1;
   };
 
   const handleTogglePacking = (id: number) => {
@@ -227,7 +231,7 @@ export default function TravelGuide({ articles, initialArticleId }: TravelGuideP
                           <div className="flex items-center space-x-2">
                             <div className="flex items-center space-x-0.5 text-[10px] text-stone-400 font-bold bg-stone-50 px-2 py-0.5 rounded-md">
                               <Eye className="w-3 h-3" />
-                              <span>{article.views}</span>
+                              <span>{metrics.enabled?(metrics.stats[article.id]?.view||0).toLocaleString('vi-VN'):'—'}</span>
                             </div>
                             <button
                               type="button"
@@ -239,7 +243,7 @@ export default function TravelGuide({ articles, initialArticleId }: TravelGuideP
                               id={`like_btn_${article.id}`}
                             >
                               <Heart className={`w-3.5 h-3.5 ${liked ? "fill-current text-rose-600" : ""}`} />
-                              <span className="font-mono text-[10px]">{article.likes + (liked ? 1 : 0)}</span>
+                              <span className="font-mono text-[10px]">{metrics.enabled?((metrics.stats[article.id]?.like||0)+(liked?1:0)).toLocaleString('vi-VN'):'—'}</span>
                             </button>
                             <button
                               type="button"
@@ -409,7 +413,7 @@ export default function TravelGuide({ articles, initialArticleId }: TravelGuideP
                   <span>•</span>
                   <div className="flex items-center space-x-1">
                     <Eye className="w-3.5 h-3.5" />
-                    <span>{readingArticle.views}</span>
+                    <span>{metrics.enabled?(metrics.stats[readingArticle.id]?.view||0).toLocaleString('vi-VN'):'—'}</span>
                   </div>
                 </div>
 
@@ -446,6 +450,17 @@ export default function TravelGuide({ articles, initialArticleId }: TravelGuideP
                   </div>
                 )}
 
+                {onBookLimousine && <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 sm:p-5 flex flex-wrap items-center gap-3 justify-between">
+                  <div className="flex-1 min-w-[190px]"><p className="font-extrabold text-[#1b4332] text-sm">🚐 Đi Mộc Châu? Xem chuyến xe QT Limousine</p>
+                    <p className="text-xs text-stone-600 mt-1">Chọn ngày đi, điểm đón trả và giờ khởi hành trước khi đặt vé.</p></div>
+                  <button type="button" onClick={()=>{
+                    trackContentEvent(readingArticle.id,'booking_click');
+                    setReadingArticle(null);
+                    onBookLimousine();
+                  }} className="rounded-xl bg-[#1b4332] text-white text-xs sm:text-sm font-black px-5 py-3 min-h-11">
+                    Xem chuyến & đặt xe
+                  </button>
+                </div>}
                 {/* Footer Modal Info */}
                 <div className="pt-6 border-t border-stone-100 flex items-center justify-between">
                   <div className="flex gap-2">

@@ -1,13 +1,19 @@
 import React, {useEffect,useState} from 'react';
 import {CloudSun,Sparkles,Flower2,BookOpen,MapPin,Flame,Bus,Car,Bike,House,UtensilsCrossed,Ticket,ArrowRight,Heart,ChevronRight,ChevronLeft,MessageCircle,UsersRound} from 'lucide-react';
-import {useSiteContent,HomeTile,FeaturedStory} from '../lib/siteContent';
+import {useSiteContent,HomeTile} from '../lib/siteContent';
+import type {GuideArticle} from '../types';
+import {getContentMetrics,EMPTY_METRICS,type MetricsSnapshot} from '../lib/growthMetrics';
+import {selectFeaturedStories} from '../lib/featuredStories';
+import TikTokShowcase from './TikTokShowcase';
 
-interface Props {setActiveTab:(tab:string)=>void;onOpenArticle:(articleId:string)=>void;onOpenLimousineBooking:()=>void;openMotorbike:()=>void;openAuth:()=>void;isSignedIn:boolean}
+interface Props {setActiveTab:(tab:string)=>void;onOpenArticle:(articleId:string)=>void;onOpenLimousineBooking:()=>void;openMotorbike:()=>void;openAuth:()=>void;isSignedIn:boolean;articles:GuideArticle[]}
 const icons:Record<string,React.ComponentType<any>>={'cloud-sun':CloudSun,users:UsersRound,sparkles:Sparkles,flower:Flower2,'book-open':BookOpen,'map-pin':MapPin,flame:Flame,bus:Bus,car:Car,bike:Bike,home:House,utensils:UtensilsCrossed,ticket:Ticket};
 
-export default function ExploreLanding({setActiveTab,onOpenArticle,onOpenLimousineBooking,openMotorbike,openAuth,isSignedIn}:Props){
+export default function ExploreLanding({setActiveTab,onOpenArticle,onOpenLimousineBooking,openMotorbike,openAuth,isSignedIn,articles}:Props){
   const {content}=useSiteContent();
   const [slideIndex,setSlideIndex]=useState(0);
+  const [metrics,setMetrics]=useState<MetricsSnapshot>(EMPTY_METRICS);
+  useEffect(()=>{let mounted=true;getContentMetrics(content.featuredTrendingDays||30).then(s=>{if(mounted)setMetrics(s)});return()=>{mounted=false}},[content.featuredTrendingDays]);
   // Older published content had no article IDs attached to banner cards.
   // Use the closest existing guide article for the original seeded slides,
   // while preserving every explicitly configured article target.
@@ -76,7 +82,7 @@ export default function ExploreLanding({setActiveTab,onOpenArticle,onOpenLimousi
     pinnedCommunity,
     ...otherTiles.slice(communityPosition)
   ];
-  const hot=content.stories.filter(x=>x.visible);
+  const hot=selectFeaturedStories(content,articles,metrics);
   return <div className="bg-[#f7faf7] text-[#17382b] pb-28 min-h-screen" id="explore_mobile_home">
     <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 space-y-6">
       <section className="relative overflow-hidden rounded-[24px] shadow-lg bg-[#1b4332]" aria-label="Khám phá Mộc Châu">
@@ -119,17 +125,30 @@ export default function ExploreLanding({setActiveTab,onOpenArticle,onOpenLimousi
       <section className="space-y-3 scroll-mt-24" id="hot_stories">
         <div className="flex items-center justify-between"><div><h2 className="text-xl sm:text-2xl font-black">🔥 Bài viết & Điểm đến nổi bật</h2><p className="text-xs text-stone-500 mt-0.5">Gợi ý để bạn lên kế hoạch cho chuyến đi</p></div><span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded-full font-black">NỔI BẬT</span></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {hot.map((story:FeaturedStory,i)=><button key={story.id} onClick={()=>navigate(legacyBannerTarget(story.id,story.target))} className={`relative min-h-[210px] ${i===0?'sm:col-span-2 lg:col-span-2 lg:row-span-2 sm:min-h-[260px]':''} overflow-hidden rounded-2xl shadow-sm text-left group bg-emerald-900`}>
+          {hot.map((story,i)=><button key={story.id} onClick={()=>navigate(legacyBannerTarget(story.id,story.target))} className={`relative min-h-[210px] ${i===0?'sm:col-span-2 lg:col-span-2 lg:row-span-2 sm:min-h-[260px]':''} overflow-hidden rounded-2xl shadow-sm text-left group bg-emerald-900`}>
             {story.imageUrl&&<img src={story.imageUrl} alt={story.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"/>}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent"/><span className="absolute top-3 left-3 bg-white/90 text-emerald-800 rounded-full px-3 py-1 text-[10px] font-bold">{story.label}</span>
-            <div className="absolute inset-x-0 bottom-0 p-4 text-white"><h3 className="text-lg sm:text-xl font-black">{story.title}</h3><p className="text-xs text-white/90 mt-1">{story.description}</p><span className="mt-2 inline-flex gap-1 items-center text-xs font-bold">Khám phá <ArrowRight className="w-3.5 h-3.5"/></span></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/5"/>
+            <span className="absolute top-3 left-3 bg-white/95 text-emerald-800 rounded-full px-3 py-1 text-[10px] font-bold">{story.pinned?'QT gợi ý':story.trending?'Đang quan tâm':story.label}</span>
+            <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 text-white">
+              <div className="bg-black/75 backdrop-blur-sm border border-white/10 rounded-xl p-3">
+                <h3 className="text-base sm:text-xl font-black line-clamp-2">{story.title}</h3>
+                <p className="text-xs text-white/90 mt-1 line-clamp-2">{story.description}</p>
+                <span className="mt-2 inline-flex gap-1 items-center text-xs font-bold">Khám phá <ArrowRight className="w-3.5 h-3.5"/></span>
+              </div>
+            </div>
           </button>)}
         </div>
+      </section>
+      <section className="rounded-2xl border border-emerald-200 bg-white p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div><h2 className="text-base sm:text-xl font-black">🚐 Đã lên kế hoạch Mộc Châu? Chọn chuyến xe phù hợp</h2>
+          <p className="text-xs sm:text-sm text-stone-600 mt-1">Xem ngày đi, giờ xe và điểm đón trả trước khi xác nhận vé QT Limousine.</p></div>
+        <button type="button" onClick={onOpenLimousineBooking} className="shrink-0 rounded-xl bg-[#1b4332] text-white font-extrabold text-sm px-5 py-3 min-h-11">Xem chuyến & đặt xe <ArrowRight className="inline w-4 h-4"/></button>
       </section>
       <section className="bg-gradient-to-br from-[#e2f5eb] to-white rounded-2xl p-5 sm:p-7 flex flex-wrap items-center gap-4 border border-emerald-100">
         <div className="flex-1 min-w-[190px]"><h2 className="text-lg sm:text-xl font-black">✨ Lên lịch trình Mộc Châu cùng AI</h2><p className="text-xs sm:text-sm text-stone-600 mt-1">Theo ngày đi, số khách, sở thích và ngân sách của bạn.</p></div>
         <button onClick={()=>navigate('trip')} className="rounded-xl bg-emerald-700 text-white px-5 py-3 text-sm font-bold">Lập chuyến đi <ArrowRight className="inline w-4 h-4"/></button>
       </section>
+      <TikTokShowcase videoLinks={content.tiktokVideoLinks||[]}/>
       {!isSignedIn&&<button onClick={openAuth} className="w-full flex items-center gap-3 p-4 rounded-xl bg-white border text-left"><Heart className="w-6 h-6 text-emerald-700"/><span className="flex-1"><strong className="block text-sm">Trở thành thành viên Mộc Châu Travel</strong><small className="block text-xs text-stone-500">Đăng ký để quản lý vé và sử dụng voucher khi có chương trình phù hợp.</small></span><ChevronRight className="w-4 h-4"/></button>}
     </div>
   </div>

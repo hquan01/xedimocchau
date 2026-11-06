@@ -12,12 +12,22 @@ export interface SiteContent {
   siteName:string; tagline:string; logoUrl:string; heroImageUrl:string; heroTitle:string; heroDescription:string; heroTarget?:string; linkVersion?:number;
   hotline:string; zaloUrl:string; messengerUrl:string;
   tiles:HomeTile[]; stories:FeaturedStory[]; heroSlides?:HeroSlide[]; attractionTickets?:AttractionTicket[];
+  featuredMode?:'hybrid'|'automatic'|'manual';
+  featuredPinTarget?:string;
+  featuredPinUntil?:string;
+  featuredTrendingDays?:7|30|90;
+  tiktokProfileUrl?:string;
+  tiktokVideoLinks?:string[];
 }
 export const defaultSiteContent: SiteContent = {
   siteName:'MỘC CHÂU TRAVEL', tagline:'Cẩm nang & Dịch vụ du lịch Mộc Châu',
   logoUrl:'/brand-xedimocchau-header.png',heroImageUrl:'/mocchau-hero-v5.jpg',
   heroTitle:'Khám phá Mộc Châu',heroDescription:'Thiên nhiên Tây Bắc · Mùa hoa · Những trải nghiệm đáng nhớ',heroTarget:'article:guide-1',linkVersion:2,
   hotline:'0971050324',zaloUrl:'https://zalo.me/0971050324',messengerUrl:'https://m.me/1277673239073987',
+  featuredMode:'hybrid',featuredPinTarget:'',featuredPinUntil:'',
+  featuredTrendingDays:30,
+  tiktokProfileUrl:'https://www.tiktok.com/@limousinemocchau',
+  tiktokVideoLinks:[],
   tiles:[
     {id:'weather',title:'Thời tiết',subtitle:'Mộc Châu hôm nay',icon:'cloud-sun',target:'moc_chau_today',visible:true},
     {id:'community',title:'Cộng đồng',subtitle:'Hỏi đáp · nhóm Zalo',icon:'users',target:'community',visible:true},
@@ -65,7 +75,15 @@ export function useSiteContent(){
       logoUrl:raw.logoUrl === '/mocchau-logo-v4.png'
         ? '/brand-xedimocchau-header.png'
         : (raw.logoUrl || defaultSiteContent.logoUrl),
-      linkVersion:raw.linkVersion??1,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides,attractionTickets:Array.isArray(raw.attractionTickets)?raw.attractionTickets:defaultSiteContent.attractionTickets});
+      linkVersion:raw.linkVersion??1,
+      featuredMode:raw.featuredMode||defaultSiteContent.featuredMode,
+      featuredTrendingDays:raw.featuredTrendingDays||30,
+      tiktokProfileUrl:'https://www.tiktok.com/@limousinemocchau',
+      tiktokVideoLinks:Array.isArray(raw.tiktokVideoLinks)?raw.tiktokVideoLinks:[],
+      tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,
+      stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,
+      heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides,
+      attractionTickets:Array.isArray(raw.attractionTickets)?raw.attractionTickets:defaultSiteContent.attractionTickets});
     setError('');
   },e=>{console.warn('Public content defaults used',e);setError('Không tải được cấu hình; đang sử dụng nội dung mặc định.')}),[]);
   return {content,error};
