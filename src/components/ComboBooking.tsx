@@ -1,3 +1,4 @@
+import {getVietnamToday, getVietnamNextDepartureTime, isFutureDeparture, PAST_DEPARTURE_MESSAGE} from "../lib/bookingTime";
 import React, { useState, useEffect } from "react";
 import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
 import {couponDecision} from "../lib/couponEligibility";
@@ -142,7 +143,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
   // Sync search parameters when user searches on Hero
   useEffect(() => {
     if (searchParams) {
-      if (searchParams.date) setTravelDate(searchParams.date);
+      if (searchParams.date) setTravelDate(searchParams.date >= getVietnamToday() ? searchParams.date : getVietnamToday());
       if (searchParams.from) setPickupPoint(searchParams.from);
       if (searchParams.to) setDropoffPoint(searchParams.to);
       if (searchParams.time) setTravelTime(searchParams.time);
@@ -250,18 +251,9 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
       }
     }
 
-    const systemToday = new Date().toISOString().split('T')[0];
-    if (travelDate < systemToday) {
-      setErrorMsg("Ngày khởi hành không được phép chọn ngày trong quá khứ!");
+    if (!isFutureDeparture(travelDate, travelTime)) {
+      setErrorMsg(PAST_DEPARTURE_MESSAGE);
       return;
-    }
-    if (travelDate === systemToday) {
-      const liveD = new Date();
-      const currentResStr = `${String(liveD.getHours()).padStart(2, '0')}:${String(liveD.getMinutes()).padStart(2, '0')}`;
-      if (travelTime < currentResStr) {
-        setErrorMsg("Giờ khởi hành mong muốn đã diễn ra ở quá khứ! Vui lòng điều chỉnh lại giờ hẹn đón.");
-        return;
-      }
     }
 
     // Anti-spam security challenge
@@ -336,6 +328,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
       type: "combo",
       bookingDate: new Date().toLocaleDateString('vi-VN'),
       travelDate: travelDate,
+      departureTime: travelTime,
       returnDate: returnDateStr,
       passengerName: trimmedName,
       passengerPhone: trimmedPhone,
@@ -765,8 +758,15 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                         type="date"
                         required
                         value={travelDate}
-                        min={new Date().toISOString().split('T')[0]}
-                        onChange={(e) => setTravelDate(e.target.value)}
+                        min={getVietnamToday()}
+                        onChange={(e) => {
+                          if (e.target.value && e.target.value < getVietnamToday()) {
+                            setErrorMsg(PAST_DEPARTURE_MESSAGE);
+                            return;
+                          }
+                          setErrorMsg("");
+                          setTravelDate(e.target.value);
+                        }}
                         className="w-full bg-white px-3 py-2 border border-stone-200 rounded-lg text-sm font-semibold text-stone-800 cursor-pointer focus:outline-none font-sans"
                       />
                     </div>
@@ -779,7 +779,15 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                           type="time"
                           required
                           value={travelTime}
-                          onChange={(e) => setTravelTime(e.target.value)}
+                          min={travelDate === getVietnamToday() ? (getVietnamNextDepartureTime() || "23:59") : undefined}
+                          onChange={(e) => {
+                            if (e.target.value && !isFutureDeparture(travelDate, e.target.value)) {
+                              setErrorMsg(PAST_DEPARTURE_MESSAGE);
+                              return;
+                            }
+                            setErrorMsg("");
+                            setTravelTime(e.target.value);
+                          }}
                           className="w-full sm:w-32 bg-white px-3 py-2 border border-stone-200 rounded-lg text-sm font-semibold text-stone-800 cursor-pointer focus:outline-none font-sans"
                         />
                         <div className="flex-1 flex flex-wrap gap-1.5 items-center">
@@ -787,7 +795,7 @@ export default function ComboBooking({ onAddBooking, searchParams, onOpenPayment
                             <button
                               key={t}
                               type="button"
-                              onClick={() => setTravelTime(t)}
+                              onClick={() => { if (isFutureDeparture(travelDate, t)) { setTravelTime(t); setErrorMsg(""); } else setErrorMsg(PAST_DEPARTURE_MESSAGE); }}
                               className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
                                 travelTime === t
                                   ? "bg-[#1b4332] text-white border-transparent shadow-[0_2px_4px_rgba(27,67,50,0.2)]"
