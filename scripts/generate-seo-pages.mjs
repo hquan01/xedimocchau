@@ -47,6 +47,17 @@ for(const article of articles){
   const hydrate=`<script>
   (function(){
     var articleId=${JSON.stringify(article.id)};
+    function record(event){
+      try{
+        var payload=new Blob([JSON.stringify({articleId:articleId,event:event})],{type:'application/json'});
+        if(navigator.sendBeacon){navigator.sendBeacon('/api/content/engagement',payload);return;}
+        fetch('/api/content/engagement',{method:'POST',body:payload,keepalive:true}).catch(function(){});
+      }catch(e){}
+    }
+    setTimeout(function(){if(document.visibilityState==='visible')record('view')},2500);
+    Array.prototype.forEach.call(document.querySelectorAll('a[href*="dat-xe=1"]'),function(a){
+      a.addEventListener('click',function(){record('booking_click')});
+    });
     var controller=new AbortController();
     var timer=setTimeout(function(){controller.abort()},5000);
     fetch('/api/content/article?id='+encodeURIComponent(articleId),{signal:controller.signal})
