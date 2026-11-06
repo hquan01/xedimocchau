@@ -12,8 +12,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Xe Đi Mộc Châu Notifications';
   const options = {
     body: data.message || 'Bạn có thông báo mới!',
-    icon: '/logo.png',
-    badge: '/logo.png',
+    icon: '/brand-xedimocchau-icon-192.png',
+    badge: '/brand-xedimocchau-icon-192.png',
     data: data.metadata || {}
   };
 
