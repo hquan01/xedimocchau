@@ -27,6 +27,7 @@ async function writePng(name, size) {
 await writePng("brand-xedimocchau-icon-512.png", 512);
 await writePng("brand-xedimocchau-apple-touch.png", 180);
 await writePng("brand-xedimocchau-icon-32.png", 32);
+await writePng("brand-xedimocchau-icon-16.png", 16);
 
 const sizes = [16, 32, 48];
 const entries = await Promise.all(sizes.map(size =>
