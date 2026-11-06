@@ -93,3 +93,23 @@ test('Remembering an ID updates the saved record; deleting it clears device copy
   forgetDeviceBooking('ticket-4');
   assert.deepEqual(readDeviceBookingHistory(),[]);
 });
+
+test('Legacy localStorage history from previous website version remains searchable',()=>{
+  storage.clear();
+  storage.set('xemc_device_id','dev_myphone');
+  storage.set('xemc_bookings',JSON.stringify([
+    makeBooking('legacy-2026','0368557668',{deviceId:'dev_myphone',status:'success'}),
+    makeBooking('unrelated','0368557668',{deviceId:'dev_another_phone',status:'pending'})
+  ]));
+  const history=readDeviceBookingHistory();
+  assert.equal(history.length,1);
+  assert.equal(history[0].id,'legacy-2026');
+  const result=findMyDeviceBookings('0368557668',history,[],[],undefined,'dev_myphone');
+  assert.equal(result.length,1);
+  assert.equal(result[0].status,'success');
+});
+test('Guest may not use other people account reservations in allBookings',()=>{
+  storage.clear();
+  const global=[makeBooking('customer-2-order','0368557668',{userId:'customer-2'})];
+  assert.deepEqual(findMyDeviceBookings('0368557668',[],[],global,undefined,'wrong-device'),[]);
+});
