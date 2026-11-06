@@ -42,7 +42,7 @@ export default function NotificationCenter({
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("Thông báo thử nghiệm ✅", {
         body: "Tuyệt vời! Hệ thống thông báo của bạn đã hoạt động bình thường.",
-        icon: "/logo.png"
+        icon: "/brand-xedimocchau-icon-192.png"
       });
     } else {
       handleRequestPermission();

@@ -26,6 +26,12 @@ export default function Header({
 }: HeaderProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const {content:siteContent} = useSiteContent();
+  // Respect custom logos uploaded in Admin; migrate only the former default.
+  const isWideBrandLogo = siteContent.logoUrl === "/brand-xedimocchau-header.png" ||
+    siteContent.logoUrl === "/mocchau-logo-v4.png";
+  const visibleBrandLogo = isWideBrandLogo
+    ? "/brand-xedimocchau-header.png"
+    : siteContent.logoUrl;
   const { preference, dayPart, effective, cyclePreference } = useAppearance(activeTab);
   const appearanceLabel = preference === 'auto' ? 'Tự động' : preference === 'dark' ? 'Tối' : 'Sáng';
   const appliedLabel = effective === 'night' ? 'tối' : effective === 'afternoon' ? 'dịu chiều' : 'sáng';
@@ -89,19 +95,27 @@ export default function Header({
               id="logo_btn"
               aria-label="Về trang chủ Mộc Châu Travel"
             >
-              <img 
-                src={siteContent.logoUrl} 
-                alt="Xe Đi Mộc Châu Logo" 
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl object-contain shadow-xs shrink-0"
-              />
-              <div className="flex flex-col min-w-0">
-                <span className="font-extrabold text-xs sm:text-base text-rose-700 tracking-tight leading-none uppercase truncate">
-                  {siteContent.siteName}
-                </span>
-                <span className="text-[8px] sm:text-[9.5px] font-bold text-rose-500 uppercase tracking-wider mt-0.5 leading-none font-sans truncate">
-                  {siteContent.tagline}
-                </span>
-              </div>
+              {isWideBrandLogo ? (
+                <img
+                  src={visibleBrandLogo}
+                  alt="Xe Đi Mộc Châu – QT Limousine"
+                  width={520}
+                  height={114}
+                  className="w-[185px] sm:w-[216px] lg:w-[172px] xl:w-[224px] h-auto max-h-[58px] object-contain"
+                />
+              ) : (
+                <>
+                  <img
+                    src={visibleBrandLogo}
+                    alt="Logo Xe Đi Mộc Châu"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl object-contain shadow-xs shrink-0"
+                  />
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-extrabold text-xs sm:text-base text-rose-700 tracking-tight leading-none uppercase truncate">{siteContent.siteName}</span>
+                    <span className="text-[8px] sm:text-[9.5px] font-bold text-rose-500 uppercase tracking-wider mt-0.5 leading-none font-sans truncate">{siteContent.tagline}</span>
+                  </div>
+                </>
+              )}
             </button>
           </div>
 
