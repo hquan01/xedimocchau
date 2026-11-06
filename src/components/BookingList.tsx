@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Booking } from "../types";
+import { Booking, User } from "../types";
+import { getDeviceId } from "../lib/firebaseUtils";
+import { findMyDeviceBookings, isCompleteBookingPhone, readDeviceBookingHistory } from "../lib/deviceBookingHistory";
 import { CalendarDays, MapPin, Ticket, User, Phone, Check, Trash2, X, Compass, Printer, Info, Search, Cloud, Sparkles, Hotel, Car, Gift, Tag, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { INITIAL_COMBOS } from "../data/combos";
@@ -7,13 +9,14 @@ import { INITIAL_COMBOS } from "../data/combos";
 interface BookingListProps {
   bookings: Booking[];
   allBookings?: Booking[];
+  currentUser?: User | null;
   isOpen: boolean;
   onClose: () => void;
   onCancelBooking: (id: string) => void;
   onDeleteBooking?: (id: string) => void;
 }
 
-export default function BookingList({ bookings, allBookings, isOpen, onClose, onCancelBooking, onDeleteBooking }: BookingListProps) {
+export default function BookingList({ bookings, allBookings, currentUser, isOpen, onClose, onCancelBooking, onDeleteBooking }: BookingListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "search">("all");
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
@@ -25,22 +28,20 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
     window.print();
   };
 
-  const cleanQuery = (searchQuery || "").trim().toLowerCase().replace(/#/g, "");
-
-  // 1. Matched in local device state
-  const localMatched = bookings.filter((bk) => {
-    if (!cleanQuery) return true;
-    return (
-      (bk.id || "").toLowerCase().includes(cleanQuery) ||
-      (bk.passengerPhone || "").replace(/[\s\.\-]+/g, "").includes(cleanQuery.replace(/[\s\.\-]+/g, ""))
-    );
-  });
-
-  // Only expose bookings authorized for the current customer/session.
-  // Search by someone else's phone or ticket code must never reveal their trips.
-  const combinedResults=localMatched;
-  const onlineMatched:Booking[]=[]; // Never search unrelated customers' tickets.
-  const isSearchActive=cleanQuery.length>0;
+  // Full exact phone plus trusted device/account ownership is required.
+  // Partial digits, phone substring, or ticket IDs never expose a booking.
+  const isSearchActive=searchQuery.trim().length>0;
+  const phoneComplete=isCompleteBookingPhone(searchQuery);
+  const deviceHistory=readDeviceBookingHistory();
+  const authenticatedId=currentUser?.role==='customer'?currentUser.id:undefined;
+  const combinedResults=findMyDeviceBookings(
+    searchQuery,deviceHistory,bookings,allBookings||[],authenticatedId,getDeviceId()
+  );
+  const onlineMatched=bookings.filter(item=>combinedResults.some(row=>row.id===item.id));
+  const liveIds=new Set([
+    ...onlineMatched.map(item=>item.id),
+    ...(authenticatedId?(allBookings||[]).filter(item=>item.userId===authenticatedId).map(item=>item.id):[])
+  ]);
 
   return (
     <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -80,13 +81,15 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
             <div className="flex-1 text-center sm:text-left">
               <span className="block text-xs font-bold text-[#1b4332] uppercase tracking-wide">Bộ phận Tra Cứu Đơn Vé Điện Tử</span>
               <p className="text-[10px] text-stone-500 font-sans mt-0.5">
-                Nhập số điện thoại (ví dụ: <span className="font-mono font-bold text-emerald-700">SĐT của bạn</span>) hoặc Mã GD để kiểm tra thông tin.
+                Nhập <strong>đầy đủ số điện thoại đã đặt vé</strong>. Chỉ vé lưu trên thiết bị này hoặc thuộc tài khoản đăng nhập mới hiển thị.
               </p>
             </div>
             <div className="relative w-full sm:w-auto flex items-center">
               <input
-                type="text"
-                placeholder="Nhập Mã vé hoặc SĐT..."
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="Nhập đủ SĐT đặt vé (10 số)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full sm:w-56 pl-3 pr-8 py-2 bg-white border border-stone-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 text-stone-800"
@@ -127,9 +130,9 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
                 <Ticket className="w-10 h-10 mx-auto stroke-1 mb-2 opacity-30 text-[#1b4332]" />
                 <h4 className="font-extrabold text-[#1b4332] text-xs sm:text-sm">Không tìm thấy đơn đặt xe nào</h4>
                 <p className="text-[11px] text-stone-400 max-w-sm mx-auto font-sans mt-1 px-4 leading-relaxed">
-                  {isSearchActive 
-                    ? "Chúng tôi không tìm thấy vé nào khớp với thông tin bạn cung cấp. Vui lòng kiểm tra lại số điện thoại hoặc mã vé."
-                    : "Bạn chưa thực hiện giao dịch đặt vé nào trên thiết bị này. Vui lòng nhập số điện thoại hoặc Mã vé để đồng bộ từ Cloud."
+                  {isSearchActive
+                    ? (!phoneComplete ? "Vui lòng nhập đủ 10 số điện thoại đã dùng khi đặt vé, không tìm bằng một phần số hay mã vé." : "Chưa tìm thấy vé khớp số điện thoại này trong lịch sử thiết bị hoặc tài khoản đăng nhập.")
+                    : "Nhập đúng số điện thoại để xem lịch sử lưu trên thiết bị này, hoặc đăng nhập tài khoản để xem vé của bạn."
                   }
                 </p>
                 {isSearchActive && (
@@ -147,6 +150,7 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
               combinedResults.map((bk, idx) => {
                 const isLimo = bk.type === 'limousine';
                 const isFromCloud = onlineMatched.some((o) => o.id === bk.id);
+                const canManageThisBooking=liveIds.has(bk.id);
                 const isPastOrInactive = bk.status === "cancelled" || bk.status === "completed" || (() => {
                   try {
                     if (bk.travelDate) {
@@ -414,7 +418,7 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
                             <span>In Vé</span>
                           </button>
                           
-                          {bk.status !== "cancelled" && !isFromCloud && (
+                          {bk.status !== "cancelled" && canManageThisBooking && (
                             <button
                               onClick={() => {
                                 if (confirmCancelId === bk.id) {
@@ -438,7 +442,7 @@ export default function BookingList({ bookings, allBookings, isOpen, onClose, on
                             </button>
                           )}
 
-                          {isPastOrInactive && onDeleteBooking && (
+                          {isPastOrInactive && canManageThisBooking && onDeleteBooking && (
                             <button
                               onClick={() => {
                                 if (confirmDeleteId === bk.id) {
