@@ -4,24 +4,45 @@ import type {GuideArticle} from '../../types';
 import {SiteContent,HomeTile,FeaturedStory,HeroSlide,AttractionTicket,useSiteContent,publishSiteContent,uploadSiteImage} from '../../lib/siteContent';
 
 function Uploader({onFile}: {onFile:(url:string)=>void}) {
-  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
-  return <div className="space-y-1">
-    <label className={`inline-flex gap-2 items-center cursor-pointer text-xs text-emerald-800 font-bold border border-emerald-200 rounded-xl px-3 py-2 bg-emerald-50 ${busy?'opacity-60 pointer-events-none':''}`}>
-      <ImagePlus className="w-4 h-4"/>{busy?'Đang xử lý ảnh...':'Thay ảnh từ thiết bị'}
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const [success,setSuccess]=useState('');
+  const [preview,setPreview]=useState('');
+  const [stage,setStage]=useState('');
+  return <div className="space-y-2">
+    <label className={`inline-flex gap-2 items-center cursor-pointer text-xs text-emerald-800 font-bold border border-emerald-200 rounded-xl px-3 py-2 bg-emerald-50 ${busy?'opacity-65':''}`}>
+      <ImagePlus className="w-4 h-4"/>{busy?'Đang lưu ảnh...':'Thay ảnh từ thiết bị'}
       <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy}
         onChange={async e=>{
           const input=e.currentTarget;
           const file=input.files?.[0];
           if(!file)return;
-          setBusy(true);setError('');setSuccess('');
+          setBusy(true);setError('');setSuccess('');setPreview('');
+          setStage('Đang đọc và tối ưu ảnh trên thiết bị...');
           try{
-            const url=await uploadSiteImage(file);
+            const url=await uploadSiteImage(file,localPreview=>{
+              setPreview(localPreview);
+              setStage('Đã xem trước ảnh mới. Đang hoàn tất lưu ảnh lên máy chủ...');
+            });
             onFile(url);
-            setSuccess(url.startsWith('data:')?'Đã thêm ảnh tối ưu vào bản nháp. Nhấn Xuất bản để lưu.':'Đã tải ảnh lên. Nhấn Xuất bản để áp dụng.');
-          }catch(err:any){setError(err?.message||'Không thể xử lý ảnh.')}
-          finally{setBusy(false);input.value=''}
+            setPreview('');setStage('');
+            setSuccess(url.startsWith('data:')
+              ?'Đã thêm ảnh đã nén vào bản nháp. Bấm Xuất bản để lưu lên website.'
+              :'Đã tải ảnh lên máy chủ và thay trong bản nháp. Bấm Xuất bản để áp dụng.');
+          }catch(err:any){
+            setError(err?.message||'Không thể xử lý ảnh, vui lòng thử lại.');
+            setStage('');
+          }finally{
+            setBusy(false);
+            input.value='';
+          }
         }}/>
     </label>
+    {preview&&<div className="rounded-xl border border-emerald-200 p-2 bg-emerald-50">
+      <p className="text-xs font-bold text-emerald-800 mb-1">Xem trước ảnh mới</p>
+      <img src={preview} alt="Ảnh mới đang chờ lưu" className="w-full max-h-40 rounded-lg object-contain"/>
+    </div>}
+    {stage&&<p role="status" className="text-xs text-amber-800">{stage}</p>}
     {error&&<p role="alert" className="text-xs text-red-700 font-semibold">{error}</p>}
     {success&&<p role="status" className="text-xs text-emerald-800">{success}</p>}
   </div>;
@@ -95,7 +116,7 @@ export default function SiteContentStudio({articles}: {articles:GuideArticle[]})
   return <div className="bg-white rounded-2xl border border-stone-200 p-4 sm:p-6 pb-32 sm:pb-36 space-y-5 text-left">
     <div><h2 className="text-lg font-black text-[#1b4332]">Chỉnh sửa giao diện & Nội dung trang chủ</h2><p className="text-xs text-stone-500 mt-1">Logo · Banner · 12 danh mục · Bài HOT · Thông tin liên hệ. Chỉnh trên bản nháp rồi bấm Xuất bản.</p></div>
     {loadError&&<p className="bg-amber-50 rounded-xl p-3 text-xs text-amber-900">{loadError}</p>}
-    {message&&<p role="status" className="rounded-xl p-3 bg-emerald-50 text-emerald-900 text-xs">{message}</p>}
+    {message&&<p role={message.startsWith('Không thể')?'alert':'status'} className={`rounded-xl p-3 text-xs font-semibold ${message.startsWith('Không thể')?'bg-red-50 text-red-900 border border-red-200':'bg-emerald-50 text-emerald-900'}`}>{message}</p>}
     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-2" role="tablist" aria-label="Chọn phần nội dung cần chỉnh sửa">
       <div className="flex overflow-x-auto gap-2 sm:flex-wrap pb-1">
         {editorTabs.map(tab=>(
@@ -184,7 +205,8 @@ export default function SiteContentStudio({articles}: {articles:GuideArticle[]})
     <div className="fixed bottom-0 right-0 left-0 md:left-64 z-[65] bg-white/95 backdrop-blur-md px-4 sm:px-7 py-3 shadow-[0_-6px_24px_rgba(0,0,0,0.12)] border-t border-emerald-100 flex justify-between items-center gap-3" style={{paddingBottom:'max(0.75rem, env(safe-area-inset-bottom))'}}>
       <div className="min-w-0">
         <p className="text-xs font-black text-[#1b4332]">Xuất bản nội dung website</p>
-        <p className="text-[11px] text-stone-600 truncate">{dirty?'Bạn có thay đổi chưa xuất bản':'Bản nháp đang đồng bộ, chưa có thay đổi'}</p>
+        <p className="text-[11px] text-stone-600">{dirty?'Bạn có thay đổi chưa xuất bản':'Bản nháp đang đồng bộ, chưa có thay đổi'}</p>
+        {message&&<p role={message.startsWith('Không thể')?'alert':'status'} className={`text-[11px] font-semibold max-w-lg ${message.startsWith('Không thể')?'text-red-700':'text-emerald-700'}`}>{message}</p>}
       </div>
       <button type="button" disabled={publishing||!dirty} onClick={publish}
         className="shrink-0 bg-[#1b4332] text-white rounded-xl px-5 py-3 font-black text-sm disabled:opacity-40 inline-flex items-center justify-center gap-2 min-h-[44px]">

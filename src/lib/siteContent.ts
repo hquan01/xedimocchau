@@ -1,5 +1,5 @@
 import {doc, getDoc, onSnapshot, setDoc, serverTimestamp} from 'firebase/firestore';
-import {getStorage, ref, uploadBytes, getDownloadURL} from 'firebase/storage';
+import {getStorage, ref, uploadBytesResumable, getDownloadURL} from 'firebase/storage';
 import {auth, db} from '../firebase';
 import {hasOperatorAccess} from './simpleAuth';
 import {useEffect,useState} from 'react';
@@ -108,18 +108,33 @@ export async function publishSiteContent(content:SiteContent){
   await setDoc(doc(db,'site_content','public'),{...content,linkVersion:2,updatedAt:serverTimestamp(),updatedBy:user.uid});
 }
 
+// Every image stage is bounded. A rejected Storage request or a hanging
+// refresh must not leave the admin upload control spinning indefinitely.
+const IMAGE_READ_TIMEOUT_MS = 8_000;
+const STORAGE_UPLOAD_TIMEOUT_MS = 8_000;
+const STORAGE_URL_TIMEOUT_MS = 4_000;
+function deadline<T>(work:Promise<T>,timeoutMs:number,message:string):Promise<T>{
+  return new Promise<T>((resolve,reject)=>{
+    const timer=globalThis.setTimeout(()=>reject(new Error(message)),timeoutMs);
+    work.then(
+      value=>{clearTimeout(timer);resolve(value)},
+      error=>{clearTimeout(timer);reject(error)}
+    );
+  });
+}
+
 async function makeCompactImage(file:File):Promise<string>{
   const objectUrl=URL.createObjectURL(file);
   try{
     const image=new Image();
     image.src=objectUrl;
-    await image.decode();
+    await deadline(image.decode(),IMAGE_READ_TIMEOUT_MS,'Ảnh không phản hồi khi xử lý. Vui lòng chọn ảnh JPG hoặc WebP khác.');
     if(!image.naturalWidth||!image.naturalHeight)throw new Error('Không thể đọc ảnh. Vui lòng chọn ảnh khác.');
     const canvas=document.createElement('canvas');
     const ctx=canvas.getContext('2d');
     if(!ctx)throw new Error('Trình duyệt không hỗ trợ xử lý ảnh.');
-    // Try a few sizes to fit into an existing Firestore config without
-    // sacrificing the original image in browser memory.
+    // Work on a bounded canvas, never the original huge smartphone photo.
+    // Generate a Firestore-compatible preview before touching the network.
     for(const width of [1300,1050,850,650,500]){
       const scale=Math.min(1,width/image.naturalWidth,750/image.naturalHeight);
       canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
@@ -131,31 +146,60 @@ async function makeCompactImage(file:File):Promise<string>{
         if(embeddedImage(data))return data;
       }
     }
-    throw new Error('Ảnh quá phức tạp để lưu trực tiếp. Vui lòng chọn ảnh JPG/WebP đã giảm dung lượng.');
+    throw new Error('Ảnh có quá nhiều chi tiết để nén an toàn. Hãy chọn ảnh JPG/WebP dung lượng nhỏ hơn.');
   }finally{URL.revokeObjectURL(objectUrl)}
 }
 
-export async function uploadSiteImage(file:File){
+async function storeImageWithDeadline(file:File,compact:string):Promise<string>{
+  const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-70);
+  const storagePath=`site-media/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safeName}`;
+  const location=ref(getStorage(),storagePath);
+  const uploadFile=file.size<=5*1024*1024 ? file : await (async()=>{
+    const blob=await(await fetch(compact)).blob();
+    return new File([blob],safeName+'.webp',{type:'image/webp'});
+  })();
+  const task=uploadBytesResumable(location,uploadFile,{contentType:uploadFile.type});
+  await new Promise<void>((resolve,reject)=>{
+    let finished=false;
+    const settle=(error?:Error)=>{
+      if(finished)return;
+      finished=true;
+      clearTimeout(timer);
+      if(error)reject(error);else resolve();
+    };
+    const timer=setTimeout(()=>{
+      task.cancel();
+      settle(new Error('Firebase Storage không phản hồi trong thời gian cho phép.'));
+    },STORAGE_UPLOAD_TIMEOUT_MS);
+    task.on('state_changed',undefined,error=>settle(error),()=>settle());
+  });
+  return deadline(getDownloadURL(location),STORAGE_URL_TIMEOUT_MS,'Không thể lấy liên kết ảnh từ Storage.');
+}
+
+/**
+ * Returns a usable URL even if Firebase Storage rejects or stalls.
+ * The callback is a local preview only; publishing is still an explicit action.
+ */
+export async function uploadSiteImage(file:File,onLocalPreview?:(dataUrl:string)=>void):Promise<string>{
   if(!['image/jpeg','image/png','image/webp'].includes(file.type))
     throw new Error('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.');
   if(file.size>15*1024*1024)
     throw new Error('Ảnh lớn hơn 15 MB. Vui lòng nén ảnh trước khi tải.');
-  await requireContentEditor();
+  // Save the real customer-supplied image locally before any network request;
+  // never block the preview on a token refresh or Storage upload.
   const compact=await makeCompactImage(file);
+  onLocalPreview?.(compact);
+
+  if(!auth.currentUser){
+    // The publish button checks Firebase editor permissions and reports errors.
+    return compact;
+  }
   try{
-    // Prefer full-size Cloud Storage media when permissions/bucket are available.
-    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-70);
-    const location=ref(getStorage(),`site-media/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safeName}`);
-    const uploadFile=file.size<=5*1024*1024 ? file : await (async()=>{
-      const b=await(await fetch(compact)).blob();
-      return new File([b],safeName+'.webp',{type:'image/webp'});
-    })();
-    await uploadBytes(location,uploadFile,{contentType:uploadFile.type});
-    return getDownloadURL(location);
-  }catch(err){
-    // Storage often needs custom claims while Firestore also accepts owner
-    // email/operator documents. Inline compressed images keep publishing usable.
-    console.warn('Storage upload unavailable; using a size-limited Firestore image.',err);
+    return await storeImageWithDeadline(file,compact);
+  }catch(error){
+    // The compact version can still be published to Firestore under the
+    // existing document-size budget, so no photo is silently discarded.
+    console.warn('Firebase Storage unavailable, using the compressed image preview instead.',error);
     return compact;
   }
 }
