@@ -53,7 +53,7 @@ export default function TikTokShowcase({videoLinks=[]}: {videoLinks?:string[]}){
           const id=url.match(VIDEO_RE)?.[1];
           return <div key={url} className="aspect-[9/16] bg-[#12261e] text-white rounded-2xl relative overflow-hidden">
             {selected===url&&id? <iframe loading="lazy" title={`Video TikTok QT Limousine ${i+1}`}
-              src={`https://www.tiktok.com/embed/v2/${id}`} className="w-full h-full" allow="encrypted-media; picture-in-picture; fullscreen" referrerPolicy="strict-origin-when-cross-origin"/>:
+              src={`https://www.tiktok.com/player/v1/${id}?autoplay=0`} className="w-full h-full" allow="encrypted-media; picture-in-picture; fullscreen" referrerPolicy="strict-origin-when-cross-origin"/>:
               <button type="button" onClick={()=>setSelected(url)} className="w-full h-full flex flex-col gap-3 justify-center items-center px-3 text-center">
                 <span className="w-14 h-14 rounded-full bg-white/15 grid place-items-center"><Play className="w-7 h-7 fill-white"/></span>
                 <span className="font-bold text-xs">Xem video {i+1}</span>
