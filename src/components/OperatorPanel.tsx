@@ -219,7 +219,7 @@ export default function OperatorPanel({
             try {
               new window.Notification("Có yêu cầu dịch vụ mới", {
                 body: `${newest.kind === "taxi" ? "Taxi" : "Thuê xe máy"} • ${newest.customerName}`,
-                icon: "/logo.png"
+                icon: "/brand-xedimocchau-icon-192.png"
               });
             } catch { /* Browser notifications may be blocked; in-app alert remains. */ }
           }
