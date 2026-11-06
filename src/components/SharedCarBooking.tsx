@@ -86,7 +86,6 @@ export default function SharedCarBooking({
   // Query parameters
   const [from, setFrom] = useState(searchParams?.from || "Hà Nội");
   const [to, setTo] = useState(searchParams?.to || "Mộc Châu");
-  const getVietnamToday = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const [date, setDate] = useState(() => {
     const todayVN = getVietnamToday();
     if (searchParams?.date && searchParams.date >= todayVN) {
