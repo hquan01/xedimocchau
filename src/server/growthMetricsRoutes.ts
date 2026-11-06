@@ -1,5 +1,5 @@
 import {Router, type Request} from 'express';
-import {createHash} from 'node:crypto';
+import {createHmac} from 'node:crypto';
 import {getApps, initializeApp, applicationDefault, cert} from 'firebase-admin/app';
 import {getFirestore, FieldValue} from 'firebase-admin/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -12,6 +12,8 @@ const DAY_MS=86400000;
 let cached:{expires:number;days:number;stats:Record<string,Record<Engagement,number>>}|null=null;
 function firestore(){
   const key=process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON?.trim();
+  // A private HMAC salt is required to protect IP-based deduplication keys.
+  if(!process.env.CONTENT_METRICS_HASH_SALT?.trim())return null;
   if(!key&&!process.env.GOOGLE_APPLICATION_CREDENTIALS)return null;
   const name='qt-public-growth-stats';
   const app=getApps().find(x=>x.name===name)||
@@ -23,10 +25,10 @@ function sourceKey(req:Request,event:Engagement,articleId:string,day:string){
   const forwarded=req.headers['x-vercel-forwarded-for'];
   const ip=typeof forwarded==='string'?forwarded.split(',')[0]:(req.ip||'');
   const agent=String(req.headers['user-agent']||'').slice(0,150);
-  const salt=process.env.CONTENT_METRICS_HASH_SALT||firebaseConfig.projectId;
-  // Only a digest is stored, never visitor IP or user agent. One action
-  // per client/network signature per calendar day; not a unique-user count.
-  return createHash('sha256').update([salt,ip,agent,event,articleId,day].join('|')).digest('hex');
+  const salt=process.env.CONTENT_METRICS_HASH_SALT!;
+  // Never persist visitor IP or UA. HMAC with a secret server-only key;
+  // approximate deduplication, not a verified unique-person counter.
+  return createHmac('sha256',salt).update([ip,agent,event,articleId,day].join('|')).digest('hex');
 }
 // Read only aggregated, privacy-preserving public counters; never expose fingerprints.
 growthMetricsRouter.get('/engagement',async(req,res)=>{
