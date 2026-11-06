@@ -14,7 +14,7 @@ export default function GrowthAnalytics({ bookings }: GrowthAnalyticsProps) {
     .filter(b => b.status === "completed" || b.status === "success")
     .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
-  const conversionRate = totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 85;
+  const completionRate = totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 0;
 
   // Route breakdown
   const hnToMc = bookings.filter(b => (b.routeSelection || "").includes("Hà Nội ➔ Mộc Châu") || (b.routeSelection || "").startsWith("Hà Nội")).length;
@@ -31,7 +31,7 @@ export default function GrowthAnalytics({ bookings }: GrowthAnalyticsProps) {
             <h3 className="text-base font-black text-stone-900">Thống Kê Tăng Trưởng & Phân Tích Kinh Doanh</h3>
           </div>
           <p className="text-xs text-stone-500 mt-0.5">
-            Dữ liệu thống kê thực tế được kết xuất từ các đơn đặt xe QT Limousine, combo lưu trú và hành vi khách hàng.
+            Số liệu dưới đây dựa trên đơn đã lưu trong hệ thống, không phải số liệu khách truy cập.
           </p>
         </div>
 
@@ -50,31 +50,31 @@ export default function GrowthAnalytics({ bookings }: GrowthAnalyticsProps) {
           <h4 className="text-3xl font-black text-stone-900 font-mono mt-2">{totalBookings} đơn</h4>
           <div className="mt-2 text-xs text-emerald-700 font-medium flex items-center space-x-1">
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>Tăng trưởng đều theo tuần</span>
+            <span>Số đơn được ghi nhận trong hệ thống</span>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
           <div className="flex justify-between items-center text-stone-400">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Doanh thu xác nhận</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Giá trị đơn thành công</span>
             <DollarSign className="w-4 h-4 text-amber-500" />
           </div>
           <h4 className="text-2xl font-black text-stone-900 font-mono mt-2">
             {totalGrossRevenue.toLocaleString()} đ
           </h4>
           <span className="text-xs text-stone-500 block mt-2 font-sans">
-            Bao gồm vé xe Limousine & combo phòng
+            Tổng giá trị đơn thành công; không đồng nghĩa số tiền thực thu
           </span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
           <div className="flex justify-between items-center text-stone-400">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Tỷ lệ chốt đơn</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Tỷ lệ đơn hoàn tất</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
-          <h4 className="text-3xl font-black text-emerald-700 font-mono mt-2">{conversionRate}%</h4>
+          <h4 className="text-3xl font-black text-emerald-700 font-mono mt-2">{completionRate}%</h4>
           <span className="text-xs text-stone-500 block mt-2 font-sans">
-            {completedBookings} đơn duyệt thành công
+            {completedBookings}/{totalBookings} đơn thành công; không phải tỷ lệ chuyển đổi khách truy cập
           </span>
         </div>
 
@@ -98,12 +98,12 @@ export default function GrowthAnalytics({ bookings }: GrowthAnalyticsProps) {
           <div>
             <div className="flex justify-between font-bold text-stone-700 mb-1">
               <span>Hà Nội ➔ Mộc Châu (Chiều đi cao nguyên)</span>
-              <span className="font-mono">{hnToMc} đơn ({totalBookings > 0 ? Math.round((hnToMc / totalBookings) * 100) : 55}%)</span>
+              <span className="font-mono">{hnToMc} đơn ({totalBookings > 0 ? Math.round((hnToMc / totalBookings) * 100) : 0}%)</span>
             </div>
             <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-emerald-600 rounded-full"
-                style={{ width: `${totalBookings > 0 ? (hnToMc / totalBookings) * 100 : 55}%` }}
+                style={{ width: `${totalBookings > 0 ? (hnToMc / totalBookings) * 100 : 0}%` }}
               />
             </div>
           </div>
@@ -111,12 +111,12 @@ export default function GrowthAnalytics({ bookings }: GrowthAnalyticsProps) {
           <div>
             <div className="flex justify-between font-bold text-stone-700 mb-1">
               <span>Mộc Châu ➔ Hà Nội (Chiều về xuôi)</span>
-              <span className="font-mono">{mcToHn} đơn ({totalBookings > 0 ? Math.round((mcToHn / totalBookings) * 100) : 40}%)</span>
+              <span className="font-mono">{mcToHn} đơn ({totalBookings > 0 ? Math.round((mcToHn / totalBookings) * 100) : 0}%)</span>
             </div>
             <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-teal-600 rounded-full"
-                style={{ width: `${totalBookings > 0 ? (mcToHn / totalBookings) * 100 : 40}%` }}
+                style={{ width: `${totalBookings > 0 ? (mcToHn / totalBookings) * 100 : 0}%` }}
               />
             </div>
           </div>
