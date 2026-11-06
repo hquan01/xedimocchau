@@ -15,6 +15,7 @@ export default function ExploreLanding({setActiveTab,onOpenArticle,onOpenLimousi
     flower:'article:guide-4',tea:'article:guide-2',waterfall:'article:guide-2'
   };
   const legacyBannerTarget=(id:string,target:string)=>{
+    if((content.linkVersion||1)>=2)return target;
     if(id==='flower'&&target==='moc_chau_today')return oldSlideArticle.flower;
     if((id==='tea'||id==='waterfall')&&target==='explore_legacy')return oldSlideArticle[id];
     return target;
