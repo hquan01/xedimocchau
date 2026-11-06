@@ -214,7 +214,7 @@ export default function SiteContentStudio({articles}: {articles:GuideArticle[]})
         </label>}
         <div className="p-3 rounded-xl border border-stone-200 bg-white">
           <p className="text-xs font-bold">{metrics.enabled?'Đang sử dụng dữ liệu tương tác phía máy chủ':'Chưa có kết nối số liệu tương tác xác minh'}</p>
-          <p className="text-[11px] text-stone-600 mt-1">{metrics.enabled?'Các lượt xem, thích, lưu, chia sẻ và nhấn đặt xe được ghi nhận có chống lặp cơ bản.':'Nếu máy chủ chưa được cấp quyền Firestore Admin, hệ thống tự dùng nội dung ghim/thủ công; không tự tạo lượt xem hoặc thích.'}</p>
+          <p className="text-[11px] text-stone-600 mt-1">{metrics.enabled?'Các lượt xem, thích, lưu, chia sẻ và nhấn đặt xe được ghi nhận có chống lặp cơ bản.':'Để kích hoạt thống kê xác minh cần cấu hình FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON và CONTENT_METRICS_HASH_SALT trên Vercel; sau đó bật chính sách TTL cho growth_event_once.expiresAt. Chưa có thì dùng bài ghim/thủ công, không tạo lượt tương tác giả.'}</p>
           {metrics.enabled&&<div className="mt-2 space-y-1">{articles.slice().sort((a,b)=>trendingScore(metrics.stats[b.id])-trendingScore(metrics.stats[a.id])).slice(0,5).map(a=><p key={a.id} className="text-[11px] flex justify-between gap-2"><span className="truncate">{a.title}</span><span className="font-bold shrink-0">{trendingScore(metrics.stats[a.id])} điểm</span></p>)}</div>}
         </div>
       </section>
