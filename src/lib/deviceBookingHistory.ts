@@ -89,7 +89,8 @@ export function findMyDeviceBookings(
   deviceHistory:Booking[],
   liveDeviceBookings:Booking[],
   accountBookings:Booking[],
-  authenticatedUserId?:string
+  authenticatedUserId?:string,
+  trustedDeviceId?:string
 ):Booking[]{
   if(!isCompleteBookingPhone(phoneInput))return [];
   const phone=normalizeBookingPhone(phoneInput);
@@ -100,10 +101,10 @@ export function findMyDeviceBookings(
   const deviceIds=new Set(deviceHistory.map(row=>row.id));
   for(const item of liveDeviceBookings){
     if(normalizeBookingPhone(item.passengerPhone)!==phone)continue;
-    // The liveDeviceBookings collection is already filtered by the device's
-    // identity in useFirebaseSync. Requiring either a cached ID or trusted
-    // session ownership prevents accidental broad searches.
-    if(deviceIds.has(item.id)||(authenticatedUserId&&item.userId===authenticatedUserId)){
+    // Cross-check the device identifier, even if a parent accidentally passes
+    // an unfiltered collection of bookings. Old locally saved IDs remain ours.
+    if(deviceIds.has(item.id)||(trustedDeviceId&&item.deviceId===trustedDeviceId)||
+       (authenticatedUserId&&item.userId===authenticatedUserId)){
       mine.set(item.id,item);
     }
   }
