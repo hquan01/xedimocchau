@@ -144,7 +144,7 @@ export default function MocChauWeatherSection({
           <h3 className="font-black text-sm text-[#1b4332]">Đối chiếu dự báo Mộc Châu từ nguồn khác</h3>
           <p className="text-xs text-stone-600 mt-1">Các số liệu bên dưới là <strong>dự báo mô hình Open-Meteo</strong>, không phải nhiệt độ đo tại trạm. Nguồn tham khảo bên cạnh có thể khác về tọa độ, độ cao, thời gian và mô hình. Không có nguồn nào được mặc định là chính xác tuyệt đối.</p>
         </div>
-        <a href="https://dubaothoitiet.edu.vn/son-la/moc-chau/moc-chau" target="_blank" rel="noopener noreferrer"
+        <a href="https://dubaothoitiet.edu.vn/son-la/moc-chau" target="_blank" rel="noopener noreferrer"
           className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-[#1b4332] text-white px-4 py-3 text-xs font-black hover:bg-emerald-800">
           Xem dự báo nguồn khác ↗
         </a>
@@ -194,7 +194,7 @@ export default function MocChauWeatherSection({
           ? `${current.time.slice(11,16)} ngày ${current.time.slice(8,10)}/${current.time.slice(5,7)}/${current.time.slice(0,4)} (giờ Việt Nam)`
           : "chưa xác định"}.
         {" "}Dữ liệu thời tiết này được ước tính trên ô lưới khí tượng theo tọa độ, không phải số đo tại trạm đặt ở Mộc Châu.
-        Có thể chênh lệch vài độ so với nguồn khác hoặc thời tiết thực tế. *Lượng mưa là ước tính theo khoảng dữ liệu hiện tại của nguồn, không phải lượng mưa đã đo ở trạm.
+        Có thể chênh lệch vài độ so với nguồn khác hoặc thời tiết thực tế. *Lượng mưa là tổng tích lũy theo khoảng thời gian mà Open-Meteo cung cấp (thường 15 phút cho biến current), không phải lượng mưa đo tại trạm.
       </div>
       {/* Main Real-Time Weather Banner */}
       <div className="bg-gradient-to-br from-teal-950 via-[#1b4332] to-emerald-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden">
@@ -242,7 +242,7 @@ export default function MocChauWeatherSection({
 
             <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/15 text-center">
               <CloudRain className="w-4 h-4 text-amber-300 mx-auto mb-1" />
-              <span className="text-[10px] text-emerald-200 uppercase font-bold block">Mưa 15 phút*</span>
+              <span className="text-[10px] text-emerald-200 uppercase font-bold block">Mưa (mô hình)*</span>
               <span className="text-sm font-black font-mono mt-0.5 block text-amber-300">
                 {current.precipitation} mm
               </span>
