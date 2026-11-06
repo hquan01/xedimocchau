@@ -1,3 +1,4 @@
+import {getVietnamToday, getVietnamNextDepartureTime, isFutureDeparture, PAST_DEPARTURE_MESSAGE} from "../lib/bookingTime";
 import React, { useState, useEffect, useMemo } from "react";
 import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
 import {couponDecision} from "../lib/couponEligibility";
@@ -78,7 +79,6 @@ export default function LimousineBooking({
     searchParams?.to && searchParams.to !== "Hà Nội" && searchParams.to !== "Mộc Châu" ? searchParams.to : ""
   );
 
-  const getVietnamToday = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const [date, setDate] = useState(() => {
     const todayVN = getVietnamToday();
     if (searchParams?.date && searchParams.date >= todayVN) {
@@ -232,7 +232,7 @@ export default function LimousineBooking({
 
   useEffect(() => {
     if (searchParams) {
-      if (searchParams.date) setDate(searchParams.date);
+      if (searchParams.date) setDate(searchParams.date >= getVietnamToday() ? searchParams.date : getVietnamToday());
       if (searchParams.time && searchParams.time !== "all" && searchParams.time !== "morning" && searchParams.time !== "afternoon") {
         setSelectedTimeFilter(searchParams.time);
       }
@@ -249,7 +249,32 @@ export default function LimousineBooking({
     }
   }, [currentUser]);
 
-  const scheduleTimes = getOfficialSchedulesForRoute(from, to, date, limousineConfig);
+  // Refresh near real-time so an open page never keeps offering a departed trip.
+  const [bookingClock, setBookingClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setBookingClock(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (date && date < getVietnamToday(bookingClock)) {
+      setDate(getVietnamToday(bookingClock));
+      setSelectedTrip(null);
+      return;
+    }
+    if (date === getVietnamToday(bookingClock) &&
+        !isFutureDeparture(date, selectedTimeFilter, bookingClock)) {
+      const nextTime = getVietnamNextDepartureTime(bookingClock);
+      if (selectedTimeFilter !== nextTime) {
+        setSelectedTimeFilter(nextTime);
+        setSelectedTrip(null);
+      }
+    }
+    if (selectedTrip && !isFutureDeparture(date, selectedTrip.departureTime, bookingClock))
+      setSelectedTrip(null);
+  }, [date, selectedTimeFilter, selectedTrip, bookingClock]);
+
+  const scheduleTimes = getOfficialSchedulesForRoute(from, to, date, limousineConfig)
+    .filter(time => isFutureDeparture(date, time, bookingClock));
 
   const parseTimeToMinutes = (timeStr: string): number => {
     const [h, m] = timeStr.split(":").map(Number);
@@ -276,9 +301,9 @@ export default function LimousineBooking({
   });
 
   const uniqueRecs = new Set<string>();
-  uniqueRecs.add(beforeTime);
-  uniqueRecs.add(closestTime);
-  uniqueRecs.add(afterTime);
+  if (beforeTime) uniqueRecs.add(beforeTime);
+  if (closestTime) uniqueRecs.add(closestTime);
+  if (afterTime) uniqueRecs.add(afterTime);
 
   if (uniqueRecs.size < 3 && precedingSchedules[1]) uniqueRecs.add(precedingSchedules[1]);
   if (uniqueRecs.size < 3 && succeedingSchedules[1]) uniqueRecs.add(succeedingSchedules[1]);
@@ -317,6 +342,11 @@ export default function LimousineBooking({
   });
 
   const handleTripSelect = (trip: LimousineTrip) => {
+    if (!isFutureDeparture(date, trip.departureTime)) {
+      setErrorMsg(PAST_DEPARTURE_MESSAGE);
+      return;
+    }
+    setErrorMsg("");
     setSelectedTrip(trip);
     setSeatCount(1);
   };
@@ -338,9 +368,9 @@ export default function LimousineBooking({
       return;
     }
 
-    const systemToday = new Date().toISOString().split('T')[0];
-    if (date < systemToday) {
-      setErrorMsg("Ngày khởi hành không được trong quá khứ!");
+    if (!isFutureDeparture(date, selectedTrip.departureTime)) {
+      setErrorMsg(PAST_DEPARTURE_MESSAGE);
+      setSelectedTrip(null);
       return;
     }
 
@@ -538,7 +568,15 @@ export default function LimousineBooking({
               type="date"
               value={date}
               min={getVietnamToday()}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value && e.target.value < getVietnamToday()) {
+                  setErrorMsg(PAST_DEPARTURE_MESSAGE);
+                  return;
+                }
+                setErrorMsg("");
+                setDate(e.target.value);
+                setSelectedTrip(null);
+              }}
               className="w-full p-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold text-[#1b4332] focus:outline-none cursor-pointer"
             />
           </div>
@@ -550,7 +588,13 @@ export default function LimousineBooking({
               type="time"
               required
               value={selectedTimeFilter}
+              min={date === getVietnamToday(bookingClock) ? (getVietnamNextDepartureTime(bookingClock) || "23:59") : undefined}
               onChange={(e) => {
+                if (e.target.value && !isFutureDeparture(date, e.target.value)) {
+                  setErrorMsg(PAST_DEPARTURE_MESSAGE);
+                  return;
+                }
+                setErrorMsg("");
                 setSelectedTimeFilter(e.target.value);
                 setSelectedTrip(null);
               }}
@@ -607,6 +651,11 @@ export default function LimousineBooking({
             <span>BƯỚC 1: CHỌN GIỜ ĐI KHỞI HÀNH</span>
           </h3>
 
+          {filteredTrips.length === 0 && (
+            <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              Không còn chuyến xe chưa khởi hành trong ngày đã chọn. Vui lòng chọn ngày khác.
+            </p>
+          )}
           {filteredTrips.map((trip) => {
             const isChosen = selectedTrip?.id === trip.id;
             return (

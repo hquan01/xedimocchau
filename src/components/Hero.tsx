@@ -1,3 +1,4 @@
+import {getVietnamToday} from "../lib/bookingTime";
 import React, { useState } from "react";
 import { Compass, CalendarDays, Users, Search, Sparkles, MapPin, Ticket, Sun, CloudRain, Utensils, Home, Hotel, ShoppingBag, Car, HelpCircle, BookOpen, Award, Loader2, ArrowLeftRight } from "lucide-react";
 import { motion } from "motion/react";
@@ -13,9 +14,7 @@ interface HeroProps {
 }
 
 export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSearchCombo }: HeroProps) {
-  const getTodayString = () => {
-    return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  };
+  const getTodayString = () => getVietnamToday();
 
   const [routeFromType, setRouteFromType] = useState<"Hà Nội" | "Mộc Châu" | "other">("Hà Nội");
   const [customRouteFrom, setCustomRouteFrom] = useState("");
@@ -116,6 +115,11 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
     e.preventDefault();
     if (!travelDate) {
       alert("Vui lòng chọn ngày khởi hành!");
+      return;
+    }
+    // The quick-search box has no hour picker; departure time is chosen on the booking screen.
+    if (travelDate < getVietnamToday()) {
+      alert("Ngày khởi hành đã qua. Vui lòng chọn ngày hôm nay hoặc ngày sau.");
       return;
     }
     if (subType === 'limousine') {
