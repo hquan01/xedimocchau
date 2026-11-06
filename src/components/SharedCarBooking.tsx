@@ -1,3 +1,4 @@
+import {getVietnamToday, getVietnamNextDepartureTime, isFutureDeparture, PAST_DEPARTURE_MESSAGE} from "../lib/bookingTime";
 import React, { useState, useEffect, useMemo } from "react";
 import {eligibleForNextBookingReward, redeemablePoints, POINT_VALUE_VND} from "../lib/loyalty";
 import {couponDecision} from "../lib/couponEligibility";
@@ -206,7 +207,7 @@ export default function SharedCarBooking({
     if (searchParams) {
       if (searchParams.from) setFrom(searchParams.from);
       if (searchParams.to) setTo(searchParams.to);
-      if (searchParams.date) setDate(searchParams.date);
+      if (searchParams.date) setDate(searchParams.date >= getVietnamToday() ? searchParams.date : getVietnamToday());
       if (searchParams.time && searchParams.time !== "all" && searchParams.time !== "morning" && searchParams.time !== "afternoon") {
         setSelectedTimeFilter(searchParams.time);
       }
@@ -229,7 +230,7 @@ export default function SharedCarBooking({
     if (searchParams) {
       setFrom(searchParams.from);
       setTo(searchParams.to);
-      setDate(searchParams.date || "2026-05-25");
+      setDate(searchParams.date && searchParams.date >= getVietnamToday() ? searchParams.date : getVietnamToday());
       setSelectedTimeFilter(
         searchParams.time && searchParams.time !== "all" && searchParams.time !== "morning" && searchParams.time !== "afternoon"
           ? searchParams.time
@@ -268,6 +269,30 @@ export default function SharedCarBooking({
     return (h || 0) * 60 + (m || 0);
   };
 
+  // Refresh near real-time: expired departures must disappear even if this tab stays open.
+  const [bookingClock, setBookingClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setBookingClock(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (date && date < getVietnamToday(bookingClock)) {
+      setDate(getVietnamToday(bookingClock));
+      setSelectedTrip(null);
+      return;
+    }
+    if (date === getVietnamToday(bookingClock) &&
+        !isFutureDeparture(date, selectedTimeFilter, bookingClock)) {
+      const nextTime = getVietnamNextDepartureTime(bookingClock);
+      if (nextTime !== selectedTimeFilter) {
+        setSelectedTimeFilter(nextTime);
+        setSelectedTrip(null);
+      }
+    }
+    if (selectedTrip && !isFutureDeparture(date, selectedTrip.departureTime, bookingClock))
+      setSelectedTrip(null);
+  }, [date, selectedTimeFilter, selectedTrip, bookingClock]);
+
   const targetMinutes = parseTimeToMinutes(selectedTimeFilter);
 
   // Chronological matching
@@ -291,9 +316,9 @@ export default function SharedCarBooking({
   });
 
   const uniqueRecs = new Set<string>();
-  uniqueRecs.add(beforeTime);
-  uniqueRecs.add(closestTime);
-  uniqueRecs.add(afterTime);
+  if (beforeTime) uniqueRecs.add(beforeTime);
+  if (closestTime) uniqueRecs.add(closestTime);
+  if (afterTime) uniqueRecs.add(afterTime);
 
   if (uniqueRecs.size < 3 && precedingSchedules[1]) uniqueRecs.add(precedingSchedules[1]);
   if (uniqueRecs.size < 3 && succeedingSchedules[1]) uniqueRecs.add(succeedingSchedules[1]);
@@ -331,6 +356,11 @@ export default function SharedCarBooking({
   });
 
   const handleTripSelect = (trip: any) => {
+    if (!isFutureDeparture(date, trip.departureTime)) {
+      setErrorMsg(PAST_DEPARTURE_MESSAGE);
+      return;
+    }
+    setErrorMsg("");
     setSelectedTrip(trip);
     setSeatCount(1);
   };
@@ -347,6 +377,11 @@ export default function SharedCarBooking({
 
     if (!selectedTrip) {
       setErrorMsg("Vui lòng chọn khung giờ di chuyển phù hợp bên trái!");
+      return;
+    }
+    if (!isFutureDeparture(date, selectedTrip.departureTime)) {
+      setErrorMsg(PAST_DEPARTURE_MESSAGE);
+      setSelectedTrip(null);
       return;
     }
     if (!seatCount || seatCount < 1) {
@@ -543,7 +578,15 @@ export default function SharedCarBooking({
               type="date"
               value={date}
               min={getVietnamToday()}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value && e.target.value < getVietnamToday()) {
+                  setErrorMsg(PAST_DEPARTURE_MESSAGE);
+                  return;
+                }
+                setErrorMsg("");
+                setDate(e.target.value);
+                setSelectedTrip(null);
+              }
               className="text-sm font-semibold text-[#1b4332] bg-transparent focus:outline-none cursor-pointer font-sans"
             />
           </div>
@@ -554,7 +597,13 @@ export default function SharedCarBooking({
               type="time"
               required
               value={selectedTimeFilter}
+              min={date === getVietnamToday(bookingClock) ? (getVietnamNextDepartureTime(bookingClock) || "23:59") : undefined}
               onChange={(e) => {
+                if (e.target.value && !isFutureDeparture(date, e.target.value)) {
+                  setErrorMsg(PAST_DEPARTURE_MESSAGE);
+                  return;
+                }
+                setErrorMsg("");
                 setSelectedTimeFilter(e.target.value);
                 setSelectedTrip(null);
               }}
@@ -581,6 +630,11 @@ export default function SharedCarBooking({
             <span>BƯỚC 1: CHỌN GIỜ ĐI KHỞI HÀNH XE GHÉP</span>
           </h3>
 
+          {filteredTrips.length === 0 && (
+            <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              Không còn chuyến xe chưa khởi hành trong ngày đã chọn. Vui lòng chọn ngày khác.
+            </p>
+          )}
           {filteredTrips.map((trip) => {
             const isChosen = selectedTrip?.id === trip.id;
             return (
