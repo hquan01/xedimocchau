@@ -1,4 +1,4 @@
-import {doc, onSnapshot, setDoc, serverTimestamp} from 'firebase/firestore';
+import {doc, getDoc, onSnapshot, setDoc, serverTimestamp} from 'firebase/firestore';
 import {getStorage, ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {auth, db} from '../firebase';
 import {hasOperatorAccess} from './simpleAuth';
@@ -9,14 +9,14 @@ export interface HeroSlide {id:string; imageUrl:string; title:string; descriptio
 export interface FeaturedStory {id:string; title:string; description:string; imageUrl:string; label:string; target:string; visible:boolean}
 export interface AttractionTicket {id:string; name:string; adultPrice:string; childPrice:string; note:string; sourceUrl:string; visible:boolean}
 export interface SiteContent {
-  siteName:string; tagline:string; logoUrl:string; heroImageUrl:string; heroTitle:string; heroDescription:string; heroTarget?:string;
+  siteName:string; tagline:string; logoUrl:string; heroImageUrl:string; heroTitle:string; heroDescription:string; heroTarget?:string; linkVersion?:number;
   hotline:string; zaloUrl:string; messengerUrl:string;
   tiles:HomeTile[]; stories:FeaturedStory[]; heroSlides?:HeroSlide[]; attractionTickets?:AttractionTicket[];
 }
 export const defaultSiteContent: SiteContent = {
   siteName:'MỘC CHÂU TRAVEL', tagline:'Cẩm nang & Dịch vụ du lịch Mộc Châu',
   logoUrl:'/mocchau-logo-v4.png',heroImageUrl:'/mocchau-hero-v5.jpg',
-  heroTitle:'Khám phá Mộc Châu',heroDescription:'Thiên nhiên Tây Bắc · Mùa hoa · Những trải nghiệm đáng nhớ',heroTarget:'article:guide-1',
+  heroTitle:'Khám phá Mộc Châu',heroDescription:'Thiên nhiên Tây Bắc · Mùa hoa · Những trải nghiệm đáng nhớ',heroTarget:'article:guide-1',linkVersion:2,
   hotline:'0971050324',zaloUrl:'https://zalo.me/0971050324',messengerUrl:'https://m.me/1277673239073987',
   tiles:[
     {id:'weather',title:'Thời tiết',subtitle:'Mộc Châu hôm nay',icon:'cloud-sun',target:'moc_chau_today',visible:true},
@@ -61,7 +61,7 @@ export function useSiteContent(){
   useEffect(()=>onSnapshot(doc(db,'site_content','public'),snap=>{
     if(!snap.exists()) return;
     const raw=snap.data() as Partial<SiteContent>;
-    setContent({...defaultSiteContent,...raw,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides,attractionTickets:Array.isArray(raw.attractionTickets)?raw.attractionTickets:defaultSiteContent.attractionTickets});
+    setContent({...defaultSiteContent,...raw,linkVersion:raw.linkVersion??1,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides,attractionTickets:Array.isArray(raw.attractionTickets)?raw.attractionTickets:defaultSiteContent.attractionTickets});
     setError('');
   },e=>{console.warn('Public content defaults used',e);setError('Không tải được cấu hình; đang sử dụng nội dung mặc định.')}),[]);
   return {content,error};
@@ -79,11 +79,21 @@ const embeddedImage = (url:string) =>
 const safeImageSource = (url:string) => url.startsWith('/') ||
   /^https:\/\//i.test(url) || embeddedImage(url);
 
-export async function publishSiteContent(content:SiteContent){
+async function requireContentEditor(){
   const user=auth.currentUser;
-  if(!user) throw new Error('Bạn cần đăng nhập Firebase để xuất bản.');
+  if(!user)throw new Error('Vui lòng đăng nhập tài khoản quản trị.');
   const token=await user.getIdTokenResult(true);
-  if(!hasOperatorAccess(token)) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase.');
+  if(hasOperatorAccess(token))return user;
+  // Firestore rules also allow operators granted through their users/{uid}
+  // document; they may not have a custom claim in Firebase Storage yet.
+  const ownProfile=await getDoc(doc(db,'users',user.uid));
+  const role=ownProfile.data()?.role;
+  if(role==='operator'||role==='admin')return user;
+  throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase.');
+}
+
+export async function publishSiteContent(content:SiteContent){
+  const user=await requireContentEditor();
   const allImages=[content.logoUrl,content.heroImageUrl,
     ...content.stories.map(x=>x.imageUrl),
     ...(content.heroSlides||[]).map(x=>x.imageUrl)];
@@ -95,7 +105,7 @@ export async function publishSiteContent(content:SiteContent){
   if(bytes>PUBLISHED_CONFIG_MAX_BYTES){
     throw new Error('Bản nháp chứa quá nhiều ảnh nhúng. Hãy dùng ảnh nhỏ hơn hoặc liên kết ảnh HTTPS cho một số banner trước khi xuất bản.');
   }
-  await setDoc(doc(db,'site_content','public'),{...content,updatedAt:serverTimestamp(),updatedBy:user.uid});
+  await setDoc(doc(db,'site_content','public'),{...content,linkVersion:2,updatedAt:serverTimestamp(),updatedBy:user.uid});
 }
 
 async function makeCompactImage(file:File):Promise<string>{
@@ -130,10 +140,7 @@ export async function uploadSiteImage(file:File){
     throw new Error('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.');
   if(file.size>15*1024*1024)
     throw new Error('Ảnh lớn hơn 15 MB. Vui lòng nén ảnh trước khi tải.');
-  const user=auth.currentUser;
-  if(!user)throw new Error('Vui lòng đăng nhập Admin.');
-  const token=await user.getIdTokenResult(true);
-  if(!hasOperatorAccess(token))throw new Error('Chưa được cấp quyền tải ảnh quản trị.');
+  await requireContentEditor();
   const compact=await makeCompactImage(file);
   try{
     // Prefer full-size Cloud Storage media when permissions/bucket are available.
