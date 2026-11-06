@@ -2,6 +2,7 @@ import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy, 
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
 import {POINTS_PER_CONFIRMED_BOOKING, previousConfirmedBookings} from "./loyalty";
 import {couponDecision} from "./couponEligibility";
+import {isFutureDeparture, PAST_DEPARTURE_MESSAGE} from "./bookingTime";
 import type {User} from "../types";
 import { Booking, BlockedSeat, LimousineConfig, SharedCarConfig, TourCombo, Accommodation, Coupon, LocationPoint, Destination, GuideArticle, AppNotification, Review, ZaloGroup, CommunityQuestion } from "../types";
 
@@ -72,6 +73,11 @@ export const listenToReviews = (destinationId: string, callback: (reviews: Revie
 };
 
 export const saveBookingToFirebase = async (booking: Booking) => {
+  // Re-check immediately before writing: time may have elapsed while the form was open.
+  if (["limousine", "shared_car", "combo"].includes(booking.type) &&
+      !isFutureDeparture(booking.travelDate, booking.departureTime || "")) {
+    throw new Error(PAST_DEPARTURE_MESSAGE);
+  }
   // Sync to local first for immediate feedback
   const current = getLocalList<Booking>("bookings", []);
   const existingIndex = current.findIndex(b => b.id === booking.id);
