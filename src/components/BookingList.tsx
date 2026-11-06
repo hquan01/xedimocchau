@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Booking, type User as CustomerUser } from "../types";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { getDeviceId } from "../lib/firebaseUtils";
-import { findMyDeviceBookings, isCompleteBookingPhone, readDeviceBookingHistory } from "../lib/deviceBookingHistory";
+import { findMyDeviceBookings, isCompleteBookingPhone, normalizeBookingPhone, readDeviceBookingHistory, rememberDeviceBooking } from "../lib/deviceBookingHistory";
 import { CalendarDays, MapPin, Ticket, User, Phone, Check, Trash2, X, Compass, Printer, Info, Search, Cloud, Sparkles, Hotel, Car, Gift, Tag, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { INITIAL_COMBOS } from "../data/combos";
@@ -18,6 +20,10 @@ interface BookingListProps {
 
 export default function BookingList({ bookings, allBookings, currentUser, isOpen, onClose, onCancelBooking, onDeleteBooking }: BookingListProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [recoveryCode,setRecoveryCode] = useState('');
+  const [recoveryError,setRecoveryError] = useState('');
+  const [recovering,setRecovering] = useState(false);
+  const [recovered,setRecovered] = useState<Booking[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "search">("all");
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -32,16 +38,58 @@ export default function BookingList({ bookings, allBookings, currentUser, isOpen
   // Partial digits, phone substring, or ticket IDs never expose a booking.
   const isSearchActive=searchQuery.trim().length>0;
   const phoneComplete=isCompleteBookingPhone(searchQuery);
-  const deviceHistory=readDeviceBookingHistory();
+  const deviceHistory=[...recovered,...readDeviceBookingHistory()];
   const authenticatedId=currentUser?.role==='customer'?currentUser.id:undefined;
   const combinedResults=findMyDeviceBookings(
     searchQuery,deviceHistory,bookings,allBookings||[],authenticatedId,getDeviceId()
   );
+  // Admin has a verified Firestore operator session and may search the cloud.
+  // Never make this full-collection fallback available to public visitors.
+  const operatorMatches=currentUser?.role==='operator'&&phoneComplete
+    ? (allBookings||[]).filter(item=>normalizeBookingPhone(item.passengerPhone)===normalizeBookingPhone(searchQuery))
+    : [];
+  for(const row of operatorMatches){
+    if(!combinedResults.some(x=>x.id===row.id))combinedResults.push(row);
+  }
   const onlineMatched=bookings.filter(item=>combinedResults.some(row=>row.id===item.id));
   const liveIds=new Set([
     ...onlineMatched.map(item=>item.id),
+    ...operatorMatches.map(item=>item.id),
     ...(authenticatedId?(allBookings||[]).filter(item=>item.userId===authenticatedId).map(item=>item.id):[])
   ]);
+
+  // Old guest orders cannot be searched globally by phone alone without
+  // allowing strangers to inspect another customer's private itinerary.
+  // Ticket code + exact phone is a proof-of-possession fallback for old orders
+  // created on a different phone/browser.
+  const recoverOldTicket=async()=>{
+    setRecoveryError('');
+    if(!phoneComplete){setRecoveryError('Vui lòng nhập đúng số điện thoại đặt vé trước.');return;}
+    const id=recoveryCode.trim().replace(/^#/,'');
+    if(!/^[a-zA-Z0-9_-]{3,128}$/.test(id)){
+      setRecoveryError('Vui lòng nhập mã vé hợp lệ đã nhận khi đặt chỗ.');return;
+    }
+    setRecovering(true);
+    try {
+      const alternatives=[id,...(id.toLowerCase()!==id?[id.toLowerCase()]:[])];
+      let found:Booking|null=null;
+      for(const candidate of alternatives){
+        const result=await getDoc(doc(db,'bookings',candidate));
+        if(result.exists()){found={...result.data(),id:result.id} as Booking;break;}
+      }
+      if(!found||normalizeBookingPhone(found.passengerPhone)!==normalizeBookingPhone(searchQuery)){
+        setRecoveryError('Không xác minh được vé với SĐT và mã đã nhập. Vui lòng kiểm tra hoặc liên hệ nhà xe.');
+        return;
+      }
+      const saved=rememberDeviceBooking(found);
+      setRecovered(previous=>[found!,...previous.filter(b=>b.id!==found!.id)]);
+      if(!saved)setRecoveryError('Đã đọc được vé, nhưng trình duyệt không cho lưu lịch sử. Vé vẫn hiển thị trong lần mở này.');
+      else {setRecoveryCode('');setRecoveryError('');}
+    }catch(error){
+      console.warn('Ticket recovery failed',error);
+      setRecoveryError('Không tra cứu được vé lúc này. Vui lòng thử lại hoặc liên hệ nhà xe.');
+    }finally{setRecovering(false);}
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -106,6 +154,19 @@ export default function BookingList({ bookings, allBookings, currentUser, isOpen
               )}
             </div>
           </div>
+
+          {phoneComplete && combinedResults.length===0 && (
+            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
+              <p className="text-xs font-bold text-amber-900">Vé cũ đặt bằng thiết bị khác?</p>
+              <p className="text-xs text-stone-700">Nếu đơn cũ chưa liên kết tài khoản, hãy nhập thêm <strong>mã vé nhận khi đặt chỗ</strong> để khôi phục an toàn. Chỉ nhập số điện thoại không xác minh được chủ sở hữu vé.</p>
+              <div className="flex flex-wrap sm:flex-nowrap gap-2">
+                <input aria-label="Mã vé cũ" className="rounded-lg border border-amber-300 px-3 py-2 text-sm w-full min-w-0" value={recoveryCode} onChange={e=>setRecoveryCode(e.target.value)} placeholder="Mã vé / Mã giao dịch" autoComplete="off"/>
+                <button disabled={recovering||!recoveryCode.trim()} type="button" onClick={()=>void recoverOldTicket()} className="rounded-lg bg-emerald-800 text-white px-4 py-2 text-xs font-bold shrink-0 disabled:opacity-50">{recovering?'Đang kiểm tra':'Khôi phục vé'}</button>
+              </div>
+              {recoveryError&&<p role="alert" className="text-xs text-red-800">{recoveryError}</p>}
+              <p className="text-xs text-stone-600">Nếu không còn mã, bạn có thể liên hệ nhà xe để đối chiếu đơn. Không gửi mật khẩu tài khoản.</p>
+            </div>
+          )}
 
           {/* Display search summary bar if searching */}
           {isSearchActive && (
