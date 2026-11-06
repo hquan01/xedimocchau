@@ -9,7 +9,8 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:ticket": "node --experimental-strip-types --test tests/ticketPhoneHistory.test.mjs"
+    "test:ticket": "node --experimental-strip-types --test tests/ticketPhoneHistory.test.mjs",
+    "test:weather": "node --test tests/weatherProvenance.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
