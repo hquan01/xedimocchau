@@ -15,7 +15,7 @@ export interface SiteContent {
 }
 export const defaultSiteContent: SiteContent = {
   siteName:'MỘC CHÂU TRAVEL', tagline:'Cẩm nang & Dịch vụ du lịch Mộc Châu',
-  logoUrl:'/mocchau-logo-v4.png',heroImageUrl:'/mocchau-hero-v5.jpg',
+  logoUrl:'/brand-xedimocchau-header.png',heroImageUrl:'/mocchau-hero-v5.jpg',
   heroTitle:'Khám phá Mộc Châu',heroDescription:'Thiên nhiên Tây Bắc · Mùa hoa · Những trải nghiệm đáng nhớ',heroTarget:'article:guide-1',linkVersion:2,
   hotline:'0971050324',zaloUrl:'https://zalo.me/0971050324',messengerUrl:'https://m.me/1277673239073987',
   tiles:[
@@ -61,7 +61,11 @@ export function useSiteContent(){
   useEffect(()=>onSnapshot(doc(db,'site_content','public'),snap=>{
     if(!snap.exists()) return;
     const raw=snap.data() as Partial<SiteContent>;
-    setContent({...defaultSiteContent,...raw,linkVersion:raw.linkVersion??1,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides,attractionTickets:Array.isArray(raw.attractionTickets)?raw.attractionTickets:defaultSiteContent.attractionTickets});
+    setContent({...defaultSiteContent,...raw,
+      logoUrl:raw.logoUrl === '/mocchau-logo-v4.png'
+        ? '/brand-xedimocchau-header.png'
+        : (raw.logoUrl || defaultSiteContent.logoUrl),
+      linkVersion:raw.linkVersion??1,tiles:Array.isArray(raw.tiles)?raw.tiles:defaultSiteContent.tiles,stories:Array.isArray(raw.stories)?raw.stories:defaultSiteContent.stories,heroSlides:Array.isArray(raw.heroSlides)?raw.heroSlides:defaultSiteContent.heroSlides,attractionTickets:Array.isArray(raw.attractionTickets)?raw.attractionTickets:defaultSiteContent.attractionTickets});
     setError('');
   },e=>{console.warn('Public content defaults used',e);setError('Không tải được cấu hình; đang sử dụng nội dung mặc định.')}),[]);
   return {content,error};
