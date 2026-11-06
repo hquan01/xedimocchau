@@ -63,59 +63,29 @@
     <style>html[data-qt-prepaint="night"],html[data-qt-prepaint="night"] body{background:#0c1720}</style>
 
     <!-- Accurate organization and service details for search engines following Google Structured Data guidelines. -->
+    <!-- Only verifiable organization and service fields; no invented offers, opening hours or price ranges. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@graph": [
           {
-            "@type": "TravelAgency",
+            "@type": "Organization",
             "@id": "https://xedimocchau.com/#business",
-            "name": "Mộc Châu Travel",
-            "alternateName": "QT Limousine",
+            "name": "QT Limousine – Xe Đi Mộc Châu",
+            "alternateName": "Mộc Châu Travel",
             "url": "https://xedimocchau.com/",
-            "image": "https://xedimocchau.com/og-mocchau-1200x630.jpg",
-            "logo": "https://xedimocchau.com/mocchau-logo-v4.png",
-            "description": "Đặt xe QT Limousine VIP Hà Nội – Mộc Châu, combo du lịch trọn gói, thuê xe máy và cẩm nang du lịch cao nguyên Mộc Châu.",
+            "logo": "https://xedimocchau.com/brand-xedimocchau-icon-512.png",
             "telephone": "+84971050324",
-            "priceRange": "250.000đ - 1.850.000đ",
-            "currenciesAccepted": "VND",
-            "paymentAccepted": "Cash, Bank Transfer",
-            "address": {
-              "@type": "PostalAddress",
-              "streetAddress": "Tiểu khu Nhà Nghỉ, Thị trấn Nông Trường Mộc Châu",
-              "addressLocality": "Mộc Châu",
-              "addressRegion": "Sơn La",
-              "postalCode": "350000",
-              "addressCountry": "VN"
-            },
-            "geo": {
-              "@type": "GeoCoordinates",
-              "latitude": 20.8354,
-              "longitude": 104.6644
-            },
-            "openingHoursSpecification": [
-              {
-                "@type": "OpeningHoursSpecification",
-                "dayOfWeek": [
-                  "Monday",
-                  "Tuesday",
-                  "Wednesday",
-                  "Thursday",
-                  "Friday",
-                  "Saturday",
-                  "Sunday"
-                ],
-                "opens": "06:00",
-                "closes": "21:00"
-              }
-            ],
+            "description": "Dịch vụ xe khách và hỗ trợ thông tin du lịch Hà Nội – Mộc Châu.",
             "contactPoint": {
               "@type": "ContactPoint",
+              "contactType": "customer support",
               "telephone": "+84971050324",
-              "contactType": "customer service",
-              "availableLanguage": ["vi", "en"],
-              "areaServed": "VN"
+              "availableLanguage": "vi"
             },
+            "sameAs": [
+              "https://www.tiktok.com/@limousinemocchau"
+            ],
             "areaServed": [
               {
                 "@type": "Place",
@@ -125,24 +95,23 @@
                 "@type": "Place",
                 "name": "Hà Nội"
               }
-            ],
-            "hasOfferCatalog": {
-              "@type": "OfferCatalog",
-              "name": "Dịch vụ vận chuyển và du lịch Mộc Châu",
-              "itemListElement": [
-                { "@id": "https://xedimocchau.com/#service-limousine" },
-                { "@id": "https://xedimocchau.com/#product-combo-tour" },
-                { "@id": "https://xedimocchau.com/#service-motorbike-rental" }
-              ]
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://xedimocchau.com/#website",
+            "name": "Xe Đi Mộc Châu – QT Limousine",
+            "url": "https://xedimocchau.com/",
+            "inLanguage": "vi-VN",
+            "publisher": {
+              "@id": "https://xedimocchau.com/#business"
             }
           },
           {
             "@type": "Service",
-            "@id": "https://xedimocchau.com/#service-limousine",
-            "name": "Vé Xe QT Limousine VIP Hà Nội – Mộc Châu",
-            "serviceType": "Vận chuyển hành khách / Xe Limousine VIP",
-            "category": "Vé xe khách VIP",
-            "description": "Dịch vụ xe QT Limousine 9 chỗ VIP tuyến hai chiều Hà Nội – Mộc Châu. Đón trả tận nơi tại Hà Nội và Mộc Châu, ghế massage bọc da cao cấp, wifi tốc độ cao, nước uống khăn lạnh miễn phí. Chạy liên tục từ 06:30 đến 18:30 hàng ngày.",
+            "@id": "https://xedimocchau.com/#limousine",
+            "name": "Xe Limousine Hà Nội – Mộc Châu",
+            "serviceType": "Vận chuyển hành khách",
             "provider": {
               "@id": "https://xedimocchau.com/#business"
             },
@@ -156,46 +125,13 @@
                 "name": "Mộc Châu, Sơn La"
               }
             ],
-            "offers": {
-              "@type": "AggregateOffer",
-              "priceCurrency": "VND",
-              "lowPrice": "250000",
-              "highPrice": "350000",
-              "offerCount": "4",
-              "availability": "https://schema.org/InStock",
-              "url": "https://xedimocchau.com/#booking",
-              "priceValidUntil": "2026-12-31"
-            }
-          },
-          {
-            "@type": "Product",
-            "@id": "https://xedimocchau.com/#product-combo-tour",
-            "name": "Combo Du Lịch Mộc Châu Trọn Gói (Xe Limousine VIP + Homestay / Khách Sạn)",
-            "category": "Tour du lịch Mộc Châu trọn gói",
-            "image": "https://xedimocchau.com/og-mocchau-1200x630.jpg",
-            "description": "Gói combo du lịch Mộc Châu trọn gói 2N1Đ hoặc 3N2Đ bao gồm vé xe QT Limousine VIP khứ hồi Hà Nội – Mộc Châu, phòng nghỉ homestay đồi chè hoặc khách sạn 3-4 sao, hỗ trợ thuê xe máy và lịch trình khám phá cao nguyên Mộc Châu.",
-            "brand": {
-              "@type": "Brand",
-              "name": "Mộc Châu Travel"
-            },
-            "offers": {
-              "@type": "AggregateOffer",
-              "priceCurrency": "VND",
-              "lowPrice": "650000",
-              "highPrice": "1850000",
-              "offerCount": "3",
-              "availability": "https://schema.org/InStock",
-              "url": "https://xedimocchau.com/#combos",
-              "priceValidUntil": "2026-12-31"
-            }
+            "url": "https://xedimocchau.com/dich-vu/xe-limousine-ha-noi-moc-chau"
           },
           {
             "@type": "Service",
-            "@id": "https://xedimocchau.com/#service-motorbike-rental",
-            "name": "Dịch Vụ Cho Thuê Xe Máy & Xe Du Lịch Mộc Châu",
-            "serviceType": "Cho thuê xe máy du lịch",
-            "category": "Phương tiện di chuyển Mộc Châu",
-            "description": "Dịch vụ cho thuê xe máy số và xe tay ga đời mới tại Mộc Châu. Giao xe tận nơi miễn phí tại homestay, khách sạn hoặc điểm dừng xe Limousine kèm mũ bảo hiểm, áo mưa và bản đồ du lịch.",
+            "@id": "https://xedimocchau.com/#bike",
+            "name": "Yêu cầu thuê xe máy Mộc Châu",
+            "serviceType": "Cho thuê xe máy",
             "provider": {
               "@id": "https://xedimocchau.com/#business"
             },
@@ -203,26 +139,7 @@
               "@type": "Place",
               "name": "Mộc Châu, Sơn La"
             },
-            "offers": {
-              "@type": "AggregateOffer",
-              "priceCurrency": "VND",
-              "lowPrice": "120000",
-              "highPrice": "200000",
-              "offerCount": "2",
-              "availability": "https://schema.org/InStock",
-              "url": "https://xedimocchau.com/#services",
-              "priceValidUntil": "2026-12-31"
-            }
-          },
-          {
-            "@type": "WebSite",
-            "@id": "https://xedimocchau.com/#website",
-            "url": "https://xedimocchau.com/",
-            "name": "Mộc Châu Travel",
-            "inLanguage": "vi-VN",
-            "publisher": {
-              "@id": "https://xedimocchau.com/#business"
-            }
+            "url": "https://xedimocchau.com/dich-vu/thue-xe-may-moc-chau"
           }
         ]
       }
