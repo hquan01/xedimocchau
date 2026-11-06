@@ -586,7 +586,7 @@ export default function SharedCarBooking({
                 setErrorMsg("");
                 setDate(e.target.value);
                 setSelectedTrip(null);
-              }
+              }}
               className="text-sm font-semibold text-[#1b4332] bg-transparent focus:outline-none cursor-pointer font-sans"
             />
           </div>
