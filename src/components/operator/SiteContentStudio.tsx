@@ -224,14 +224,14 @@ export default function SiteContentStudio({articles}: {articles:GuideArticle[]})
         <div><h3 className="font-black text-[#1b4332]">Kênh TikTok QT Limousine</h3>
           <p className="text-xs text-stone-600 mt-1">Kênh bạn xác nhận: <a className="underline text-emerald-800" href={VERIFIED_TIKTOK_PROFILE} target="_blank" rel="noopener noreferrer">@limousinemocchau</a>.</p>
         </div>
-        <p className="text-xs text-emerald-800 font-semibold">Mặc định website dùng TikTok Creator Profile Embed chính thức để hiện các video mới (TikTok có thể hiển thị đến 10 video). Trình phát chỉ được tải khi khách cuộn đến cuối trang.</p>
+        <p className="text-xs text-emerald-800 font-semibold">Website đã ngừng nhúng khung hồ sơ TikTok vì lỗi “overload-protect”. Khách chỉ tải trình phát khi chủ động bấm vào video. Nếu không có video khả dụng, trang khách hiển thị nút mở kênh thay vì một khung bị lỗi.</p>
         <label className="block text-xs font-bold">Tùy chọn: chọn chính xác 3–4 video muốn ghim (mỗi dòng một URL)
           <textarea className={inputClass+' mt-1 min-h-[130px]'} rows={4}
             placeholder="https://www.tiktok.com/@limousinemocchau/video/..."
             value={(draft.tiktokVideoLinks||[]).join('\n')}
             onChange={e=>edit({tiktokVideoLinks:e.target.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)})}/>
         </label>
-        <p className="text-xs text-stone-600">Để trống để dùng video mới tự động qua TikTok Profile Embed. Muốn đúng 4 video mới nhất qua API cần TikTok Developer cấp quyền video.list và chủ kênh xác thực OAuth; website chưa có quyền đó.</p>
+        <p className="text-xs text-stone-600">Dán tối đa 4 liên kết video thực tế từ chính kênh để hiển thị 4 thẻ video ngay. Để trống: website chỉ tự lấy 4 video mới nhất khi đã có kết nối TikTok Display API hợp lệ với quyền video.list; chưa kết nối thì hiển thị nút xem kênh. Không cần đăng ký API nếu bạn chọn ghim video bằng URL.</p>
       </section>
     )}
     {editorSection === 'tickets' && (

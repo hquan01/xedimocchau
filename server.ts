@@ -1,6 +1,7 @@
 import express from "express";
 import { phoneAuthRouter } from "./src/server/phoneAuthRoutes";
 import { growthMetricsRouter } from "./src/server/growthMetricsRoutes";
+import { tiktokRecentRouter } from "./src/server/tiktokRecentRoutes";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -222,6 +223,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", phoneAuthRouter);
 // Server-validated content counters; never fake engagement in the browser.
 app.use("/api/content", growthMetricsRouter);
+// TikTok Display API is only called when the owner grants a server-side token.
+app.use("/api/tiktok", tiktokRecentRouter);
 
 // Initialize Google Gen AI
 let aiClient: GoogleGenAI | null = null;
