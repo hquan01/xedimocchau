@@ -115,7 +115,7 @@ export default function Header({
                     <span className="text-[8px] sm:text-[9.5px] font-bold text-rose-500 uppercase tracking-wider mt-0.5 leading-none font-sans truncate">{siteContent.tagline}</span>
                   </div>
                 </>
-              )
+              )}
             </button>
           </div>
 
