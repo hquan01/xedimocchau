@@ -23,15 +23,32 @@ const HISTORY_LIMIT=75;
 export function readDeviceBookingHistory():Booking[] {
   try {
     if(typeof window==='undefined')return [];
-    const parsed:unknown=JSON.parse(window.localStorage.getItem(DEVICE_BOOKING_HISTORY_KEY)||'[]');
-    if(!Array.isArray(parsed))return [];
-    return parsed.filter((item):item is Booking=>{
+    // Read both the new minimal history and the previously released app's
+    // xemc_bookings cache. Old purchases predate DEVICE_BOOKING_HISTORY_KEY.
+    const current:unknown=JSON.parse(window.localStorage.getItem(DEVICE_BOOKING_HISTORY_KEY)||'[]');
+    const legacy:unknown=JSON.parse(window.localStorage.getItem('xemc_bookings')||'[]');
+    const deviceId=window.localStorage.getItem('xemc_device_id');
+    const valid=(item:unknown):item is Booking=>{
       if(!item||typeof item!=='object')return false;
       const row=item as Partial<Booking>;
       return typeof row.id==='string'&&row.id.length>0&&
         typeof row.passengerPhone==='string'&&isCompleteBookingPhone(row.passengerPhone)&&
         typeof row.travelDate==='string';
-    }).slice(0,HISTORY_LIMIT);
+    };
+    const combined=new Map<string,Booking>();
+    // Never import a different-device booking from any cached admin list.
+    if(Array.isArray(legacy)){
+      for(const row of legacy){
+        if(!valid(row)||row.deviceId&&row.deviceId!==deviceId)continue;
+        combined.set(row.id,row);
+      }
+    }
+    if(Array.isArray(current)){
+      for(const row of current){
+        if(valid(row))combined.set(row.id,row);
+      }
+    }
+    return [...combined.values()].slice(0,HISTORY_LIMIT);
   } catch {return [];}
 }
 
