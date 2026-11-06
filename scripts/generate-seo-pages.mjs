@@ -44,7 +44,37 @@ for(const article of articles){
   const description=String(article.excerpt||'').slice(0,185);
   const image=photos[article.id];
   const paragraphs=(article.content||[]).map(p=>'<p>'+escapeHtml(p)+'</p>').join('');
-  const body=`<p class="eyebrow">Cẩm nang du lịch Mộc Châu · ${escapeHtml(article.categoryLabel)}</p><h1>${escapeHtml(article.title)}</h1><p class="lead">${escapeHtml(article.excerpt)}</p><figure><img src="${image}" width="1000" height="540" alt="${escapeHtml(article.title)}" fetchpriority="high"/><figcaption>Hình minh họa chủ đề Mộc Châu</figcaption></figure><div class="note">Thông tin theo mùa, lịch trình, giá tham khảo và tình trạng các điểm đến có thể thay đổi. Vui lòng xác minh trước ngày đi.</div>${paragraphs}${cta()}<h2>Khám phá thêm</h2><ul><li><a href="/cam-nang/kinh-nghiem-du-lich-moc-chau-tu-tuc">Cẩm nang du lịch Mộc Châu A–Z</a></li><li><a href="/cam-nang/mua-hoa-man-moc-chau">Kinh nghiệm đi Mộc Châu mùa hoa mận</a></li><li><a href="/dich-vu/xe-limousine-ha-noi-moc-chau">Xe Limousine Hà Nội – Mộc Châu</a></li></ul>`;
+  const hydrate=`<script>
+  (function(){
+    var articleId=${JSON.stringify(article.id)};
+    var controller=new AbortController();
+    var timer=setTimeout(function(){controller.abort()},5000);
+    fetch('/api/content/article?id='+encodeURIComponent(articleId),{signal:controller.signal})
+      .then(function(r){if(!r.ok)throw Error('CMS unavailable');return r.json()})
+      .then(function(a){
+        if(!a||!a.title||!Array.isArray(a.content))return;
+        var title=document.getElementById('seo_article_title');
+        var intro=document.getElementById('seo_article_excerpt');
+        var container=document.getElementById('seo_article_body');
+        var cover=document.getElementById('seo_article_cover');
+        if(title)title.textContent=a.title;
+        if(intro)intro.textContent=a.excerpt||'';
+        if(container){
+          var fragment=document.createDocumentFragment();
+          a.content.forEach(function(line){if(typeof line!=='string')return;var p=document.createElement('p');p.textContent=line;fragment.appendChild(p)});
+          container.replaceChildren(fragment);
+        }
+        if(cover&&typeof a.imageUrl==='string'&&(a.imageUrl.startsWith('https://')||a.imageUrl.startsWith('/'))){
+          cover.src=a.imageUrl;cover.alt=a.title;
+        }
+        document.title=a.title+' | Cẩm nang Xe Đi Mộc Châu';
+        var meta=document.querySelector('meta[name="description"]');
+        if(meta)meta.setAttribute('content',a.excerpt||'');
+      }).catch(function(){/* Static readable content stays available. */})
+      .finally(function(){clearTimeout(timer)});
+  })();
+  </script>`;
+  const body=`<p class="eyebrow">Cẩm nang du lịch Mộc Châu · ${escapeHtml(article.categoryLabel)}</p><h1 id="seo_article_title">${escapeHtml(article.title)}</h1><p id="seo_article_excerpt" class="lead">${escapeHtml(article.excerpt)}</p><figure><img id="seo_article_cover" src="${image}" width="1000" height="540" alt="${escapeHtml(article.title)}" fetchpriority="high"/><figcaption>Hình minh họa chủ đề Mộc Châu</figcaption></figure><div class="note">Thông tin theo mùa, lịch trình, giá tham khảo và tình trạng các điểm đến có thể thay đổi. Vui lòng xác minh trước ngày đi.</div><div id="seo_article_body">${paragraphs}</div>${cta()}<p><a href="/?bai-viet=${encodeURIComponent(article.id)}">Đọc bài trong giao diện cẩm nang tương tác</a></p><h2>Khám phá thêm</h2><ul><li><a href="/cam-nang/kinh-nghiem-du-lich-moc-chau-tu-tuc">Cẩm nang du lịch Mộc Châu A–Z</a></li><li><a href="/cam-nang/mua-hoa-man-moc-chau">Kinh nghiệm đi Mộc Châu mùa hoa mận</a></li><li><a href="/dich-vu/xe-limousine-ha-noi-moc-chau">Xe Limousine Hà Nội – Mộc Châu</a></li></ul>${hydrate}`;
   const file=path.join(root,'public','cam-nang',slug+'.html');
   await mkdir(path.dirname(file),{recursive:true});
   await writeFile(file,shell({title,description,pathname,image,body,type:'Article'}),'utf8');
