@@ -9,14 +9,14 @@ export interface HeroSlide {id:string; imageUrl:string; title:string; descriptio
 export interface FeaturedStory {id:string; title:string; description:string; imageUrl:string; label:string; target:string; visible:boolean}
 export interface AttractionTicket {id:string; name:string; adultPrice:string; childPrice:string; note:string; sourceUrl:string; visible:boolean}
 export interface SiteContent {
-  siteName:string; tagline:string; logoUrl:string; heroImageUrl:string; heroTitle:string; heroDescription:string;
+  siteName:string; tagline:string; logoUrl:string; heroImageUrl:string; heroTitle:string; heroDescription:string; heroTarget?:string;
   hotline:string; zaloUrl:string; messengerUrl:string;
   tiles:HomeTile[]; stories:FeaturedStory[]; heroSlides?:HeroSlide[]; attractionTickets?:AttractionTicket[];
 }
 export const defaultSiteContent: SiteContent = {
   siteName:'MỘC CHÂU TRAVEL', tagline:'Cẩm nang & Dịch vụ du lịch Mộc Châu',
   logoUrl:'/mocchau-logo-v4.png',heroImageUrl:'/mocchau-hero-v5.jpg',
-  heroTitle:'Khám phá Mộc Châu',heroDescription:'Thiên nhiên Tây Bắc · Mùa hoa · Những trải nghiệm đáng nhớ',
+  heroTitle:'Khám phá Mộc Châu',heroDescription:'Thiên nhiên Tây Bắc · Mùa hoa · Những trải nghiệm đáng nhớ',heroTarget:'article:guide-1',
   hotline:'0971050324',zaloUrl:'https://zalo.me/0971050324',messengerUrl:'https://m.me/1277673239073987',
   tiles:[
     {id:'weather',title:'Thời tiết',subtitle:'Mộc Châu hôm nay',icon:'cloud-sun',target:'moc_chau_today',visible:true},
@@ -44,14 +44,14 @@ export const defaultSiteContent: SiteContent = {
     {id:'bach-long',name:'Cầu kính Bạch Long – Mộc Châu Island',adultPrice:'650.000đ (Thứ 6–CN và ngày lễ)',childPrice:'350.000đ (cao 1m–1,4m)',note:'Theo bảng giá vé cuối tuần/ngày lễ của đơn vị vận hành; ngày thường và các combo có thể khác.',sourceUrl:'https://mocchauisland.com/en/orderTicket?ticket_type_id=4',visible:true}
   ],
   heroSlides:[
-    {id:'flower',imageUrl:'/mocchau-flower-v5.jpg',title:'Mùa hoa Mộc Châu',description:'Tìm mùa hoa và thời điểm ngắm cảnh phù hợp',target:'moc_chau_today',visible:true},
-    {id:'tea',imageUrl:'/mocchau-tea-v5.jpg',title:'Những đồi chè xanh',description:'Điểm check-in và kinh nghiệm tham quan',target:'explore_legacy',visible:true},
-    {id:'waterfall',imageUrl:'/mocchau-waterfall-v5.jpg',title:'Khám phá Thác Dải Yếm',description:'Địa điểm nổi bật tại Mộc Châu',target:'explore_legacy',visible:true}
+    {id:'flower',imageUrl:'/mocchau-flower-v5.jpg',title:'Mùa hoa Mộc Châu',description:'Tìm mùa hoa và thời điểm ngắm cảnh phù hợp',target:'article:guide-4',visible:true},
+    {id:'tea',imageUrl:'/mocchau-tea-v5.jpg',title:'Những đồi chè xanh',description:'Điểm check-in và kinh nghiệm tham quan',target:'article:guide-2',visible:true},
+    {id:'waterfall',imageUrl:'/mocchau-waterfall-v5.jpg',title:'Khám phá Thác Dải Yếm',description:'Địa điểm nổi bật tại Mộc Châu',target:'article:guide-2',visible:true}
   ],
   stories:[
-    {id:'flower',title:'Mùa hoa mận Mộc Châu có gì đẹp?',description:'Thời điểm tham khảo, địa điểm ngắm hoa và lưu ý khi check-in.',imageUrl:'/mocchau-flower-v5.jpg',label:'Mùa hoa',target:'moc_chau_today',visible:true},
-    {id:'waterfall',title:'Thác Dải Yếm',description:'Một điểm tham quan nổi tiếng tại Mộc Châu.',imageUrl:'/mocchau-waterfall-v5.jpg',label:'Địa điểm',target:'explore_legacy',visible:true},
-    {id:'tea',title:'Đồi chè Mộc Châu',description:'Đường đồi chè xanh và góc chụp đáng nhớ.',imageUrl:'/mocchau-tea-v5.jpg',label:'Đáng chú ý',target:'explore_legacy',visible:true},
+    {id:'flower',title:'Mùa hoa mận Mộc Châu có gì đẹp?',description:'Thời điểm tham khảo, địa điểm ngắm hoa và lưu ý khi check-in.',imageUrl:'/mocchau-flower-v5.jpg',label:'Mùa hoa',target:'article:guide-4',visible:true},
+    {id:'waterfall',title:'Thác Dải Yếm',description:'Một điểm tham quan nổi tiếng tại Mộc Châu.',imageUrl:'/mocchau-waterfall-v5.jpg',label:'Địa điểm',target:'article:guide-2',visible:true},
+    {id:'tea',title:'Đồi chè Mộc Châu',description:'Đường đồi chè xanh và góc chụp đáng nhớ.',imageUrl:'/mocchau-tea-v5.jpg',label:'Đáng chú ý',target:'article:guide-2',visible:true},
     {id:'stay',title:'Homestay được quan tâm',description:'Xem danh sách lưu trú và tìm lựa chọn phù hợp.',imageUrl:'/mocchau-stay-v5.jpg',label:'Lưu trú',target:'services',visible:true}
   ]
 };
@@ -66,24 +66,89 @@ export function useSiteContent(){
   },e=>{console.warn('Public content defaults used',e);setError('Không tải được cấu hình; đang sử dụng nội dung mặc định.')}),[]);
   return {content,error};
 }
+
+/** A data URI is a restricted, size-capped fallback when Firebase Storage refuses uploads.
+ * Photos remain in the published Firestore document and are not browser-only drafts.
+ * Firebase documents have a hard 1 MiB limit, so reserve headroom for titles/metadata.
+ */
+const INLINE_IMAGE_MAX_CHARS = 170_000;
+const PUBLISHED_CONFIG_MAX_BYTES = 850_000;
+const embeddedImage = (url:string) =>
+  /^data:image\/(?:webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(url) &&
+  url.length <= INLINE_IMAGE_MAX_CHARS;
+const safeImageSource = (url:string) => url.startsWith('/') ||
+  /^https:\/\//i.test(url) || embeddedImage(url);
+
 export async function publishSiteContent(content:SiteContent){
   const user=auth.currentUser;
   if(!user) throw new Error('Bạn cần đăng nhập Firebase để xuất bản.');
   const token=await user.getIdTokenResult(true);
-  if(!hasOperatorAccess(token)) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase (custom claim).');
-  const secure=(s:string)=>s.startsWith('/')||/^https:\/\//i.test(s);
-  if(!secure(content.logoUrl)||!secure(content.heroImageUrl)||content.stories.some(x=>x.imageUrl&&!secure(x.imageUrl))||content.heroSlides?.some(x=>x.imageUrl&&!secure(x.imageUrl))||content.attractionTickets?.some(x=>x.sourceUrl&&!/^https:\/\//i.test(x.sourceUrl)))throw new Error('Đường dẫn ảnh chỉ được dùng HTTPS hoặc đường dẫn nội bộ.');
+  if(!hasOperatorAccess(token)) throw new Error('Tài khoản chưa được cấp quyền quản trị Firebase.');
+  const allImages=[content.logoUrl,content.heroImageUrl,
+    ...content.stories.map(x=>x.imageUrl),
+    ...(content.heroSlides||[]).map(x=>x.imageUrl)];
+  if(allImages.some(src=>src && !safeImageSource(src)) ||
+    content.attractionTickets?.some(x=>x.sourceUrl&&!/^https:\/\//i.test(x.sourceUrl))){
+    throw new Error('Ảnh phải là đường dẫn nội bộ, HTTPS hoặc ảnh đã tải từ thiết bị.');
+  }
+  const bytes=new TextEncoder().encode(JSON.stringify(content)).byteLength;
+  if(bytes>PUBLISHED_CONFIG_MAX_BYTES){
+    throw new Error('Bản nháp chứa quá nhiều ảnh nhúng. Hãy dùng ảnh nhỏ hơn hoặc liên kết ảnh HTTPS cho một số banner trước khi xuất bản.');
+  }
   await setDoc(doc(db,'site_content','public'),{...content,updatedAt:serverTimestamp(),updatedBy:user.uid});
 }
+
+async function makeCompactImage(file:File):Promise<string>{
+  const objectUrl=URL.createObjectURL(file);
+  try{
+    const image=new Image();
+    image.src=objectUrl;
+    await image.decode();
+    if(!image.naturalWidth||!image.naturalHeight)throw new Error('Không thể đọc ảnh. Vui lòng chọn ảnh khác.');
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d');
+    if(!ctx)throw new Error('Trình duyệt không hỗ trợ xử lý ảnh.');
+    // Try a few sizes to fit into an existing Firestore config without
+    // sacrificing the original image in browser memory.
+    for(const width of [1300,1050,850,650,500]){
+      const scale=Math.min(1,width/image.naturalWidth,750/image.naturalHeight);
+      canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      for(const quality of [0.82,0.70,0.54,0.38]){
+        const data=canvas.toDataURL('image/webp',quality);
+        if(embeddedImage(data))return data;
+      }
+    }
+    throw new Error('Ảnh quá phức tạp để lưu trực tiếp. Vui lòng chọn ảnh JPG/WebP đã giảm dung lượng.');
+  }finally{URL.revokeObjectURL(objectUrl)}
+}
+
 export async function uploadSiteImage(file:File){
-  if(!file.type.startsWith('image/')||!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.');
-  if(file.size>5*1024*1024)throw new Error('Ảnh không được vượt quá 5 MB.');
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type))
+    throw new Error('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.');
+  if(file.size>15*1024*1024)
+    throw new Error('Ảnh lớn hơn 15 MB. Vui lòng nén ảnh trước khi tải.');
   const user=auth.currentUser;
   if(!user)throw new Error('Vui lòng đăng nhập Admin.');
   const token=await user.getIdTokenResult(true);
   if(!hasOperatorAccess(token))throw new Error('Chưa được cấp quyền tải ảnh quản trị.');
-  const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-70);
-  const location=ref(getStorage(),`site-media/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safeName}`);
-  await uploadBytes(location,file,{contentType:file.type});
-  return getDownloadURL(location);
+  const compact=await makeCompactImage(file);
+  try{
+    // Prefer full-size Cloud Storage media when permissions/bucket are available.
+    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-70);
+    const location=ref(getStorage(),`site-media/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safeName}`);
+    const uploadFile=file.size<=5*1024*1024 ? file : await (async()=>{
+      const b=await(await fetch(compact)).blob();
+      return new File([b],safeName+'.webp',{type:'image/webp'});
+    })();
+    await uploadBytes(location,uploadFile,{contentType:uploadFile.type});
+    return getDownloadURL(location);
+  }catch(err){
+    // Storage often needs custom claims while Firestore also accepts owner
+    // email/operator documents. Inline compressed images keep publishing usable.
+    console.warn('Storage upload unavailable; using a size-limited Firestore image.',err);
+    return compact;
+  }
 }
