@@ -1,6 +1,8 @@
 import React, {useEffect,useState} from 'react';
 import {Save,ImagePlus,Plus,Trash2,ArrowUp,ArrowDown,Eye,EyeOff} from 'lucide-react';
 import type {GuideArticle} from '../../types';
+import {getContentMetrics, type MetricsSnapshot, EMPTY_METRICS, trendingScore} from '../../lib/growthMetrics';
+import {validTikTokVideos, VERIFIED_TIKTOK_PROFILE} from '../TikTokShowcase';
 import {SiteContent,HomeTile,FeaturedStory,HeroSlide,AttractionTicket,useSiteContent,publishSiteContent,uploadSiteImage} from '../../lib/siteContent';
 
 function Uploader({onFile}: {onFile:(url:string)=>void}) {
@@ -82,12 +84,16 @@ function ArticleTargetSelect({value,onChange,articles,label}:{
 export default function SiteContentStudio({articles}: {articles:GuideArticle[]}){
   const {content:server,error:loadError}=useSiteContent();
   const [draft,setDraft]=useState<SiteContent>(server);
-  const [editorSection,setEditorSection]=useState<'identity'|'slides'|'tiles'|'stories'|'tickets'|'contacts'>('identity');
+  const [editorSection,setEditorSection]=useState<'identity'|'slides'|'tiles'|'stories'|'growth'|'tiktok'|'tickets'|'contacts'>('identity');
+  const [metrics,setMetrics]=useState<MetricsSnapshot>(EMPTY_METRICS);
+  useEffect(()=>{let alive=true;getContentMetrics(draft.featuredTrendingDays||30).then(data=>{if(alive)setMetrics(data)});return()=>{alive=false}},[draft.featuredTrendingDays]);
   const editorTabs = [
     {id:'identity',label:'Logo & banner chính'},
     {id:'slides',label:'Banner chuyển tiếp'},
     {id:'tiles',label:'Danh mục trang chủ'},
     {id:'stories',label:'Bài HOT & điểm đến'},
+    {id:'growth',label:'Tự động thịnh hành'},
+    {id:'tiktok',label:'Video TikTok'},
     {id:'tickets',label:'Giá vé tham quan'},
     {id:'contacts',label:'Thông tin liên hệ'}
   ] as const;
@@ -108,6 +114,8 @@ export default function SiteContentStudio({articles}: {articles:GuideArticle[]})
     const targets=[draft.heroTarget,...(draft.heroSlides||[]).map(x=>x.target),...draft.stories.map(x=>x.target)].filter(Boolean) as string[];
     const invalid=targets.find(target=>target.startsWith('article:')&&!articles.some(a=>a.id===target.slice(8)));
     if(invalid)throw new Error('Một banner liên kết đến bài viết không tồn tại. Hãy chọn lại bài viết trước khi xuất bản.');
+    const videoLinks=draft.tiktokVideoLinks||[];
+    if(validTikTokVideos(videoLinks).length!==videoLinks.filter(Boolean).length)throw new Error('Liên kết video phải thuộc @limousinemocchau, dạng tiktok.com/@limousinemocchau/video/..., tối đa 4 video.');
     await publishSiteContent(draft);
     setDirty(false);setMessage('Đã xuất bản thành công. Ảnh và liên kết bài viết được đồng bộ trên trang khách.');
   }catch(err:any){setMessage('Không thể xuất bản: '+(err?.message||'Lỗi không rõ'))}
@@ -170,6 +178,61 @@ export default function SiteContentStudio({articles}: {articles:GuideArticle[]})
     <section className="space-y-3"><div className="flex justify-between items-center"><h3 className="font-extrabold">Bài viết & điểm đến nổi bật</h3><button onClick={()=>edit({stories:[...draft.stories,{id:`hot-${Date.now()}`,title:'Bài nổi bật',description:'Mô tả ngắn',imageUrl:'',label:'Mới',target:articles[0]?`article:${articles[0].id}`:'guide',visible:false}]})} className="text-emerald-800 text-xs font-bold flex gap-1"><Plus className="w-4 h-4"/> Thêm bài</button></div>
       {draft.stories.map((s,i)=><div className="border p-3 rounded-xl space-y-2" key={s.id}><div className="flex justify-between items-center"><strong className="text-xs">{i+1}. {s.title}</strong><div className="flex gap-2"><button aria-label="Lên" onClick={()=>move('stories',i,-1)}><ArrowUp className="w-4 h-4"/></button><button aria-label="Xuống" onClick={()=>move('stories',i,1)}><ArrowDown className="w-4 h-4"/></button><button aria-label="Ẩn hiện" onClick={()=>updateStory(s.id,{visible:!s.visible})}>{s.visible?<Eye className="w-4 h-4 text-emerald-700"/>:<EyeOff className="w-4 h-4"/>}</button><button aria-label="Xóa" onClick={()=>edit({stories:draft.stories.filter(t=>t.id!==s.id)})}><Trash2 className="w-4 h-4 text-red-600"/></button></div></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-2"><input className={inputClass} value={s.title} onChange={e=>updateStory(s.id,{title:e.target.value})}/><input className={inputClass} value={s.label} onChange={e=>updateStory(s.id,{label:e.target.value})}/><input className={inputClass} value={s.description} onChange={e=>updateStory(s.id,{description:e.target.value})}/><ArticleTargetSelect label="Bài viết mở khi bấm thẻ HOT" value={s.target} articles={articles} onChange={target=>updateStory(s.id,{target})}/></div>{s.imageUrl&&<img src={s.imageUrl} alt="Ảnh bài viết" className="rounded-xl object-cover h-32 w-full"/>}<input aria-label="URL ảnh" className={inputClass} value={s.imageUrl.startsWith('data:')?'(Ảnh đã tải từ thiết bị – nhấn Xuất bản)':s.imageUrl} readOnly={s.imageUrl.startsWith('data:')} onChange={e=>updateStory(s.id,{imageUrl:e.target.value})}/><Uploader onFile={url=>updateStory(s.id,{imageUrl:url})}/></div>)}
     </section>
+    )}
+    {editorSection === 'growth' && (
+      <section className="rounded-2xl border border-stone-200 bg-stone-50 p-4 space-y-4">
+        <div><h3 className="font-black text-[#1b4332]">Ghim theo mùa & thịnh hành thật</h3>
+          <p className="text-xs text-stone-600 mt-1">Một ô lớn có thể ghim bài chiến dịch. Ba ô nhỏ ưu tiên tương tác 30 ngày, đa dạng chủ đề. Không sử dụng lượt xem/thích mẫu từ dữ liệu cũ.</p>
+        </div>
+        <label className="block text-xs font-bold">Chế độ chọn bài
+          <select className={inputClass+' mt-1'} value={draft.featuredMode||'hybrid'} onChange={e=>edit({featuredMode:e.target.value as 'hybrid'|'automatic'|'manual'})}>
+            <option value="hybrid">Ghim 1 bài lớn + tự động 3 bài nhỏ</option>
+            <option value="automatic">Tự động chọn tối đa 4 bài</option>
+            <option value="manual">Chọn thủ công theo các thẻ Bài HOT</option>
+          </select>
+        </label>
+        {(draft.featuredMode||'hybrid')==='hybrid' && <>
+          <label className="block text-xs font-bold">Bài ghim ở ô lớn
+            <select className={inputClass+' mt-1'} value={draft.featuredPinTarget||''} onChange={e=>{
+              const date=new Date(Date.now()+7*86400000).toLocaleDateString('en-CA',{timeZone:'Asia/Ho_Chi_Minh'});
+              edit({featuredPinTarget:e.target.value,featuredPinUntil:e.target.value?date:''});
+            }}>
+              <option value="">Không ghim — ưu tiên bài đang thịnh hành</option>
+              <optgroup label="Bài viết có nội dung">{articles.map(a=><option key={a.id} value={'article:'+a.id}>{a.title}</option>)}</optgroup>
+              <optgroup label="Thẻ bài HOT thủ công">{draft.stories.filter(x=>x.visible).map(s=><option key={s.id} value={'story:'+s.id}>{s.title}</option>)}</optgroup>
+            </select>
+          </label>
+          {draft.featuredPinTarget && <label className="block text-xs font-bold">Hết hạn ghim (giờ Việt Nam)
+            <input type="date" className={inputClass+' mt-1'} value={draft.featuredPinUntil||''} onChange={e=>edit({featuredPinUntil:e.target.value})}/>
+          </label>}
+          <p className="text-xs text-amber-800">Nên kiểm tra thực tế mùa hoa và kết thúc ghim khi thông tin không còn phù hợp. Ghim chiến dịch sẽ có nhãn “QT gợi ý”.</p>
+        </>}
+        {(draft.featuredMode||'hybrid')!=='manual' && <label className="block text-xs font-bold">Khoảng thời gian đánh giá
+          <select className={inputClass+' mt-1'} value={draft.featuredTrendingDays||30} onChange={e=>edit({featuredTrendingDays:Number(e.target.value) as 7|30|90})}>
+            <option value={7}>7 ngày</option><option value={30}>30 ngày — khuyên dùng</option><option value={90}>90 ngày</option>
+          </select>
+        </label>}
+        <div className="p-3 rounded-xl border border-stone-200 bg-white">
+          <p className="text-xs font-bold">{metrics.enabled?'Đang sử dụng dữ liệu tương tác phía máy chủ':'Chưa có kết nối số liệu tương tác xác minh'}</p>
+          <p className="text-[11px] text-stone-600 mt-1">{metrics.enabled?'Các lượt xem, thích, lưu, chia sẻ và nhấn đặt xe được ghi nhận có chống lặp cơ bản.':'Nếu máy chủ chưa được cấp quyền Firestore Admin, hệ thống tự dùng nội dung ghim/thủ công; không tự tạo lượt xem hoặc thích.'}</p>
+          {metrics.enabled&&<div className="mt-2 space-y-1">{articles.slice().sort((a,b)=>trendingScore(metrics.stats[b.id])-trendingScore(metrics.stats[a.id])).slice(0,5).map(a=><p key={a.id} className="text-[11px] flex justify-between gap-2"><span className="truncate">{a.title}</span><span className="font-bold shrink-0">{trendingScore(metrics.stats[a.id])} điểm</span></p>)}</div>}
+        </div>
+      </section>
+    )}
+    {editorSection === 'tiktok' && (
+      <section className="rounded-2xl border border-stone-200 bg-stone-50 p-4 space-y-4">
+        <div><h3 className="font-black text-[#1b4332]">Kênh TikTok QT Limousine</h3>
+          <p className="text-xs text-stone-600 mt-1">Kênh bạn xác nhận: <a className="underline text-emerald-800" href={VERIFIED_TIKTOK_PROFILE} target="_blank" rel="noopener noreferrer">@limousinemocchau</a>.</p>
+        </div>
+        <p className="text-xs text-emerald-800 font-semibold">Mặc định website dùng TikTok Creator Profile Embed chính thức để hiện các video mới (TikTok có thể hiển thị đến 10 video). Trình phát chỉ được tải khi khách cuộn đến cuối trang.</p>
+        <label className="block text-xs font-bold">Tùy chọn: chọn chính xác 3–4 video muốn ghim (mỗi dòng một URL)
+          <textarea className={inputClass+' mt-1 min-h-[130px]'} rows={4}
+            placeholder="https://www.tiktok.com/@limousinemocchau/video/..."
+            value={(draft.tiktokVideoLinks||[]).join('\n')}
+            onChange={e=>edit({tiktokVideoLinks:e.target.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)})}/>
+        </label>
+        <p className="text-xs text-stone-600">Để trống để dùng video mới tự động qua TikTok Profile Embed. Muốn đúng 4 video mới nhất qua API cần TikTok Developer cấp quyền video.list và chủ kênh xác thực OAuth; website chưa có quyền đó.</p>
+      </section>
     )}
     {editorSection === 'tickets' && (
     <section className="space-y-3">
