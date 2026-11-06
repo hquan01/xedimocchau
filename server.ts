@@ -318,9 +318,9 @@ function analyzeMocChauIntentLocally(message: string) {
   if (intents.includes("WEATHER")) {
     const cachedWeather = weatherCache.get("moc-chau-center")?.data?.current;
     if (cachedWeather) {
-      replyParts.push(`🌤️ **Thời tiết Mộc Châu thực tế (Trực tiếp từ dubaothoitiet.edu.vn):** Nhiệt độ hiện tại ${cachedWeather.temperature}°C (Cảm giác như ${cachedWeather.apparentTemperature}°C), ${cachedWeather.conditionText.toLowerCase()}, độ ẩm ${cachedWeather.humidity}%, ${cachedWeather.windSpeedText ? `gió ${cachedWeather.windSpeedText}` : `gió ${cachedWeather.windSpeed} km/h`}, lượng mưa ${cachedWeather.precipitation ?? 0} mm${cachedWeather.uvIndex ? `, chỉ số UV ${cachedWeather.uvIndex}` : ''}. ${cachedWeather.isRain ? "Trời đang có mưa ẩm, bạn nên mang theo ô/áo mưa và chú ý đường đèo trơn trượt." : "Thời tiết khá thuận lợi, bạn nên mang áo khoác mỏng vì chiều tối và đêm nhiệt độ vùng cao nguyên giảm nhanh."}`);
+      replyParts.push(`🌤️ **Dự báo thời tiết Mộc Châu từ mô hình Open-Meteo (không phải quan trắc thực địa):** Nhiệt độ hiện tại ${cachedWeather.temperature}°C (Cảm giác như ${cachedWeather.apparentTemperature}°C), ${cachedWeather.conditionText.toLowerCase()}, độ ẩm ${cachedWeather.humidity}%, ${cachedWeather.windSpeedText ? `gió ${cachedWeather.windSpeedText}` : `gió ${cachedWeather.windSpeed} km/h`}, lượng mưa ${cachedWeather.precipitation ?? 0} mm${cachedWeather.uvIndex ? `, chỉ số UV ${cachedWeather.uvIndex}` : ''}. ${cachedWeather.isRain ? "Trời đang có mưa ẩm, bạn nên mang theo ô/áo mưa và chú ý đường đèo trơn trượt." : "Thời tiết khá thuận lợi, bạn nên mang áo khoác mỏng vì chiều tối và đêm nhiệt độ vùng cao nguyên giảm nhanh."}`);
     } else {
-      replyParts.push(`🌤️ **Thời tiết Mộc Châu:** Dữ liệu được trích xuất trực tiếp từ cổng dubaothoitiet.edu.vn (Sơn La - Mộc Châu). Bạn có thể nhấn vào mục 'Thời tiết' trên menu để xem dự báo nhiệt độ và khả năng mưa theo giờ thời gian thực nhé.`);
+      replyParts.push(`🌤️ **Dự báo Mộc Châu:** Website dùng mô hình Open-Meteo theo tọa độ đã chọn, không đo tại trạm. Hãy mở mục 'Thời tiết' để xem mốc dự báo và đối chiếu các nguồn khác.`);
     }
   }
 
@@ -457,9 +457,9 @@ function generateMocChauChatReplyLocally(message: string, _history?: Array<{ rol
   if (/thời tiết|mưa|nắng|lạnh|mặc gì|nhiệt độ/.test(text)) {
     const cached = weatherCache.get("moc-chau-center")?.data?.current;
     if (cached) {
-      return `Dữ liệu thời tiết trực tiếp tại Mộc Châu (Cập nhật trực tiếp từ dubaothoitiet.edu.vn): Nhiệt độ hiện tại ${cached.temperature}°C (Cảm giác như ${cached.apparentTemperature}°C), ${cached.conditionText.toLowerCase()}, độ ẩm ${cached.humidity}%, ${cached.windSpeedText ? `gió ${cached.windSpeedText}` : `gió ${cached.windSpeed} km/h`}, lượng mưa ${cached.precipitation ?? 0} mm${cached.uvIndex ? `, UV ${cached.uvIndex}` : ''}. ${cached.isRain ? "Thời tiết đang có mưa ẩm, bạn nên mang theo ô dù, áo khoác ấm và chú ý an toàn cung đường đèo." : "Thời tiết khá thuận lợi để dạo chơi đồi chè, thác Dải Yếm và các thung lũng hoa mận bạn nhé!"}`;
+      return `Dự báo mô hình Open-Meteo tại Mộc Châu (không phải số đo quan trắc): Nhiệt độ hiện tại ${cached.temperature}°C (Cảm giác như ${cached.apparentTemperature}°C), ${cached.conditionText.toLowerCase()}, độ ẩm ${cached.humidity}%, ${cached.windSpeedText ? `gió ${cached.windSpeedText}` : `gió ${cached.windSpeed} km/h`}, lượng mưa ${cached.precipitation ?? 0} mm${cached.uvIndex ? `, UV ${cached.uvIndex}` : ''}. ${cached.isRain ? "Thời tiết đang có mưa ẩm, bạn nên mang theo ô dù, áo khoác ấm và chú ý an toàn cung đường đèo." : "Thời tiết khá thuận lợi để dạo chơi đồi chè, thác Dải Yếm và các thung lũng hoa mận bạn nhé!"}`;
     }
-    return "Thời tiết Mộc Châu được cập nhật trực tiếp từ https://dubaothoitiet.edu.vn/son-la/moc-chau. Bạn có thể mở mục 'Thời tiết' trên website xedimocchau.com để xem dự báo nhiệt độ chi tiết, lượng mưa theo giờ và các ngày tới nhé!";
+    return "Website xedimocchau.com sử dụng dự báo từ mô hình Open-Meteo theo vị trí Mộc Châu. Đây không phải quan trắc thực địa; bạn có thể mở mục 'Thời tiết' để xem mốc giờ dự báo, nguồn và đối chiếu với trang khác.";
   }
 
   if (/hoa|mận|mùa hoa|đào|cải/.test(text)) {
