@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Booking, User } from "../types";
+import { Booking, type User as CustomerUser } from "../types";
 import { getDeviceId } from "../lib/firebaseUtils";
 import { findMyDeviceBookings, isCompleteBookingPhone, readDeviceBookingHistory } from "../lib/deviceBookingHistory";
 import { CalendarDays, MapPin, Ticket, User, Phone, Check, Trash2, X, Compass, Printer, Info, Search, Cloud, Sparkles, Hotel, Car, Gift, Tag, FileText } from "lucide-react";
@@ -9,7 +9,7 @@ import { INITIAL_COMBOS } from "../data/combos";
 interface BookingListProps {
   bookings: Booking[];
   allBookings?: Booking[];
-  currentUser?: User | null;
+  currentUser?: CustomerUser | null;
   isOpen: boolean;
   onClose: () => void;
   onCancelBooking: (id: string) => void;
