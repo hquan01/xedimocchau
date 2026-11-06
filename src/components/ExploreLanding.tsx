@@ -1,9 +1,9 @@
 import React, {useEffect,useState} from 'react';
-import {CloudSun,Sparkles,Flower2,BookOpen,MapPin,Flame,Bus,Car,Bike,House,UtensilsCrossed,Ticket,ArrowRight,Heart,ChevronRight,ChevronLeft,MessageCircle} from 'lucide-react';
+import {CloudSun,Sparkles,Flower2,BookOpen,MapPin,Flame,Bus,Car,Bike,House,UtensilsCrossed,Ticket,ArrowRight,Heart,ChevronRight,ChevronLeft,MessageCircle,UsersRound} from 'lucide-react';
 import {useSiteContent,HomeTile,FeaturedStory} from '../lib/siteContent';
 
 interface Props {setActiveTab:(tab:string)=>void;onOpenLimousineBooking:()=>void;openMotorbike:()=>void;openAuth:()=>void;isSignedIn:boolean}
-const icons:Record<string,React.ComponentType<any>>={'cloud-sun':CloudSun,sparkles:Sparkles,flower:Flower2,'book-open':BookOpen,'map-pin':MapPin,flame:Flame,bus:Bus,car:Car,bike:Bike,home:House,utensils:UtensilsCrossed,ticket:Ticket};
+const icons:Record<string,React.ComponentType<any>>={'cloud-sun':CloudSun,users:UsersRound,sparkles:Sparkles,flower:Flower2,'book-open':BookOpen,'map-pin':MapPin,flame:Flame,bus:Bus,car:Car,bike:Bike,home:House,utensils:UtensilsCrossed,ticket:Ticket};
 
 export default function ExploreLanding({setActiveTab,onOpenLimousineBooking,openMotorbike,openAuth,isSignedIn}:Props){
   const {content}=useSiteContent();
@@ -41,7 +41,22 @@ export default function ExploreLanding({setActiveTab,onOpenLimousineBooking,open
     }
     navigate(tile.target);
   };
-  const tiles=content.tiles.filter(x=>x.visible);
+  // The published Firebase site config may predate the new Community tile.
+  // Add it visibly after Weather without discarding any saved tile order.
+  const communityTile:HomeTile={
+    id:'community',title:'Cộng đồng',subtitle:'Hỏi đáp · nhóm Zalo',
+    icon:'users',target:'community',visible:true
+  };
+  const otherTiles=content.tiles.filter(x=>x.id!=='community'&&x.visible);
+  const communitySaved=content.tiles.find(x=>x.id==='community');
+  const pinnedCommunity={...communityTile,...communitySaved,target:'community',visible:true};
+  const weatherPosition=otherTiles.findIndex(x=>x.id==='weather');
+  const communityPosition=weatherPosition<0?0:weatherPosition+1;
+  const tiles=[
+    ...otherTiles.slice(0,communityPosition),
+    pinnedCommunity,
+    ...otherTiles.slice(communityPosition)
+  ];
   const hot=content.stories.filter(x=>x.visible);
   return <div className="bg-[#f7faf7] text-[#17382b] pb-28 min-h-screen" id="explore_mobile_home">
     <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 space-y-6">
