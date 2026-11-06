@@ -862,14 +862,14 @@ app.get("/sitemap.xml", (_req, res) => {
     "/dich-vu/thue-xe-may-moc-chau",
     "/dich-vu/taxi-du-lich-moc-chau"
   ];
-  const xml='<?xml version="1.0" encoding="UTF-8"?>\\n'+
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\\n'+
-    paths.map(p=>'<url><loc>'+origin+p+'</loc></url>').join('\\n')+
-    '\\n</urlset>';
+  const xml='<?xml version="1.0" encoding="UTF-8"?>\n'+
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'+
+    paths.map(p=>'<url><loc>'+origin+p+'</loc></url>').join('\n')+
+    '\n</urlset>';
   res.type('application/xml').set('Cache-Control','public,max-age=3600').send(xml);
 });
 app.get("/robots.txt", (_req, res) => {
-  res.type('text/plain').send('User-agent: *\\nAllow: /\\nDisallow: /api/\\nSitemap: https://xedimocchau.com/sitemap.xml');
+  res.type('text/plain').send('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://xedimocchau.com/sitemap.xml');
 });
 
 // Serve frontend build static files and setup Vite configuration in development
