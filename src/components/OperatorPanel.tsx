@@ -3323,7 +3323,7 @@ export default function OperatorPanel({
         </div>
       )}
 
-      {activeModuleId === "site_appearance" && <SiteContentStudio />}
+      {activeModuleId === "site_appearance" && <SiteContentStudio articles={articles} />}
 
       {/* Module: Nhà hàng & Ẩm thực */}
       {activeModuleId === "restaurants_culinary" && (
