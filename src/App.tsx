@@ -5,6 +5,7 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Hero from "./components/Hero";
 import BookingSwitcher from "./components/BookingSwitcher";
+import { rememberDeviceBooking, forgetDeviceBooking } from "./lib/deviceBookingHistory";
 import ComboBooking from "./components/ComboBooking";
 import FloatingContact from "./components/FloatingContact";
 import AIChatWidget from "./components/AIChatWidget";
@@ -339,6 +340,9 @@ export default function App() {
          booking.userId = currentUser.id;
       }
       await saveBookingToFirebase(booking);
+      // Keep a bounded copy of this successful booking on the same phone.
+      // Do not store bookings that the server rejected.
+      rememberDeviceBooking(booking);
 
       // Create Notification
       const notifTitle = "KHÁCH MỚI ĐẶT VÉ";
@@ -449,6 +453,7 @@ export default function App() {
 
   const handleDeleteBooking = async (id: string) => {
     await deleteBookingFromFirebase(id);
+    forgetDeviceBooking(id);
   };
 
   const handleConfirmPaymentSuccess = async (id: string, newTotal?: number) => {
@@ -1045,6 +1050,7 @@ export default function App() {
         <BookingList
           bookings={bookings}
           allBookings={allBookings}
+          currentUser={currentUser}
           isOpen={isBookingListOpen}
           onClose={() => setIsBookingListOpen(false)}
           onCancelBooking={handleCancelBooking}
