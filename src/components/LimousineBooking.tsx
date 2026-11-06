@@ -79,7 +79,6 @@ export default function LimousineBooking({
     searchParams?.to && searchParams.to !== "Hà Nội" && searchParams.to !== "Mộc Châu" ? searchParams.to : ""
   );
 
-  const getVietnamToday = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const [date, setDate] = useState(() => {
     const todayVN = getVietnamToday();
     if (searchParams?.date && searchParams.date >= todayVN) {
