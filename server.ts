@@ -225,9 +225,10 @@ app.use("/api/content", growthMetricsRouter);
 
 // Initialize Google Gen AI
 let aiClient: GoogleGenAI | null = null;
-const KNOWN_SUSPENDED_KEYS = new Set([
-  "AIzaSyBc1uWwhDDAfdHsldrlyVZqL_9VCpi7l8U"
-]);
+// Keep disabled key fingerprints out of public source code.
+const KNOWN_SUSPENDED_KEYS = new Set(
+  (process.env.GEMINI_SUSPENDED_API_KEYS || '').split(',').map(x=>x.trim()).filter(Boolean)
+);
 let isGeminiAvailable = true;
 
 function canUseGemini(): boolean {
