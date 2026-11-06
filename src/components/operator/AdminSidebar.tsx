@@ -10,12 +10,14 @@ interface AdminSidebarProps {
   activeModuleId: string;
   onSelectModule: (moduleId: string) => void;
   pendingBookingsCount: number;
+  pendingServiceOrdersCount: number;
 }
 
 export default function AdminSidebar({
   activeModuleId,
   onSelectModule,
-  pendingBookingsCount
+  pendingBookingsCount,
+  pendingServiceOrdersCount
 }: AdminSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -130,7 +132,8 @@ export default function AdminSidebar({
                 <div className="space-y-0.5 pl-1">
                   {group.modules.map(module => {
                     const isActive = activeModuleId === module.id;
-                    const hasPendingBadge = module.id === "limousine_bookings" && pendingBookingsCount > 0;
+                    const badgeCount = module.id === "limousine_bookings" ? pendingBookingsCount : (module.id === "service_orders" ? pendingServiceOrdersCount : 0);
+                    const hasPendingBadge = badgeCount > 0;
 
                     return (
                       <button
@@ -152,7 +155,7 @@ export default function AdminSidebar({
 
                         {hasPendingBadge && (
                           <span className="ml-1.5 px-1.5 py-0.5 bg-amber-500 text-stone-950 text-[10px] font-black rounded-full animate-pulse shrink-0">
-                            {pendingBookingsCount}
+                            {badgeCount}
                           </span>
                         )}
                       </button>
