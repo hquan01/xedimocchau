@@ -262,7 +262,8 @@ export default function SharedCarBooking({
   }, [to, finalDropoffPoints]);
 
   // Dynamic retrieval of matching official operator schedules
-  const scheduleTimes = getSharedCarSchedules();
+  const [bookingClock, setBookingClock] = useState(() => Date.now());
+  const scheduleTimes = getSharedCarSchedules().filter(time => isFutureDeparture(date, time, bookingClock));
 
   const parseTimeToMinutes = (timeStr: string): number => {
     const [h, m] = timeStr.split(":").map(Number);
@@ -270,7 +271,6 @@ export default function SharedCarBooking({
   };
 
   // Refresh near real-time: expired departures must disappear even if this tab stays open.
-  const [bookingClock, setBookingClock] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setBookingClock(Date.now()), 30_000);
     return () => window.clearInterval(timer);
