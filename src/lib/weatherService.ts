@@ -1,6 +1,6 @@
 // Real-Time Weather Service for Mộc Châu Travel
-// Primary Provider: https://dubaothoitiet.edu.vn/son-la/moc-chau
-// Fallback Provider: Open-Meteo High-Resolution Plateau Model
+// Operational forecast provider: Open-Meteo (browser and server).
+// The third-party website is linked as a separate comparison source, never as the API provider.
 
 export interface MocChauLocation {
   id: string;
