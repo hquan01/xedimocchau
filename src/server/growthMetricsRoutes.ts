@@ -80,3 +80,51 @@ growthMetricsRouter.post('/engagement',async(req,res)=>{
     return res.status(503).json({error:'Tracking temporarily unavailable'});
   }
 });
+
+/** Public CMS article view for static SEO pages. The rendered HTML includes a
+ * readable editorial snapshot, then refreshes with the most recent Firestore
+ * article where accessible. Only explicitly public guide fields are returned. */
+function fieldValue(v:any):any{
+  if(!v||typeof v!=='object')return null;
+  if('stringValue' in v)return String(v.stringValue);
+  if('integerValue' in v)return Number(v.integerValue)||0;
+  if('booleanValue' in v)return Boolean(v.booleanValue);
+  if('arrayValue' in v)return (v.arrayValue?.values||[]).map(fieldValue);
+  if('mapValue' in v)return Object.fromEntries(Object.entries(v.mapValue?.fields||{}).map(([k,x])=>[k,fieldValue(x)]));
+  return null;
+}
+growthMetricsRouter.get('/article',async(req,res)=>{
+  const id=String(req.query.id||'');
+  if(!ARTICLE_ID.test(id))return res.status(400).json({error:'Invalid article'});
+  res.set('Cache-Control','public, max-age=60, s-maxage=120');
+  try{
+    let row:any=null;
+    const db=firestore();
+    if(db){
+      const record=await db.collection('guide_articles').doc(id).get();
+      if(!record.exists)return res.status(404).json({error:'Article not found'});
+      row=record.data();
+    }else {
+      // Public Firestore REST read via server: the same collection is readable
+      // without login on the existing website. Never return API configuration.
+      const projectId=firebaseConfig.projectId;
+      const databaseId=firebaseConfig.firestoreDatabaseId||'(default)';
+      const url=`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(databaseId)}/documents/guide_articles/${encodeURIComponent(id)}?key=${encodeURIComponent(firebaseConfig.apiKey)}`;
+      const abort=new AbortController();
+      const timer=setTimeout(()=>abort.abort(),4500);
+      let response:Response;
+      try{response=await fetch(url,{signal:abort.signal})}finally{clearTimeout(timer)}
+      if(response.status===404)return res.status(404).json({error:'Article not found'});
+      if(!response.ok)return res.status(503).json({error:'CMS unavailable'});
+      const data=await response.json() as {fields?:Record<string,unknown>};
+      row=Object.fromEntries(Object.entries(data.fields||{}).map(([key,val])=>[key,fieldValue(val)]));
+    }
+    if(!row||typeof row.title!=='string'||!Array.isArray(row.content))return res.status(404).json({error:'Article not found'});
+    return res.json({id,title:String(row.title).slice(0,250),excerpt:String(row.excerpt||'').slice(0,1000),
+      content:row.content.filter((x:unknown)=>typeof x==='string').slice(0,75),
+      imageUrl:typeof row.imageUrl==='string'?row.imageUrl:'',categoryLabel:String(row.categoryLabel||'Cẩm nang')});
+  }catch(error){
+    console.warn('Public CMS article unavailable',error instanceof Error?error.message:'unknown');
+    return res.status(503).json({error:'CMS temporarily unavailable'});
+  }
+});
