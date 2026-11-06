@@ -6,6 +6,7 @@ interface AdminTopBarProps {
   activeModuleId: string;
   onOpenMobileDrawer: () => void;
   pendingBookingsCount: number;
+  pendingServiceOrdersCount: number;
   onRefresh?: () => void;
   onSelectModule?: (moduleId: string) => void;
 }
@@ -14,6 +15,7 @@ export default function AdminTopBar({
   activeModuleId,
   onOpenMobileDrawer,
   pendingBookingsCount,
+  pendingServiceOrdersCount,
   onRefresh,
   onSelectModule
 }: AdminTopBarProps) {
@@ -58,6 +60,16 @@ export default function AdminTopBar({
             <Bell className="w-3.5 h-3.5 text-amber-600 animate-bounce" />
             <span className="hidden sm:inline">Chờ xử lý:</span>
             <span className="font-mono">{pendingBookingsCount}</span>
+          </button>
+        )}
+
+        {pendingServiceOrdersCount > 0 && onSelectModule && (
+          <button type="button" onClick={() => onSelectModule("service_orders")}
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 border border-red-300 text-red-900 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            title="Yêu cầu taxi / thuê xe máy mới cần xử lý">
+            <Bell className="w-3.5 h-3.5 text-red-600 animate-pulse" />
+            <span className="hidden sm:inline">Đơn dịch vụ:</span>
+            <span className="font-mono">{pendingServiceOrdersCount}</span>
           </button>
         )}
 

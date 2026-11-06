@@ -12,6 +12,7 @@ interface MobileAdminDrawerProps {
   activeModuleId: string;
   onSelectModule: (moduleId: string) => void;
   pendingBookingsCount: number;
+  pendingServiceOrdersCount: number;
 }
 
 export default function MobileAdminDrawer({
@@ -19,7 +20,8 @@ export default function MobileAdminDrawer({
   onClose,
   activeModuleId,
   onSelectModule,
-  pendingBookingsCount
+  pendingBookingsCount,
+  pendingServiceOrdersCount
 }: MobileAdminDrawerProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -151,7 +153,8 @@ export default function MobileAdminDrawer({
                   <div className="space-y-1 pl-1">
                     {group.modules.map(module => {
                       const isActive = activeModuleId === module.id;
-                      const hasPending = module.id === "limousine_bookings" && pendingBookingsCount > 0;
+                      const badgeCount = module.id === "limousine_bookings" ? pendingBookingsCount : (module.id === "service_orders" ? pendingServiceOrdersCount : 0);
+                      const hasPending = badgeCount > 0;
 
                       return (
                         <button
@@ -173,7 +176,7 @@ export default function MobileAdminDrawer({
 
                           {hasPending && (
                             <span className="ml-2 px-2 py-0.5 bg-amber-500 text-stone-950 text-[10px] font-black rounded-full">
-                              {pendingBookingsCount}
+                              {badgeCount}
                             </span>
                           )}
                         </button>

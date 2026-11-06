@@ -30,6 +30,7 @@ import SecurityConfigManagement from "./operator/SecurityConfigManagement";
 import TaxiFleetManagement from "./operator/TaxiFleetManagement";
 import MotorbikeManagement from "./operator/MotorbikeManagement";
 import ServiceInquiryManagement from "./operator/ServiceInquiryManagement";
+import { ServiceInquiry, subscribeServiceInquiries } from "../lib/serviceRequests";
 import SiteContentStudio from "./operator/SiteContentStudio";
 
 // Preset driver fleet for fast selection and autocomplete
@@ -194,6 +195,42 @@ export default function OperatorPanel({
   const [activeModuleId, setActiveModuleId] = useState<string>("overview");
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const workspaceRef = React.useRef<HTMLDivElement>(null);
+  const [serviceInquiries, setServiceInquiries] = useState<ServiceInquiry[]>([]);
+  const [serviceInquiriesError, setServiceInquiriesError] = useState("");
+  const [incomingServiceInquiry, setIncomingServiceInquiry] = useState<ServiceInquiry | null>(null);
+  const knownServiceInquiryIds = React.useRef<Set<string> | null>(null);
+
+  // One live Firestore subscription feeds all service dashboards and their badges.
+  // A browser-only draft must never be counted as a submitted order.
+  useEffect(() => subscribeServiceInquiries(
+    (orders) => {
+      setServiceInquiries(orders);
+      setServiceInquiriesError("");
+      const known = knownServiceInquiryIds.current;
+      if (known !== null) {
+        const newest = orders.find(item =>
+          item.status === "pending" && !known.has(item.id) &&
+          Date.parse(item.createdAt) > Date.now() - 10 * 60 * 1000
+        );
+        if (newest) {
+          setIncomingServiceInquiry(newest);
+          if (typeof window !== "undefined" && "Notification" in window &&
+              window.Notification.permission === "granted" && document.hidden) {
+            try {
+              new window.Notification("Có yêu cầu dịch vụ mới", {
+                body: `${newest.kind === "taxi" ? "Taxi" : "Thuê xe máy"} • ${newest.customerName}`,
+                icon: "/logo.png"
+              });
+            } catch { /* Browser notifications may be blocked; in-app alert remains. */ }
+          }
+        }
+      }
+      knownServiceInquiryIds.current = new Set(orders.map(item => item.id));
+    },
+    error => setServiceInquiriesError("Không thể đồng bộ yêu cầu dịch vụ: " + error.message)
+  ), []);
+  const pendingServiceInquiries = serviceInquiries.filter(item => item.status === "pending");
+  const pendingServiceInquiriesCount = pendingServiceInquiries.length;
   // The visible workspace is DERIVED from the selected sidebar module.
   // Keeping an independent panelTab previously rendered stale modules
   // (e.g. seat charts underneath the restaurant editor).
@@ -846,12 +883,45 @@ export default function OperatorPanel({
 
   return (
     <div className="flex bg-stone-100 min-h-screen text-stone-900 font-sans text-left" id="operator_dashboard_container">
+      {incomingServiceInquiry && (
+        <div role="dialog" aria-modal="true" aria-label="Yêu cầu dịch vụ mới"
+          className="fixed inset-0 z-[160] bg-black/60 p-4 flex items-center justify-center">
+          <div className="w-full max-w-md rounded-3xl bg-white overflow-hidden shadow-2xl">
+            <div className="bg-[#1b4332] text-white px-5 py-4 flex justify-between items-start gap-3">
+              <div>
+                <p className="text-xs font-bold text-emerald-100">🔔 CÓ KHÁCH GỬI YÊU CẦU DỊCH VỤ</p>
+                <h3 className="text-xl font-black mt-1">{incomingServiceInquiry.kind === "taxi" ? "Đặt Taxi / Xe Du Lịch" : "Thuê Xe Máy"}</h3>
+              </div>
+              <button type="button" aria-label="Đóng thông báo" onClick={() => setIncomingServiceInquiry(null)}
+                className="rounded-lg bg-white/15 px-3 py-1.5">✕</button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm"><strong>{incomingServiceInquiry.customerName}</strong> · {incomingServiceInquiry.customerPhone}</p>
+              <p className="text-sm text-stone-700">
+                {incomingServiceInquiry.kind === "taxi"
+                  ? `${incomingServiceInquiry.seats || "-"} chỗ • ${incomingServiceInquiry.pickupPoint || ""} → ${incomingServiceInquiry.dropoffPoint || ""} • ${incomingServiceInquiry.travelDate || ""} ${incomingServiceInquiry.departureTime || ""}`
+                  : `${incomingServiceInquiry.bikeType || "Xe máy"} • ${incomingServiceInquiry.quantity || 1} xe • ${incomingServiceInquiry.startDate || ""} đến ${incomingServiceInquiry.endDate || ""}`}
+              </p>
+              <p className="text-xs text-amber-800 bg-amber-50 rounded-xl p-3">Đây là yêu cầu chờ liên hệ, chưa phải đơn đã xác nhận.</p>
+              <div className="flex gap-2 flex-wrap">
+                <button type="button" className="flex-1 rounded-xl bg-[#1b4332] text-white px-4 py-3 text-sm font-bold"
+                  onClick={() => { setIncomingServiceInquiry(null); handleSelectModule("service_orders"); }}>
+                  Xem và xử lý đơn
+                </button>
+                <a href={`tel:${incomingServiceInquiry.customerPhone.replace(/[^+0-9]/g, "")}`}
+                  className="rounded-xl border border-emerald-700 text-emerald-900 px-4 py-3 text-sm font-bold">Gọi khách</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* 1. Desktop Sidebar */}
       <div className="hidden md:flex">
         <AdminSidebar
           activeModuleId={activeModuleId}
           onSelectModule={handleSelectModule}
           pendingBookingsCount={pendingBookingsCount}
+          pendingServiceOrdersCount={pendingServiceInquiriesCount}
         />
       </div>
 
@@ -862,6 +932,7 @@ export default function OperatorPanel({
         activeModuleId={activeModuleId}
         onSelectModule={handleSelectModule}
         pendingBookingsCount={pendingBookingsCount}
+        pendingServiceOrdersCount={pendingServiceInquiriesCount}
       />
 
       {/* 3. Main Workspace Canvas */}
@@ -870,6 +941,7 @@ export default function OperatorPanel({
           activeModuleId={activeModuleId}
           onOpenMobileDrawer={() => setIsMobileDrawerOpen(true)}
           pendingBookingsCount={pendingBookingsCount}
+          pendingServiceOrdersCount={pendingServiceInquiriesCount}
           onRefresh={() => window.location.reload()}
           onSelectModule={handleSelectModule}
         />
@@ -888,6 +960,13 @@ export default function OperatorPanel({
             </button>
           </div>
 
+          {activeModuleId === "overview" && pendingServiceInquiriesCount > 0 && (
+            <button type="button" onClick={() => handleSelectModule("service_orders")}
+              className="w-full text-left rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 hover:bg-amber-100 flex flex-wrap justify-between items-center gap-2">
+              <span className="text-sm font-bold">🔔 Có {pendingServiceInquiriesCount} yêu cầu taxi / thuê xe máy đang chờ xử lý</span>
+              <span className="text-xs font-semibold underline">Xem đơn dịch vụ</span>
+            </button>
+          )}
           {/* Module 1: Tổng quan điều hành (Overview KPI & Route filling) */}
           {(activeModuleId === "overview" || panelTab === "overview") && (
             <div className="space-y-6">
@@ -3193,7 +3272,7 @@ export default function OperatorPanel({
       )}
 
       {/* Module: Đơn dịch vụ du lịch (Tour, Combo & Thuê xe) */}
-      {activeModuleId === "service_orders" && <ServiceInquiryManagement />}
+      {activeModuleId === "service_orders" && <ServiceInquiryManagement data={serviceInquiries} error={serviceInquiriesError} />}
       {activeModuleId === "service_orders" && (
         <div className="bg-white rounded-2xl shadow-xs border border-stone-200 p-6 sm:p-8 space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-stone-100 pb-4">
@@ -3283,12 +3362,18 @@ export default function OperatorPanel({
 
       {/* Module: Taxi & Xe du lịch 4-7-9-16 chỗ */}
       {activeModuleId === "taxi_tourist_cars" && (
-        <TaxiFleetManagement />
+        <div className="space-y-4">
+          <ServiceInquiryManagement data={serviceInquiries} error={serviceInquiriesError} kind="taxi" />
+          <TaxiFleetManagement />
+        </div>
       )}
 
       {/* Module: Cho thuê xe máy */}
       {activeModuleId === "motorbike_rental" && (
-        <MotorbikeManagement />
+        <div className="space-y-4">
+          <ServiceInquiryManagement data={serviceInquiries} error={serviceInquiriesError} kind="motorbike" />
+          <MotorbikeManagement />
+        </div>
       )}
 
       {/* Module: Cấu hình & Bảo mật */}
