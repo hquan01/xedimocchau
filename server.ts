@@ -1,5 +1,6 @@
 import express from "express";
 import { phoneAuthRouter } from "./src/server/phoneAuthRoutes";
+import { growthMetricsRouter } from "./src/server/growthMetricsRoutes";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -219,6 +220,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Phone/password alias authentication, isolated from public legacy bookings.
 app.use("/api/auth", phoneAuthRouter);
+// Server-validated content counters; never fake engagement in the browser.
+app.use("/api/content", growthMetricsRouter);
 
 // Initialize Google Gen AI
 let aiClient: GoogleGenAI | null = null;
