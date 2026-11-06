@@ -15,6 +15,7 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - run: npm run test:weather
       - run: npm run test:ticket
       - run: npm run lint
       - run: npm run build
