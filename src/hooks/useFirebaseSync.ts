@@ -158,22 +158,48 @@ export function useFirebaseSync() {
       }
     };
 
-    const unsubBookings = onSnapshot(collection(db, "bookings"), (snap) => {
-      const fetchedBookings = snap.docs.map(d => d.data() as Booking);
-      setAllBookings(fetchedBookings);
-      const deviceId = getDeviceId();
-      if (currentUser?.role === 'operator') {
-        setBookings(fetchedBookings);
-      } else {
-        setBookings(fetchedBookings.filter(b => (b as any).deviceId === deviceId));
-      }
-    }, (error) => {
-      console.warn("Bookings snapshot error:", error);
-      const localList = getLocalList<Booking>("bookings", []);
-      setAllBookings(localList);
-      const deviceId = getDeviceId();
-      setBookings(currentUser?.role === 'operator' ? localList : localList.filter(b => (b as any).deviceId === deviceId));
-    });
+    const deviceId = getDeviceId();
+    // Historical guest purchases were stored locally by earlier versions.
+    // This fallback is limited to the current browser and does not disclose
+    // the global Firestore collection of other guests' bookings.
+    const localBookings = getLocalList<Booking>("bookings", [])
+      .filter(b => b && typeof b.id === "string" && (!b.deviceId || b.deviceId === deviceId));
+    const mergeLocalAndCloud = (cloud: Booking[]) => {
+      const items = new Map<string, Booking>(localBookings.map(b => [b.id,b]));
+      for (const row of cloud) items.set(row.id,row);
+      return [...items.values()];
+    };
+
+    // Firestore intentionally denies listing every customer's tickets.
+    // Old code subscribed to ALL bookings, so customer listeners failed
+    // silently, leaving "Vé của tôi" empty even after logging in.
+    let unsubBookings = () => {};
+    const onBookingError = (error: Error) => {
+      console.warn("Booking listener failed; retaining trusted local history:", error);
+      setAllBookings(currentUser?.role === 'operator' ? localBookings : []);
+      setBookings(localBookings);
+    };
+    if (currentUser?.role === 'operator' && auth.currentUser) {
+      unsubBookings = onSnapshot(collection(db, "bookings"), snap => {
+        const rows = snap.docs.map(d => ({...d.data(),id:d.id}) as Booking);
+        setAllBookings(rows);
+        setBookings(rows);
+      }, onBookingError);
+    } else if (currentUser?.role === 'customer' && currentUser.id && auth.currentUser) {
+      // Security rules explicitly allow account-owned bookings (userId == UID).
+      // Querying the entire collection is NOT allowed for customer accounts.
+      unsubBookings = onSnapshot(
+        query(collection(db, "bookings"), where("userId","==",currentUser.id)),
+        snap => {
+          const rows = snap.docs.map(d => ({...d.data(),id:d.id}) as Booking);
+          setAllBookings(rows);
+          setBookings(mergeLocalAndCloud(rows));
+        }, onBookingError
+      );
+    } else {
+      setAllBookings([]);
+      setBookings(localBookings);
+    }
 
     const unsubCombos = onSnapshot(collection(db, "tour_combos"), (snap) => {
       handleEmptyCollection(snap.empty, snap.docs.map(d => d.data() as TourCombo), INITIAL_COMBOS, "tour_combos", setCombos);
