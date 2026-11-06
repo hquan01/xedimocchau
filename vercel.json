@@ -22,6 +22,14 @@
       "destination": "/api/index"
     },
     {
+      "source": "/cam-nang/:slug",
+      "destination": "/cam-nang/:slug.html"
+    },
+    {
+      "source": "/dich-vu/:slug",
+      "destination": "/dich-vu/:slug.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
