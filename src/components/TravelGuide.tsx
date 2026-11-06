@@ -9,12 +9,23 @@ import { GuideArticle } from "../types";
 
 interface TravelGuideProps {
   articles: GuideArticle[];
+  initialArticleId?: string | null;
 }
 
-export default function TravelGuide({ articles }: TravelGuideProps) {
+export default function TravelGuide({ articles, initialArticleId }: TravelGuideProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "checkin" | "food" | "tips" | "season">("all");
   const [readingArticle, setReadingArticle] = useState<GuideArticle | null>(null);
+  const openedInitialId = React.useRef<string | null>(null);
+  // A banner opens the actual article reader, not just the guide index.
+  React.useEffect(() => {
+    if(!initialArticleId){openedInitialId.current=null;return;}
+    const linked=articles.find(article=>article.id===initialArticleId);
+    if(linked&&openedInitialId.current!==initialArticleId){
+      openedInitialId.current=initialArticleId;
+      setReadingArticle(linked);
+    }
+  },[articles,initialArticleId]);
   const [likedArticles, setLikedArticles] = useState<Record<string, boolean>>({});
   const [savedArticles, setSavedArticles] = useState<Record<string, boolean>>({});
   const [displayCount, setDisplayCount] = useState(4);
