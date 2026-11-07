@@ -355,7 +355,9 @@ export default function App() {
       recordConversion("booking_saved", String(booking.type || 'transport'));
       // Keep a bounded copy of this successful booking on the same phone.
       // Do not store bookings that the server rejected.
-      rememberDeviceBooking(booking);
+      try { rememberDeviceBooking(booking); } catch (error) {
+        console.warn("Could not cache booking on this device; cloud booking is saved.", error);
+      }
 
       // Create Notification
       const notifTitle = "KHÁCH MỚI ĐẶT VÉ";
@@ -383,7 +385,13 @@ export default function App() {
       };
       
       setNotifications([newNotif, ...notifications].slice(0, 50));
-      await saveNotificationToFirebase(newNotif);
+      // A notification outage must not turn a successfully saved booking into
+      // a false "booking failed" message or encourage duplicate submissions.
+      try {
+        await saveNotificationToFirebase(newNotif);
+      } catch (error) {
+        console.warn("Booking saved, but notification could not be delivered.", error);
+      }
 
       // Send system level notification for operator
       if (currentUser?.role === "operator") {
