@@ -954,7 +954,7 @@ export default function SharedCarBooking({
                             </label>
                           </div>
                           <p className="text-[10px] text-stone-500">
-                            * Sau khi nhà xe xác nhận mỗi vé: +1 điểm. Từ đơn thứ hai có thể giảm 1.000đ cho mỗi điểm hiện có.
+                            * Sau khi nhà xe xác nhận {seatCount} ghế: +{seatCount} điểm hội viên (1 ghế = 1 điểm). Điểm giảm giá dùng từ đơn thứ hai.
                           </p>
                           {usePoints && (
                             <div className="p-2 bg-white rounded-lg border border-emerald-200 flex justify-between items-center text-xs text-emerald-800 font-bold font-sans">

@@ -9,7 +9,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:ticket": "node --experimental-strip-types --test tests/ticketPhoneHistory.test.mjs tests/bookingTime.test.mjs",
+    "test:ticket": "node --experimental-strip-types --test tests/ticketPhoneHistory.test.mjs tests/bookingTime.test.mjs tests/loyaltySeatPoints.test.mjs",
     "test:weather": "node --test tests/weatherProvenance.test.mjs",
     "test:booking-time": "node --experimental-strip-types --test tests/bookingTime.test.mjs"
   },
