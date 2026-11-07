@@ -35,7 +35,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { updatePassword, updateProfile, updateEmail } from "firebase/auth";
 
 import { INITIAL_COMBOS } from "../data/combos";
-import {POINT_VALUE_VND, eligibleForNextBookingReward, previousConfirmedBookings} from "../lib/loyalty";
+import {POINT_VALUE_VND, creditedPointsForBooking, eligibleForNextBookingReward, previousConfirmedBookings} from "../lib/loyalty";
 import {couponDecision,couponAudienceLabel,memberAge} from "../lib/couponEligibility";
 import {normalizeVietnamPhone,rememberPhoneEmail} from "../lib/simpleAuth";
 
@@ -208,8 +208,8 @@ export default function CustomerDashboard({
       const b = bookings.find(booking => booking.id === id);
       history.push({
         id:"tx_earn_"+id,date:b?.bookingDate || "—",
-        description:"Đã xác nhận vé #"+id.toUpperCase(),
-        amount:1,type:"plus"
+        description:(b ? "Điểm thưởng ghế đã xác nhận #" : "Điểm thưởng vé đã xác nhận #")+id.toUpperCase(),
+        amount:creditedPointsForBooking(b),type:"plus"
       });
     });
     bookings.forEach(b => {
@@ -959,7 +959,7 @@ export default function CustomerDashboard({
                   <span>Ví Điểm Tích Lũy & Thẻ Quà Tặng</span>
                 </h3>
                 <p className="text-stone-400 text-[11px] mt-0.5">
-                  Mỗi vé được nhà xe xác nhận sẽ cộng 1 điểm vào tài khoản thành viên.
+                  Mỗi ghế xe hợp lệ được nhà xe xác nhận sẽ cộng 1 điểm (10 ghế = 10 điểm).
                   Dùng điểm và voucher từ đơn thứ hai, sau khi đơn đầu đã được xác nhận.
                 </p>
               </div>
@@ -996,9 +996,9 @@ export default function CustomerDashboard({
                   <ul className="list-disc list-inside space-y-1 text-[12px] text-stone-700">
                     <li><b>Thành viên mới:</b> Tặng 10 điểm một lần khi đăng ký hoặc đăng nhập Google lần đầu.</li>
                     <li><b>Lần đặt vé đầu:</b> Giữ điểm chào mừng trong ví; chưa áp mã voucher hay trừ điểm.</li>
-                    <li><b>Admin xác nhận đơn:</b> +1 điểm cho vé hợp lệ, không cộng trùng.</li>
+                    <li><b>Admin xác nhận đơn:</b> +1 điểm cho mỗi ghế Limousine, xe ghép hoặc combo hợp lệ; đơn 10 ghế được +10 điểm, không cộng trùng.</li>
                     <li><b>Từ lần đặt vé thứ hai:</b> Có thể dùng số điểm đã tích lũy hoặc voucher đang được công bố.</li>
-                    <li><b>Quy đổi:</b> 1 điểm = 1.000đ giảm trực tiếp vào vé. Vé bị hủy không được cộng điểm.</li>
+                    <li><b>Quy đổi:</b> 1 điểm = 1.000đ giảm trực tiếp vào vé. Đơn bị hủy hoặc chuyển về chờ xác nhận sẽ thu hồi điểm đã thưởng.</li>
                   </ul>
                   <p className="text-[11px] font-bold text-emerald-800 mt-2">
                     Đơn đã xác nhận: {confirmedOrders} · {voucherUnlocked?"Đã mở quyền dùng voucher":"Voucher sẽ mở sau khi vé đầu tiên được xác nhận"}.
@@ -1133,8 +1133,8 @@ export default function CustomerDashboard({
                   </span>
                   <div className="h-px bg-stone-100 my-2" />
                   <ul className="space-y-1.5 text-[10px] text-stone-600 list-disc list-inside">
-                    <li>+1 điểm sau mỗi vé được nhà xe xác nhận.</li>
-                    <li>Không cộng điểm chào mừng tự động.</li>
+                    <li>+1 điểm cho mỗi ghế xe sau khi nhà xe xác nhận đơn.</li>
+                    <li>Hội viên mới được tặng 10 điểm chào mừng một lần.</li>
                     <li>Từ lần đặt vé thứ hai: 1 điểm giảm 1.000đ.</li>
                   </ul>
                 </div>
