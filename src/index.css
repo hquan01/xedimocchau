@@ -243,3 +243,24 @@ html, body {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Mobile booking forms: comfortable touch targets and no accidental iOS zoom. */
+@media (max-width: 639px) {
+  #app_root :is(
+    #limousine_quick_booking,
+    #limousine_booking_section,
+    #shared_car_booking_section,
+    #combo_booking_section
+  ) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea) {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+  #app_root :is(
+    #limousine_quick_booking,
+    #limousine_booking_section,
+    #shared_car_booking_section,
+    #combo_booking_section
+  ) :is(button, a) {
+    touch-action: manipulation;
+  }
+}
