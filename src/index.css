@@ -187,3 +187,59 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   #app_root { transition: none; }
 }
+
+/* Premium visitor-facing micro-interactions. Keep operational/admin controls unchanged. */
+#explore_mobile_home .mc-hero,
+#explore_mobile_home .mc-trip-starter,
+#explore_mobile_home .mc-featured-card,
+#explore_mobile_home .mc-service-tile {
+  isolation: isolate;
+}
+#explore_mobile_home .mc-hero-photo {
+  animation: mc-hero-reveal 480ms ease-out both;
+}
+@keyframes mc-hero-reveal {
+  from { opacity: .62; }
+  to { opacity: 1; }
+}
+#explore_mobile_home .mc-trip-starter {
+  background-image: radial-gradient(circle at 95% 4%, rgba(199, 233, 207, .27), transparent 38%);
+}
+#explore_mobile_home :is(.mc-featured-card,.mc-service-tile,.mc-quick-card,.mc-primary-action):focus-visible {
+  outline: 3px solid #d8a749;
+  outline-offset: 3px;
+}
+#explore_mobile_home :is(.mc-featured-card,.mc-service-tile,.mc-quick-card) {
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  #explore_mobile_home :is(.mc-featured-card,.mc-service-tile,.mc-quick-card):hover {
+    transform: translateY(-3px);
+  }
+  #explore_mobile_home .mc-primary-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(27, 67, 50, .22);
+  }
+}
+@media (max-width: 359px) {
+  #explore_mobile_home .mc-trip-starter h1 { font-size: 20px; }
+}
+/* Extend the existing night-mode text palette to new brand headings. */
+#app_root[data-appearance="night"] #explore_mobile_home :is(
+  [class~="text-[#123d2a]"],
+  [class~="text-[#17452f]"]
+) { color: #e9f2f6 !important; }
+#app_root[data-appearance="night"] #explore_mobile_home .mc-trip-starter {
+  background-image: radial-gradient(circle at 95% 5%, rgba(42, 102, 74, .25), transparent 45%);
+}
+#app_root[data-appearance="night"] #explore_mobile_home .mc-featured-card {
+  box-shadow: 0 10px 28px rgba(0,0,0,.14);
+}
+@media (prefers-reduced-motion: reduce) {
+  #explore_mobile_home .mc-hero-photo { animation: none !important; }
+  #explore_mobile_home :is(.mc-hero *,.mc-service-tile,.mc-featured-card,.mc-quick-card,.mc-trip-starter button),
+  #mobile_bottom_nav *, #main_header nav button {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
