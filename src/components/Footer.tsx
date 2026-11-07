@@ -95,10 +95,10 @@ export default function Footer({ setActiveTab, onSelectService, onOpenMotorbike 
                   if (onOpenMotorbike) {
                     onOpenMotorbike();
                   } else {
-                    alert("Dịch vụ thuê xe máy giao xe tận nơi - Hotline đặt xe: 0971.050.324");
+                    alert("Liên hệ QT Limousine để kiểm tra dịch vụ thuê xe máy: 0971.050.324");
                   }
                 }}
-                className="hover:text-amber-400 transition-colors block animate-pulse"
+                className="hover:text-amber-400 transition-colors block"
               >
                 ✦ Dịch Vụ Thuê Xe Máy Giao Tận Nơi
               </a>
@@ -129,19 +129,19 @@ export default function Footer({ setActiveTab, onSelectService, onOpenMotorbike 
           <ul className="space-y-2 text-xs text-stone-400">
             <li className="flex items-center space-x-2">
               <CreditCard className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Chuyển khoản QR ngân hàng & bảo mật 100%</span>
+              <span>Thông tin thanh toán được hiển thị theo từng đơn đặt xe.</span>
             </li>
             <li className="flex items-center space-x-2">
               <Coffee className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Miễn phí hủy xe trước 24 giờ khởi hành</span>
+              <span>Điều kiện thay đổi hoặc hủy vé cần được nhà xe xác nhận theo từng chuyến.</span>
             </li>
             <li className="flex items-center space-x-2">
               <Award className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Cam kết giữ đúng số ghế đã chọn</span>
+              <span>Yêu cầu đặt ghế được kiểm tra và xác nhận bởi nhà xe.</span>
             </li>
             <li className="flex items-center space-x-2">
               <Flame className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Combo cam kết hoàn tiền nếu không đúng chất lượng</span>
+              <span>Giá, dịch vụ bao gồm và điều kiện combo được xác nhận trước khi đặt.</span>
             </li>
           </ul>
         </div>
@@ -156,7 +156,7 @@ export default function Footer({ setActiveTab, onSelectService, onOpenMotorbike 
             </li>
             <li className="flex items-start space-x-2">
               <MapPin className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
-              <span className="text-stone-400">Điểm đón HN: Đón tận nơi, BigC Thăng Long, Ngõ 90 Nguyễn Tuân, Royal City</span>
+              <span className="text-stone-400">Điểm đón/trả thực tế tùy chuyến và khu vực phục vụ; vui lòng kiểm tra khi chọn vé.</span>
             </li>
             <li className="flex items-center space-x-2">
               <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -174,7 +174,17 @@ export default function Footer({ setActiveTab, onSelectService, onOpenMotorbike 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-stone-800">
+      <nav aria-label="Đường dẫn cẩm nang và dịch vụ xe" className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 mt-10 pt-5 border-t border-emerald-900/60">
+        <p className="text-sm font-bold text-white mb-3">Xem hướng dẫn và dịch vụ chi tiết</p>
+        <div className="flex flex-wrap gap-x-5 gap-y-3 text-xs">
+          <a href="/dich-vu/xe-limousine-ha-noi-moc-chau" className="hover:text-amber-300 underline underline-offset-4">Xe Limousine Hà Nội – Mộc Châu</a>
+          <a href="/dich-vu/xe-ghep-ha-noi-moc-chau" className="hover:text-amber-300 underline underline-offset-4">Xe ghép Hà Nội – Mộc Châu</a>
+          <a href="/dich-vu/thue-xe-may-moc-chau" className="hover:text-amber-300 underline underline-offset-4">Thuê xe máy Mộc Châu</a>
+          <a href="/cam-nang/kinh-nghiem-du-lich-moc-chau-tu-tuc" className="hover:text-amber-300 underline underline-offset-4">Cẩm nang Mộc Châu tự túc</a>
+        </div>
+      </nav>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-9 pt-8 border-t border-stone-800">
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-[10px] text-stone-600 uppercase tracking-widest font-bold">
           <span>Xe Limousine Mộc Châu</span>
           <span>•</span>
@@ -191,9 +201,9 @@ export default function Footer({ setActiveTab, onSelectService, onOpenMotorbike 
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 text-center text-[11px] text-stone-500 space-y-2">
-        <p>© 2026 Xe Đi Mộc Châu. Mộc Châu Luxury Transporter CO., LTD.</p>
-        <p>Giấy phép kinh doanh vận tải và phục vụ lữ hành nội địa số: 09-1223/2026/Sở GTVT-Sơn La. Chịu trách nhiệm nội dung: Xe Đi Mộc Châu Care Team.</p>
-        <p>Đơn vị cung cấp dịch vụ đặt vé trực tuyến và combo du lịch trọn gói chất lượng cao chuyên tuyến Hà Nội - Mộc Châu.</p>
+        <p>© 2026 QT Limousine – Xe Đi Mộc Châu.</p>
+        <p>Thông tin điều hành, điều kiện đặt vé và hồ sơ doanh nghiệp: liên hệ trực tiếp QT Limousine để được xác nhận trước khi thanh toán.</p>
+        <p>Nền tảng tìm chuyến xe, gửi yêu cầu dịch vụ và tham khảo cẩm nang du lịch Mộc Châu.</p>
       </div>
     </footer>
   );

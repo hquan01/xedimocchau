@@ -163,6 +163,18 @@ export default function LimousineBooking({
 
   // Selection states
   const [selectedTrip, setSelectedTrip] = useState<LimousineTrip | null>(null);
+  // Mobile trip cards are above the form; reveal the next step after selection.
+  useEffect(() => {
+    if (!selectedTrip || !window.matchMedia('(max-width: 1023px)').matches) return;
+    const frame = window.requestAnimationFrame(() => {
+      const form = document.getElementById('active_booking_form_parent');
+      if (!form) return;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      form.scrollIntoView({ behavior: reduceMotion ? 'instant' : 'smooth', block: 'start' });
+      form.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedTrip?.id]);
   const [seatCount, setSeatCount] = useState<number>(1);
   
   // Passenger states
@@ -353,7 +365,7 @@ export default function LimousineBooking({
 
   const getSelectedSeatsPrice = () => {
     if (!isStandardRoute) return 0;
-    const pricePerSeat = selectedTrip ? selectedTrip.priceStandard : 300000;
+    const pricePerSeat = selectedTrip ? selectedTrip.priceStandard : getDynamicPrice('standard');
     return seatCount * pricePerSeat;
   };
 
@@ -473,7 +485,7 @@ export default function LimousineBooking({
       <div className="text-center max-w-2xl mx-auto mb-10">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1b4332] tracking-tight">Đặt Vé Xe Limousine VIP</h2>
         <p className="text-stone-500 mt-2 text-sm font-sans">
-          Đặt trực tuyến vé chở khách limousine ghế VIP thương gia. Tuyến {from} <span className="text-emerald-600 font-bold">⇌</span> {to}. Giữ chỗ chuẩn xác 100%.
+          Tìm chuyến Limousine tuyến {from} <span className="text-emerald-600 font-bold">⇌</span> {to}, chọn ngày và số ghế. Nhà xe xác nhận chỗ sau khi nhận yêu cầu.
         </p>
       </div>
 
@@ -761,8 +773,10 @@ export default function LimousineBooking({
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="bg-white border border-stone-200 p-6 rounded-3xl shadow-md space-y-6"
+                className="bg-white border border-stone-200 p-4 sm:p-6 rounded-3xl shadow-md space-y-6 scroll-mt-28 focus:outline-none"
                 id="active_booking_form_parent"
+                tabIndex={-1}
+                aria-label="Bước tiếp theo: chọn số ghế và nhập thông tin đặt xe"
               >
                 {/* Header info of chosen trip */}
                 <div className="bg-gradient-to-r from-emerald-900 to-[#1b4332] text-white p-4 rounded-2xl flex justify-between items-center text-left">
@@ -772,8 +786,8 @@ export default function LimousineBooking({
                     <span className="text-[11px] opacity-85 font-sans">{date} - Tuyến {selectedTrip.from} đến {selectedTrip.to}</span>
                   </div>
                   <div className="bg-white/10 px-3 py-1.5 rounded-lg text-center font-mono">
-                    <span className="text-xs block opacity-75">Giá từ</span>
-                    <span className="text-sm font-bold text-amber-300">300k - 380k</span>
+                    <span className="text-xs block opacity-75">Giá mỗi ghế</span>
+                    <span className="text-sm font-bold text-amber-300">{selectedTrip.priceStandard.toLocaleString('vi-VN')}đ</span>
                   </div>
                 </div>
 

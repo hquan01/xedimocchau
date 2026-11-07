@@ -3,17 +3,22 @@ import { ArrowLeft, House, ShieldCheck } from "lucide-react";
 import { doc, deleteDoc, writeBatch, collection, onSnapshot } from "firebase/firestore";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import Hero from "./components/Hero";
-import BookingSwitcher from "./components/BookingSwitcher";
+const Hero = lazy(() => import("./components/Hero"));
+const BookingSwitcher = lazy(() => import("./components/BookingSwitcher"));
 import { rememberDeviceBooking, forgetDeviceBooking } from "./lib/deviceBookingHistory";
-import ComboBooking from "./components/ComboBooking";
+const ComboBooking = lazy(() => import("./components/ComboBooking"));
 import FloatingContact from "./components/FloatingContact";
-import AIChatWidget from "./components/AIChatWidget";
+const AIChatWidget = lazy(() => import("./components/AIChatWidget"));
 import BottomNavigation from "./components/BottomNavigation";
 import {submitServiceInquiry} from "./lib/serviceRequests";
-import CategoryDirectoryView from "./components/CategoryDirectoryView";
-import CategoryItemDetail from "./components/CategoryItemDetail";
+const CategoryDirectoryView = lazy(() => import("./components/CategoryDirectoryView"));
+const CategoryItemDetail = lazy(() => import("./components/CategoryItemDetail"));
 import { useSEO } from "./hooks/useSEO";
+import {track} from "@vercel/analytics";
+/** Analytics must never block a real booking if collection is unavailable. */
+const recordConversion = (event:string, type:string) => {
+  try { track(event, {type}); } catch { /* Optional telemetry, not checkout logic. */ }
+};
 import {articlePublicUrl,SEO_ARTICLE_SLUGS} from './lib/articleSeo';
 
 import NotificationCenter from "./components/NotificationCenter";
@@ -345,9 +350,14 @@ export default function App() {
          booking.userId = currentUser.id;
       }
       await saveBookingToFirebase(booking);
+      // Event contains no personal information; only a successfully saved
+      // booking is counted. Custom events depend on the Vercel Analytics plan.
+      recordConversion("booking_saved", String(booking.type || 'transport'));
       // Keep a bounded copy of this successful booking on the same phone.
       // Do not store bookings that the server rejected.
-      rememberDeviceBooking(booking);
+      try { rememberDeviceBooking(booking); } catch (error) {
+        console.warn("Could not cache booking on this device; cloud booking is saved.", error);
+      }
 
       // Create Notification
       const notifTitle = "KHÁCH MỚI ĐẶT VÉ";
@@ -375,7 +385,13 @@ export default function App() {
       };
       
       setNotifications([newNotif, ...notifications].slice(0, 50));
-      await saveNotificationToFirebase(newNotif);
+      // A notification outage must not turn a successfully saved booking into
+      // a false "booking failed" message or encourage duplicate submissions.
+      try {
+        await saveNotificationToFirebase(newNotif);
+      } catch (error) {
+        console.warn("Booking saved, but notification could not be delivered.", error);
+      }
 
       // Send system level notification for operator
       if (currentUser?.role === "operator") {
@@ -481,6 +497,7 @@ export default function App() {
   const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all", pickup?: string, dropoff?: string) => {
     setLimousineSearch({ from, to, date, time, pickup, dropoff });
     setActiveTab("limousine");
+    recordConversion("booking_started", "limousine");
     // Scroll smoothly to active section
     setTimeout(() => {
       document.getElementById("limousine_booking_section")?.scrollIntoView({ behavior: "smooth" });
@@ -490,6 +507,7 @@ export default function App() {
   const handleSearchCombo = (hotelId: string, date: string, from?: string, to?: string, time?: string, pickup?: string, dropoff?: string) => {
     setComboSearch({ hotelId, date, from, to, time, pickup, dropoff });
     setActiveTab("combo");
+    recordConversion("booking_started", "combo");
     setTimeout(() => {
       document.getElementById("combo_booking_section")?.scrollIntoView({ behavior: "smooth" });
     }, 100);
@@ -497,6 +515,7 @@ export default function App() {
 
   const handleSelectService = (tab: string, subTab?: "limousine" | "shared" | "charter") => {
     setActiveTab(tab);
+    if(tab === "limousine" || tab === "combo") recordConversion("booking_started", subTab||tab);
     if (tab === "limousine") {
       if (subTab) {
         setLimousineSubTab(subTab);
@@ -650,12 +669,14 @@ export default function App() {
 
       {/* Hero Banner only shown on home tabs */}
       {(activeTab === "combo" || (activeTab === "limousine" && !limousineSearch)) ? (
-        <Hero
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onSearchLimousine={handleSearchLimousine}
-          onSearchCombo={handleSearchCombo}
-        />
+        <Suspense fallback={<div className="max-w-6xl mx-auto h-48 bg-emerald-50 rounded-3xl animate-pulse" aria-label="Đang tải biểu mẫu tìm xe" />}>
+          <Hero
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onSearchLimousine={handleSearchLimousine}
+            onSearchCombo={handleSearchCombo}
+          />
+        </Suspense>
       ) : null}
 
       {/* Every detail/service page can return to the new Explore homepage. */}
@@ -1085,7 +1106,7 @@ export default function App() {
 
       {/* Floating fast support buttons */}
       <FloatingContact />
-      <AIChatWidget hideLauncher onOpenLimousine={openLimousineBooking} onOpenAIPlanner={() => setActiveTab("ai")} />
+      <Suspense fallback={null}><AIChatWidget hideLauncher onOpenLimousine={openLimousineBooking} onOpenAIPlanner={() => setActiveTab("ai")} /></Suspense>
 
       {/* Mobile Fixed Bottom Navigation Bar */}
       <BottomNavigation
@@ -1328,7 +1349,7 @@ export default function App() {
       )}
 
       {selectedCategoryItem && (
-        <CategoryItemDetail
+        <Suspense fallback={null}><CategoryItemDetail
           item={selectedCategoryItem}
           categoryTitle="Chi tiết Mộc Châu"
           onClose={() => setSelectedCategoryItem(null)}
@@ -1336,7 +1357,7 @@ export default function App() {
             setSelectedCategoryItem(null);
             setActiveTab("limousine");
           }}
-        />
+        /></Suspense>
       )}
     </div>
   );
