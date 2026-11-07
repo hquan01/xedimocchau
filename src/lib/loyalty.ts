@@ -47,6 +47,22 @@ export function creditedPointsForBooking(booking:Pick<Booking,'rewardPointsAward
   return validSeatCount(saved)||LEGACY_POINTS_PER_CONFIRMED_BOOKING;
 }
 
+/** Pure status transition rule shared by the Firestore transaction and
+ * regression tests. A confirmation is idempotent; a reversal subtracts the
+ * original snapshot, not the seat count that might have changed later.
+ */
+export function rewardPointChange(
+  booking:Pick<Booking,'type'|'seatCount'|'seatNumbers'|'rewardPointsAwarded'>,
+  nextStatus:Booking['status'],
+  alreadyRewarded:boolean
+):{award:number;reverse:number}{
+  const confirmed=nextStatus==='success'||nextStatus==='completed';
+  return {
+    award:confirmed&&!alreadyRewarded?rewardPointsForBooking(booking):0,
+    reverse:!confirmed&&alreadyRewarded?creditedPointsForBooking(booking):0
+  };
+}
+
 export function previousConfirmedBookings(user: User | null | undefined): number {
   if (!user || user.role !== 'customer') return 0;
   const tracked = Array.isArray(user.rewardedBookingIds) ? user.rewardedBookingIds.length : 0;
