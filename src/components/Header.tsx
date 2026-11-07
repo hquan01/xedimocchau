@@ -55,7 +55,7 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-stone-200/80 shadow-xs" id="main_header">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-emerald-100 shadow-[0_3px_18px_rgba(18,61,42,.055)]" id="main_header">
       {/* Top Banner Contact bar - Slim and sleek */}
       <div className="hidden sm:block bg-[#1b4332] text-white py-2 px-4 sm:px-8 text-[11px] backdrop-blur-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center text-[10px] sm:text-xs">
@@ -82,10 +82,10 @@ export default function Header({
       </div>
 
       {/* Main Navbar */}
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center">
+      <nav className="max-w-7xl mx-auto px-3 sm:px-5 xl:px-6 h-[64px] sm:h-[74px] flex items-center">
         <div className="flex justify-between w-full items-center">
           {/* Brand Logo - Mộc Châu Travel */}
-          <div className="flex items-center min-w-0 pr-2 max-w-[235px] lg:max-w-[180px] xl:max-w-[250px]">
+          <div className="flex items-center min-w-0 pr-1 sm:pr-2 max-w-[145px] sm:max-w-[210px] xl:max-w-[205px]">
             <button 
               onClick={() => {
                 setActiveTab("explore");
@@ -101,7 +101,7 @@ export default function Header({
                   alt="Xe Đi Mộc Châu – QT Limousine"
                   width={520}
                   height={114}
-                  className="w-[185px] sm:w-[216px] lg:w-[172px] xl:w-[224px] h-auto max-h-[58px] object-contain"
+                  className="w-[108px] min-[360px]:w-[126px] sm:w-[184px] xl:w-[200px] h-auto max-h-[58px] object-contain"
                 />
               ) : (
                 <>
@@ -119,8 +119,8 @@ export default function Header({
             </button>
           </div>
 
-          {/* Desktop Navigation - 4 clean unboxed tabs */}
-          <div className="hidden lg:flex items-center space-x-1 lg:space-x-1.5">
+          {/* Desktop Navigation: use the full menu only where it fits without overlap. */}
+          <div className="hidden xl:flex items-center gap-0.5">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -132,13 +132,13 @@ export default function Header({
                     setActiveTab(item.id);
                     setIsOpen(false);
                   }}
-                  className={`relative flex items-center space-x-1.5 px-3.5 py-2 rounded-2xl font-bold text-xs lg:text-sm transition-all cursor-pointer ${
+                  className={`relative flex items-center gap-1.5 px-2.5 py-2.5 min-h-[44px] rounded-xl font-bold text-[12px] transition-[background-color,color,box-shadow] cursor-pointer ${
                     isActive
-                      ? "text-rose-700 bg-rose-50 shadow-2xs"
-                      : "text-stone-600 hover:text-rose-700 hover:bg-rose-50"
+                      ? "text-emerald-900 bg-emerald-100 shadow-sm"
+                      : "text-stone-700 hover:text-emerald-800 hover:bg-emerald-50"
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-rose-600' : 'text-stone-400'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-700' : 'text-stone-500'}`} />
                   <span className="whitespace-nowrap">{item.label}</span>
                   {item.badge && (
                     <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-amber-400 text-white ml-1">
@@ -152,7 +152,7 @@ export default function Header({
 
 
           {/* Right Action buttons for Desktop */}
-          <div className="hidden lg:flex items-center space-x-2.5">
+          <div className="hidden xl:flex items-center gap-2">
             <button
               type="button"
               id="appearance_desktop_btn"
@@ -241,11 +241,11 @@ export default function Header({
           </div>
 
           {/* Dedicated Mobile Header Controls - Clean, uncluttered, touch-friendly */}
-          <div className="flex items-center lg:hidden space-x-1 sm:space-x-1.5 shrink-0">
+          <div className="flex items-center xl:hidden gap-0.5 sm:gap-1 shrink-0">
             {/* Quick Search Button */}
             <button
               onClick={handleMobileSearchClick}
-              className="p-2 rounded-xl text-stone-600 hover:text-[#1b4332] hover:bg-stone-100 transition-colors cursor-pointer"
+              className="w-9 h-11 sm:w-11 sm:h-11 grid place-items-center rounded-xl text-stone-600 hover:text-[#1b4332] hover:bg-stone-100 transition-colors cursor-pointer"
               aria-label="Tìm kiếm Mộc Châu"
               id="mobile_search_btn"
             >
@@ -280,7 +280,7 @@ export default function Header({
                   onOpenAuth();
                 }
               }}
-              className="p-2 rounded-xl text-stone-600 hover:text-[#1b4332] hover:bg-stone-100 transition-colors cursor-pointer relative"
+              className="w-9 h-11 sm:w-11 sm:h-11 grid place-items-center rounded-xl text-stone-600 hover:text-[#1b4332] hover:bg-stone-100 transition-colors cursor-pointer relative"
               aria-label="Tài khoản khách hàng"
               id="mobile_account_btn"
             >
@@ -293,8 +293,10 @@ export default function Header({
             {/* Mobile Menu Dropdown Toggle */}
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="p-2 rounded-xl text-stone-700 hover:bg-stone-100 cursor-pointer"
-              aria-label="Mở menu tùy chọn"
+              className="w-9 h-11 sm:w-11 sm:h-11 grid place-items-center rounded-xl text-stone-700 hover:bg-emerald-50 cursor-pointer"
+              aria-label={isOpen?"Đóng menu tùy chọn":"Mở menu tùy chọn"}
+              aria-expanded={isOpen}
+              aria-controls="mobile_menu_panel"
               id="mobile_menu_trigger"
             >
               {isOpen ? <X className="w-5.5 h-5.5 text-stone-900" /> : <Menu className="w-5.5 h-5.5 text-stone-900" />}
@@ -309,7 +311,7 @@ export default function Header({
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
-          className="lg:hidden border-t border-stone-200 bg-white px-4 py-4 space-y-3 shadow-xl"
+          className="xl:hidden border-t border-stone-200 bg-white px-4 py-4 space-y-3 shadow-xl max-h-[calc(100dvh-76px)] overflow-y-auto"
           id="mobile_menu_panel"
         >
           {/* User Account Bar in Mobile Drawer */}

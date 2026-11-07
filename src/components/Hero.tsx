@@ -176,19 +176,19 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           onSubmit={handleGeneralSearch}
           className="w-full max-w-2xl mt-8 relative"
         >
-          <div className="relative flex items-center shadow-2xl rounded-2xl overflow-hidden bg-white/95 backdrop-blur-md border border-emerald-200">
-            <Search className="absolute left-4 w-5 h-5 text-emerald-700 pointer-events-none" />
+          <div className="relative flex flex-col sm:block shadow-2xl rounded-2xl overflow-hidden bg-white/95 backdrop-blur-md border border-emerald-200 p-1.5 sm:p-0">
+            <Search className="absolute top-5 sm:top-1/2 sm:-translate-y-1/2 left-4 w-5 h-5 text-emerald-700 pointer-events-none" />
             <input
               type="text"
               value={generalQuery}
               onChange={(e) => setGeneralQuery(e.target.value)}
               placeholder="Bạn muốn biết điều gì về Mộc Châu? (Ví dụ: Thời tiết, quán ăn, homestay...)"
-              className="w-full pl-12 pr-36 py-4 text-xs sm:text-sm text-stone-900 font-medium focus:outline-none bg-transparent"
+              className="w-full pl-11 pr-3 sm:pl-12 sm:pr-36 py-3.5 min-h-[52px] text-[16px] sm:text-sm text-stone-900 font-medium focus:outline-2 focus:outline-emerald-500 rounded-xl bg-transparent"
             />
             <button
               type="submit"
               disabled={loadingAi}
-              className="absolute right-1.5 top-1.5 bottom-1.5 px-5 bg-[#1b4332] hover:bg-emerald-800 disabled:opacity-70 text-white rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-colors shadow-md flex items-center space-x-1.5 cursor-pointer"
+              className="relative sm:absolute sm:right-1.5 sm:top-1.5 sm:bottom-1.5 w-full sm:w-auto justify-center min-h-[45px] px-5 py-2.5 sm:py-0 bg-[#1b4332] hover:bg-emerald-800 disabled:opacity-70 text-white rounded-xl font-bold text-sm tracking-wide transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
             >
               {loadingAi ? (
                 <>
@@ -239,7 +239,7 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
             </div>
             <h3 className="text-white font-extrabold text-sm sm:text-base tracking-tight">Tôi đang ở Mộc Châu</h3>
             <p className="text-stone-300 text-xs mt-1 sm:mt-1.5 font-sans leading-relaxed line-clamp-2">
-              Điểm tham quan, ăn uống, vị trí bản đồ và dịch vụ di chuyển quanh đảo.
+              Điểm tham quan, ăn uống, vị trí bản đồ và dịch vụ di chuyển quanh Mộc Châu.
             </p>
             <span className="inline-flex items-center text-amber-300 text-xs font-bold mt-2.5 sm:mt-4 group-hover:translate-x-1 transition-transform">
               Xem bản đồ →
@@ -308,7 +308,7 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-3.5 relative z-10">
             {[
               { label: "Thời tiết", icon: Sun, cat: "thoi-tiet", sub: "Dự báo Live 24/7", badge: "LIVE", badgeColor: "bg-red-500" },
-              { label: "Mùa hoa", icon: Sparkles, cat: "mua-hoa", sub: "Mận nở rộ tháng 1-2", badge: "HOT", badgeColor: "bg-amber-500" },
+              { label: "Mùa hoa", icon: Sparkles, cat: "mua-hoa", sub: "Xem tình trạng thực tế", badge: "MÙA", badgeColor: "bg-amber-500" },
               { label: "Lịch trình", icon: CalendarDays, cat: "lich-trinh", sub: "Gợi ý 2N1Đ, 3N2Đ" },
               { label: "Điểm tham quan", icon: MapPin, cat: "dia-diem", sub: "Bạch Long, Bản Áng" },
               { label: "Homestay", icon: Home, cat: "homestay", sub: "View đồi chè đẹp", badge: "TOP", badgeColor: "bg-emerald-500" },
@@ -340,7 +340,7 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
                     <span className="text-white text-xs font-black tracking-tight leading-tight block group-hover:text-amber-200 transition-colors">
                       {cat.label}
                     </span>
-                    <span className="text-[9.5px] text-stone-400 group-hover:text-emerald-100 mt-0.5 block leading-tight font-sans">
+                    <span className="text-[11px] text-stone-300 group-hover:text-emerald-100 mt-1 block leading-snug font-sans">
                       {cat.sub}
                     </span>
                   </div>
@@ -510,24 +510,21 @@ export default function Hero({ activeTab, setActiveTab, onSearchLimousine, onSea
           </form>
         </motion.div>
 
-        {/* Agency Trust Authority Numbers */}
-        <div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-6 w-full max-w-5xl text-stone-300 border-t border-stone-800 pt-8">
-          <div>
-            <span className="block text-2xl md:text-3xl font-black text-white font-mono">15.000+</span>
-            <span className="text-[11px] uppercase tracking-wider text-stone-400">Khách hàng tin tưởng</span>
-          </div>
-          <div>
-            <span className="block text-2xl md:text-3xl font-black text-white font-mono">30+</span>
-            <span className="text-[11px] uppercase tracking-wider text-stone-400">Dàn xe Limousine VIP</span>
-          </div>
-          <div>
-            <span className="block text-2xl md:text-3xl font-black text-white font-mono">4.9 / 5</span>
-            <span className="text-[11px] uppercase tracking-wider text-stone-400">Điểm đánh giá thực tế</span>
-          </div>
-          <div>
-            <span className="block text-2xl md:text-3xl font-black text-white font-mono">100%</span>
-            <span className="text-[11px] uppercase tracking-wider text-stone-400">Cam kết giữ chỗ chính xác</span>
-          </div>
+        {/* Helpful booking steps instead of unverifiable customer/review statistics. */}
+        <div className="mt-10 sm:mt-12 grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-5xl border-t border-white/15 pt-6" aria-label="Tiện ích đặt xe trực tuyến">
+          {[
+            {icon:CalendarDays,title:'Chọn ngày đi',desc:'Theo kế hoạch của bạn'},
+            {icon:Car,title:'Tìm chuyến xe',desc:'Kiểm tra giờ & điểm đón'},
+            {icon:Ticket,title:'Quản lý vé',desc:'Tra cứu thông tin đã đặt'},
+            {icon:HelpCircle,title:'Cần tư vấn?',desc:'Liên hệ QT Limousine'}
+          ].map((item)=>{
+            const Icon=item.icon;
+            return <div key={item.title} className="rounded-2xl border border-white/15 bg-white/5 p-3.5 sm:p-4 text-left backdrop-blur-sm">
+              <Icon className="w-5 h-5 text-emerald-300 mb-2" aria-hidden="true"/>
+              <strong className="text-[13px] sm:text-sm block text-white leading-snug">{item.title}</strong>
+              <p className="text-[11px] sm:text-xs text-stone-300 mt-1 leading-snug">{item.desc}</p>
+            </div>
+          })}
         </div>
 
       </div>

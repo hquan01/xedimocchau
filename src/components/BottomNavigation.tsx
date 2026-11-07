@@ -63,12 +63,12 @@ export default function BottomNavigation({
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-50 flex lg:hidden bg-white/98 backdrop-blur-md border-t border-emerald-200 shadow-[0_-6px_22px_rgba(0,0,0,0.1)] px-2 pt-2 pb-[max(10px,env(safe-area-inset-bottom))]"
+      className="fixed bottom-0 left-0 right-0 z-50 flex xl:hidden bg-white/95 backdrop-blur-xl border-t border-emerald-100 shadow-[0_-7px_24px_rgba(17,55,38,.10)] px-2 pt-1.5 pb-[max(8px,env(safe-area-inset-bottom))]"
       id="mobile_bottom_nav"
       role="navigation"
       aria-label="Thanh điều hướng dưới điện thoại"
     >
-      <div className="grid grid-cols-4 items-center gap-1 min-h-[72px] max-w-lg mx-auto w-full">
+      <div className="grid grid-cols-4 items-center gap-1.5 min-h-[68px] max-w-xl mx-auto w-full">
         {navTabs.map((tab) => {
           const Icon = tab.icon;
           const active = tab.isActive;
@@ -76,10 +76,10 @@ export default function BottomNavigation({
             <button
               key={tab.id}
               onClick={tab.onClick}
-              className={`flex flex-col gap-1.5 items-center justify-center h-[72px] min-w-0 px-0.5 rounded-2xl transition-all select-none cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-600 ${
+              className={`flex flex-col gap-1 items-center justify-center min-h-[68px] min-w-0 px-0.5 rounded-[18px] transition-[transform,background-color,color] select-none cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-600 ${
                 active 
-                  ? "text-emerald-800 bg-emerald-50 border border-emerald-200" 
-                  : "text-stone-600 hover:text-emerald-700 hover:bg-stone-50"
+                  ? "text-emerald-900 bg-emerald-100/75 border border-emerald-200 shadow-sm" 
+                  : "text-stone-700 hover:text-emerald-700 hover:bg-emerald-50"
               }`}
               id={`bottom_nav_${tab.id}`}
               aria-current={active ? "page" : undefined}
@@ -87,7 +87,7 @@ export default function BottomNavigation({
               <div className="relative">
                 <Icon 
                   className={`w-7 h-7 transition-transform ${
-                    active ? "scale-105 text-emerald-800 stroke-[2.5]" : "stroke-[2.1]"
+                    active ? "scale-105 text-emerald-800 stroke-[2.5]" : "stroke-[2] text-stone-600"
                   }`} 
                 />
                 {tab.id === "trip" && bookingCount > 0 && (
