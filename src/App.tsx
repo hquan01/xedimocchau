@@ -15,6 +15,10 @@ const CategoryDirectoryView = lazy(() => import("./components/CategoryDirectoryV
 const CategoryItemDetail = lazy(() => import("./components/CategoryItemDetail"));
 import { useSEO } from "./hooks/useSEO";
 import {track} from "@vercel/analytics";
+/** Analytics must never block a real booking if collection is unavailable. */
+const recordConversion = (event:string, type:string) => {
+  try { track(event, {type}); } catch { /* Optional telemetry, not checkout logic. */ }
+};
 import {articlePublicUrl,SEO_ARTICLE_SLUGS} from './lib/articleSeo';
 
 import NotificationCenter from "./components/NotificationCenter";
@@ -348,7 +352,7 @@ export default function App() {
       await saveBookingToFirebase(booking);
       // Event contains no personal information; only a successfully saved
       // booking is counted. Custom events depend on the Vercel Analytics plan.
-      track("booking_saved", {type: String(booking.type || 'transport')});
+      recordConversion("booking_saved", String(booking.type || 'transport'));
       // Keep a bounded copy of this successful booking on the same phone.
       // Do not store bookings that the server rejected.
       rememberDeviceBooking(booking);
@@ -485,7 +489,7 @@ export default function App() {
   const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all", pickup?: string, dropoff?: string) => {
     setLimousineSearch({ from, to, date, time, pickup, dropoff });
     setActiveTab("limousine");
-    track("booking_started", {type:"limousine"});
+    recordConversion("booking_started", "limousine");
     // Scroll smoothly to active section
     setTimeout(() => {
       document.getElementById("limousine_booking_section")?.scrollIntoView({ behavior: "smooth" });
@@ -495,7 +499,7 @@ export default function App() {
   const handleSearchCombo = (hotelId: string, date: string, from?: string, to?: string, time?: string, pickup?: string, dropoff?: string) => {
     setComboSearch({ hotelId, date, from, to, time, pickup, dropoff });
     setActiveTab("combo");
-    track("booking_started", {type:"combo"});
+    recordConversion("booking_started", "combo");
     setTimeout(() => {
       document.getElementById("combo_booking_section")?.scrollIntoView({ behavior: "smooth" });
     }, 100);
@@ -503,7 +507,7 @@ export default function App() {
 
   const handleSelectService = (tab: string, subTab?: "limousine" | "shared" | "charter") => {
     setActiveTab(tab);
-    if(tab === "limousine" || tab === "combo") track("booking_started", {type:subTab||tab});
+    if(tab === "limousine" || tab === "combo") recordConversion("booking_started", subTab||tab);
     if (tab === "limousine") {
       if (subTab) {
         setLimousineSubTab(subTab);
