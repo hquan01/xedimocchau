@@ -9,27 +9,25 @@ interface FooterProps {
 
 export default function Footer({ setActiveTab, onSelectService, onOpenMotorbike }: FooterProps) {
   return (
-    <footer className="bg-stone-950 text-stone-300 pt-16 pb-8 border-t border-stone-800" id="main_footer">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+    <footer className="bg-[#10271e] text-emerald-50/80 pt-14 sm:pt-16 pb-9 border-t border-emerald-900" id="main_footer">
+      <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-9 sm:gap-11">
         {/* Brand Info */}
         <div className="space-y-4">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 to-[#1b4332] flex items-center justify-center text-white font-bold text-xs uppercase">
-              XM
-            </div>
+            <img src="/brand-xedimocchau-icon-192.png" width="44" height="44" alt="" loading="lazy" className="w-11 h-11 rounded-xl object-cover border border-emerald-100/15"/>
             <div className="flex flex-col">
               <span className="font-extrabold text-sm tracking-tight text-white uppercase">XE ĐI MỘC CHÂU</span>
               <span className="text-[9px] font-sans text-stone-400 tracking-wider">Limousine & Combo Cao Cấp</span>
             </div>
           </div>
           <p className="text-xs text-stone-400 leading-relaxed">
-            Hãng vận tải và cung cấp combo phòng du lịch chuyên tuyến Hà Nội - Mộc Châu chất lượng thương gia. Kiến tạo những chuyến đi an tâm, hạnh phúc trọn vẹn tại cao nguyên sữa xanh đồi chè mượt.
+            Tìm lịch xe QT Limousine, kiểm tra thông tin chuyến đi và khám phá cẩm nang du lịch Mộc Châu. Chọn dịch vụ phù hợp với nhu cầu của bạn.
           </p>
           <div className="flex items-center space-x-2 bg-stone-900 border border-stone-800 p-2.5 rounded-lg">
             <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
             <div className="text-[11px] leading-tight text-stone-400">
-              <span className="font-bold text-stone-200 block">Đã thông báo Bộ Công Thương</span>
-              Bảo hiểm hành khách trọn vẹn mọi hành trình
+              <span className="font-bold text-stone-200 block">Kiểm tra chuyến đi trước khi đặt</span>
+              Xem lịch trình, điểm đón trả và thông tin vé trong hệ thống.
             </div>
           </div>
         </div>
