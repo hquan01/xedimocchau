@@ -3,17 +3,18 @@ import { ArrowLeft, House, ShieldCheck } from "lucide-react";
 import { doc, deleteDoc, writeBatch, collection, onSnapshot } from "firebase/firestore";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import Hero from "./components/Hero";
-import BookingSwitcher from "./components/BookingSwitcher";
+const Hero = lazy(() => import("./components/Hero"));
+const BookingSwitcher = lazy(() => import("./components/BookingSwitcher"));
 import { rememberDeviceBooking, forgetDeviceBooking } from "./lib/deviceBookingHistory";
-import ComboBooking from "./components/ComboBooking";
+const ComboBooking = lazy(() => import("./components/ComboBooking"));
 import FloatingContact from "./components/FloatingContact";
-import AIChatWidget from "./components/AIChatWidget";
+const AIChatWidget = lazy(() => import("./components/AIChatWidget"));
 import BottomNavigation from "./components/BottomNavigation";
 import {submitServiceInquiry} from "./lib/serviceRequests";
-import CategoryDirectoryView from "./components/CategoryDirectoryView";
-import CategoryItemDetail from "./components/CategoryItemDetail";
+const CategoryDirectoryView = lazy(() => import("./components/CategoryDirectoryView"));
+const CategoryItemDetail = lazy(() => import("./components/CategoryItemDetail"));
 import { useSEO } from "./hooks/useSEO";
+import {track} from "@vercel/analytics";
 import {articlePublicUrl,SEO_ARTICLE_SLUGS} from './lib/articleSeo';
 
 import NotificationCenter from "./components/NotificationCenter";
@@ -345,6 +346,9 @@ export default function App() {
          booking.userId = currentUser.id;
       }
       await saveBookingToFirebase(booking);
+      // Event contains no personal information; only a successfully saved
+      // booking is counted. Custom events depend on the Vercel Analytics plan.
+      track("booking_saved", {type: String(booking.type || 'transport')});
       // Keep a bounded copy of this successful booking on the same phone.
       // Do not store bookings that the server rejected.
       rememberDeviceBooking(booking);
@@ -481,6 +485,7 @@ export default function App() {
   const handleSearchLimousine = (from: string, to: string, date: string, time: string = "all", pickup?: string, dropoff?: string) => {
     setLimousineSearch({ from, to, date, time, pickup, dropoff });
     setActiveTab("limousine");
+    track("booking_started", {type:"limousine"});
     // Scroll smoothly to active section
     setTimeout(() => {
       document.getElementById("limousine_booking_section")?.scrollIntoView({ behavior: "smooth" });
@@ -490,6 +495,7 @@ export default function App() {
   const handleSearchCombo = (hotelId: string, date: string, from?: string, to?: string, time?: string, pickup?: string, dropoff?: string) => {
     setComboSearch({ hotelId, date, from, to, time, pickup, dropoff });
     setActiveTab("combo");
+    track("booking_started", {type:"combo"});
     setTimeout(() => {
       document.getElementById("combo_booking_section")?.scrollIntoView({ behavior: "smooth" });
     }, 100);
@@ -497,6 +503,7 @@ export default function App() {
 
   const handleSelectService = (tab: string, subTab?: "limousine" | "shared" | "charter") => {
     setActiveTab(tab);
+    if(tab === "limousine" || tab === "combo") track("booking_started", {type:subTab||tab});
     if (tab === "limousine") {
       if (subTab) {
         setLimousineSubTab(subTab);
@@ -1085,7 +1092,7 @@ export default function App() {
 
       {/* Floating fast support buttons */}
       <FloatingContact />
-      <AIChatWidget hideLauncher onOpenLimousine={openLimousineBooking} onOpenAIPlanner={() => setActiveTab("ai")} />
+      <Suspense fallback={null}><AIChatWidget hideLauncher onOpenLimousine={openLimousineBooking} onOpenAIPlanner={() => setActiveTab("ai")} /></Suspense>
 
       {/* Mobile Fixed Bottom Navigation Bar */}
       <BottomNavigation
@@ -1328,7 +1335,7 @@ export default function App() {
       )}
 
       {selectedCategoryItem && (
-        <CategoryItemDetail
+        <Suspense fallback={null}><CategoryItemDetail
           item={selectedCategoryItem}
           categoryTitle="Chi tiết Mộc Châu"
           onClose={() => setSelectedCategoryItem(null)}
@@ -1336,7 +1343,7 @@ export default function App() {
             setSelectedCategoryItem(null);
             setActiveTab("limousine");
           }}
-        />
+        /></Suspense>
       )}
     </div>
   );
