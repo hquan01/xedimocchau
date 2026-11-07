@@ -1,5 +1,5 @@
 import React, {useEffect,useState} from 'react';
-import {CloudSun,Sparkles,Flower2,BookOpen,MapPin,Flame,Bus,Car,Bike,House,UtensilsCrossed,Ticket,ArrowRight,Heart,ChevronRight,ChevronLeft,UsersRound,ArrowUpRight,CalendarCheck2,CheckCircle2,Route} from 'lucide-react';
+import {CloudSun,Sparkles,Flower2,BookOpen,MapPin,Flame,Bus,Car,Bike,House,UtensilsCrossed,Ticket,ArrowRight,Heart,ChevronRight,ChevronLeft,UsersRound,ArrowUpRight,CheckCircle2,Route} from 'lucide-react';
 import {useSiteContent,HomeTile} from '../lib/siteContent';
 import type {GuideArticle} from '../types';
 import {getContentMetrics,EMPTY_METRICS,type MetricsSnapshot} from '../lib/growthMetrics';
