@@ -1,6 +1,6 @@
 import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy, runTransaction } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
-import {POINTS_PER_CONFIRMED_BOOKING, previousConfirmedBookings} from "./loyalty";
+import {rewardPointsForBooking, creditedPointsForBooking, previousConfirmedBookings} from "./loyalty";
 import {couponDecision} from "./couponEligibility";
 import {isFutureDeparture, PAST_DEPARTURE_MESSAGE} from "./bookingTime";
 import type {User} from "../types";
@@ -182,9 +182,11 @@ export const updateBookingStatusInFirebase = async (bookingId: string, booking: 
 };
 
 /**
- * An operator confirms a booking once, and the linked customer receives +1 point.
- * This transaction updates booking + customer wallet atomically. Repeated
- * confirmations cannot credit the same booking twice.
+ * An operator confirms a booking once, and the linked customer receives one
+ * point per booked passenger seat. The earned amount is snapshotted on the
+ * booking so a later cancellation returns precisely those points.
+ * Booking and member wallet are updated atomically; repeated confirmations
+ * cannot earn points twice.
  *
  * NOTE: Real fraud protection still requires secure Firestore rules; the
  * legacy publicly writable rules are not sufficient for production discounts.
@@ -206,18 +208,24 @@ export const updateBookingStatusWithRewards = async (
     const confirmed=status==="success" || status==="completed";
     const cancelled=status==="cancelled";
     const alreadyRewarded=rewarded.includes(bookingId);
+    const earnedPoints=rewardPointsForBooking(booking);
     let nextRewarded=rewarded;
     let points=existingPoints;
     let changed=false;
     const bookingChange:any={status};
 
-    if(profile && confirmed && !alreadyRewarded){
+    if(profile && confirmed && !alreadyRewarded && earnedPoints>0){
       nextRewarded=[...rewarded,bookingId];
-      points+=POINTS_PER_CONFIRMED_BOOKING;
+      points+=earnedPoints;
+      // Freeze the credit amount. Never recalculate a previously rewarded
+      // booking when seats are edited or status is confirmed again.
+      bookingChange.rewardPointsAwarded=earnedPoints;
       changed=true;
-    } else if(profile && cancelled && alreadyRewarded){
+    } else if(profile && !confirmed && alreadyRewarded){
       nextRewarded=rewarded.filter(id=>id!==bookingId);
-      points=Math.max(0,points-POINTS_PER_CONFIRMED_BOOKING);
+      // Pre-policy bookings have no rewardPointsAwarded; they originally got +1.
+      points=Math.max(0,points-creditedPointsForBooking(booking));
+      bookingChange.rewardPointsAwarded=0;
       changed=true;
     }
     if(profile && cancelled && (booking.pointsDeducted||0)>0 && !booking.pointsRefunded){
@@ -248,7 +256,8 @@ export const updateBookingStatusWithRewards = async (
  * Repair legacy member balances for bookings that were already marked
  * confirmed before the new point policy was deployed. Only a booking linked
  * to the authenticated Firebase UID qualifies; phone numbers alone do not
- * establish ownership. One transaction = at most one point per booking.
+ * establish ownership. A transaction credits at most one seat-based award
+ * per booking ID, and stores the awarded amount on the order.
  */
 export const reconcileConfirmedMemberBooking = async (bookingId:string):Promise<void> => {
   const uid=auth.currentUser?.uid;
@@ -264,12 +273,15 @@ export const reconcileConfirmedMemberBooking = async (bookingId:string):Promise<
     const profile=profileDoc.data() as any;
     const rewarded:string[]=Array.isArray(profile.rewardedBookingIds)?profile.rewardedBookingIds:[];
     if(rewarded.includes(bookingId))return;
+    const earnedPoints=rewardPointsForBooking(booking);
+    if(earnedPoints<=0)return;
     const next=[...rewarded,bookingId];
     tx.set(profileRef,{
       rewardedBookingIds:next,
       completedBookingsCount:next.length,
-      points:Math.max(0,Math.floor(Number(profile.points||0)))+POINTS_PER_CONFIRMED_BOOKING
+      points:Math.max(0,Math.floor(Number(profile.points||0)))+earnedPoints
     },{merge:true});
+    tx.set(bookingRef,{rewardPointsAwarded:earnedPoints},{merge:true});
   });
 };
 
