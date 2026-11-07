@@ -140,6 +140,17 @@ export default function SharedCarBooking({
 
   // Selection states
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
+  useEffect(() => {
+    if (!selectedTrip || !window.matchMedia('(max-width: 1023px)').matches) return;
+    const frame = window.requestAnimationFrame(() => {
+      const form = document.getElementById('active_booking_form_parent');
+      if (!form) return;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      form.scrollIntoView({ behavior: reduceMotion ? 'instant' : 'smooth', block: 'start' });
+      form.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedTrip?.id]);
   const [seatCount, setSeatCount] = useState<number>(1);
   
   // Passenger states
@@ -731,19 +742,21 @@ export default function SharedCarBooking({
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="bg-white border border-stone-200 p-6 rounded-3xl shadow-md space-y-6"
+                className="bg-white border border-stone-200 p-4 sm:p-6 rounded-3xl shadow-md space-y-6 scroll-mt-28 focus:outline-none"
                 id="active_booking_form_parent"
+                tabIndex={-1}
+                aria-label="Bước tiếp theo: chọn số ghế và nhập thông tin đặt xe"
               >
                 {/* Header info of chosen trip */}
                 <div className="bg-gradient-to-r from-emerald-950 to-[#122e22] text-white p-4 rounded-2xl flex justify-between items-center text-left">
                   <div>
-                    <span className="text-[10px] font-bold text-emerald-300 uppercase block tracking-widest">Đang giữ chỗ</span>
+                    <span className="text-[10px] font-bold text-emerald-300 uppercase block tracking-widest">Đang chọn chuyến</span>
                     <h4 className="font-extrabold text-base leading-tight">Chuyến xe ghép {selectedTrip.departureTime}</h4>
                     <span className="text-[11px] opacity-85 font-sans">{date} - Tuyến {selectedTrip.from} đến {selectedTrip.to}</span>
                   </div>
                   <div className="bg-white/10 px-3 py-1.5 rounded-lg text-center font-mono">
                     <span className="text-xs block opacity-75">Giá vé</span>
-                    <span className="text-sm font-bold text-emerald-300">350k/ghế</span>
+                    <span className="text-sm font-bold text-emerald-300">{currentPrice.toLocaleString('vi-VN')}đ/ghế</span>
                   </div>
                 </div>
 
