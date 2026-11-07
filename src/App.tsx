@@ -657,12 +657,14 @@ export default function App() {
 
       {/* Hero Banner only shown on home tabs */}
       {(activeTab === "combo" || (activeTab === "limousine" && !limousineSearch)) ? (
-        <Hero
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onSearchLimousine={handleSearchLimousine}
-          onSearchCombo={handleSearchCombo}
-        />
+        <Suspense fallback={<div className="max-w-6xl mx-auto h-48 bg-emerald-50 rounded-3xl animate-pulse" aria-label="Đang tải biểu mẫu tìm xe" />}>
+          <Hero
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onSearchLimousine={handleSearchLimousine}
+            onSearchCombo={handleSearchCombo}
+          />
+        </Suspense>
       ) : null}
 
       {/* Every detail/service page can return to the new Explore homepage. */}
