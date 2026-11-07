@@ -1,6 +1,6 @@
 import { doc, setDoc, deleteDoc, collection, query, where, onSnapshot, orderBy, runTransaction } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
-import {rewardPointsForBooking, creditedPointsForBooking, previousConfirmedBookings} from "./loyalty";
+import {rewardPointsForBooking, rewardPointChange, previousConfirmedBookings} from "./loyalty";
 import {couponDecision} from "./couponEligibility";
 import {isFutureDeparture, PAST_DEPARTURE_MESSAGE} from "./bookingTime";
 import type {User} from "../types";
@@ -205,26 +205,25 @@ export const updateBookingStatusWithRewards = async (
     const rewarded:string[]=Array.isArray(profile?.rewardedBookingIds)?profile.rewardedBookingIds:[];
     const usedCoupons:string[]=Array.isArray(profile?.usedCoupons)?profile.usedCoupons:[];
     const existingPoints=Math.max(0,Math.floor(Number(profile?.points||0)));
-    const confirmed=status==="success" || status==="completed";
     const cancelled=status==="cancelled";
     const alreadyRewarded=rewarded.includes(bookingId);
-    const earnedPoints=rewardPointsForBooking(booking);
+    const {award,reverse}=rewardPointChange(booking,status,alreadyRewarded);
     let nextRewarded=rewarded;
     let points=existingPoints;
     let changed=false;
     const bookingChange:any={status};
 
-    if(profile && confirmed && !alreadyRewarded && earnedPoints>0){
+    if(profile && award>0){
       nextRewarded=[...rewarded,bookingId];
-      points+=earnedPoints;
+      points+=award;
       // Freeze the credit amount. Never recalculate a previously rewarded
       // booking when seats are edited or status is confirmed again.
-      bookingChange.rewardPointsAwarded=earnedPoints;
+      bookingChange.rewardPointsAwarded=award;
       changed=true;
-    } else if(profile && !confirmed && alreadyRewarded){
+    } else if(profile && reverse>0){
       nextRewarded=rewarded.filter(id=>id!==bookingId);
       // Pre-policy bookings have no rewardPointsAwarded; they originally got +1.
-      points=Math.max(0,points-creditedPointsForBooking(booking));
+      points=Math.max(0,points-reverse);
       bookingChange.rewardPointsAwarded=0;
       changed=true;
     }
