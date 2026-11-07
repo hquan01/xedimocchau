@@ -82,6 +82,7 @@ export interface Booking {
   couponId?: string;
   pointsDeducted?: number;
   pointsRefunded?: boolean; // Prevent double refunds when a reservation is cancelled.
+  rewardPointsAwarded?: number; // Snapshot of seat-based points actually credited at confirmation; legacy orders have no snapshot.
   discountAmount?: number;
   paymentReported?: boolean; // Khách đã bấm "Tôi đã chuyển khoản cọc 50%"
   paymentReportedAt?: string; // Thời điểm khách bấm báo đã chuyển cọc
@@ -152,7 +153,7 @@ export interface User {
   welcomeBonusGranted?: boolean; // True once a new membership receives its 10-point welcome reward
   welcomeBonusPoints?: number;
   welcomeBonusAt?: string;
-  rewardedBookingIds?: string[]; // Unique confirmed orders, prevents duplicate +1 awards
+  rewardedBookingIds?: string[]; // Unique confirmed orders, prevents duplicate seat-based point awards
   completedBookingsCount?: number; // Legacy-safe count, at least rewardedBookingIds.length
   usedCoupons?: string[];
   address?: string;
