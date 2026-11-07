@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {submitServiceInquiry} from "../lib/serviceRequests";
+import {getVietnamToday} from "../lib/bookingTime";
 import {useSiteContent} from "../lib/siteContent";
 import { 
   Bus, Car, Bike, Hotel, Star, DollarSign, Sparkles, MapPin, Phone, 
@@ -218,18 +219,18 @@ export default function ServicesHubView({
                     </h3>
 
                     <p className="text-[13px] sm:text-xs text-stone-600 font-sans leading-relaxed line-clamp-3 sm:line-clamp-none">
-                      Chạy liên tục từ 06h30 đến 18h30 hàng ngày hai chiều Hà Nội ⇌ Mộc Châu. Ghế massage êm ái, wifi miễn phí, nước uống & cổng sạc điện thoại.
+                      Chọn ngày đi để xem giờ xe và giá vé thực tế tuyến Hà Nội ⇌ Mộc Châu. Tiện nghi và điểm đón trả tùy từng chuyến, vui lòng kiểm tra trước khi đặt.
                     </p>
 
                     <div className="hidden sm:block bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100 text-[11px] text-emerald-950 space-y-1">
-                      <p>✓ Khung giờ: 06:30, 07:30, 08:30, 09:30, 11:30, 13:30, 15:30, 17:30, 18:30</p>
-                      <p>✓ Đón tận nơi phố cổ, Mỹ Đình, BigC Thăng Long & Homestay Mộc Châu</p>
+                      <p>✓ Giờ xe được hiển thị khi tìm chuyến theo ngày đi.</p>
+                      <p>✓ Điểm đón trả và chi phí phát sinh (nếu có) được kiểm tra trước khi xác nhận.</p>
                     </div>
                   </div>
 
                   <div className="pt-4 mt-3 border-t border-stone-100 flex gap-2">
                     <button
-                      onClick={() => onSearchLimousine("Hà Nội", "Mộc Châu", new Date().toISOString().split("T")[0], "06:30")}
+                      onClick={() => onSearchLimousine("Hà Nội", "Mộc Châu", getVietnamToday(), "all")}
                       className="flex-1 py-3 bg-[#1b4332] hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer shadow-md text-center"
                     >
                       Đặt Vé Xe Ngay
@@ -395,7 +396,7 @@ export default function ServicesHubView({
                       </span>
                     </div>
                     <button
-                      onClick={() => onSearchCombo(acc.id, new Date().toISOString().split("T")[0])}
+                      onClick={() => onSearchCombo(acc.id, getVietnamToday())}
                       className="px-4 py-2 bg-[#1b4332] text-white text-xs font-bold rounded-xl hover:bg-emerald-800 transition-colors cursor-pointer"
                     >
                       Xem combo xe + phòng
@@ -450,7 +451,7 @@ export default function ServicesHubView({
 
                   <div className="pt-4 mt-3 border-t border-emerald-100 flex gap-2">
                     <button
-                      onClick={() => onSearchCombo(combo.accommodationId || "all", new Date().toISOString().split("T")[0])}
+                      onClick={() => onSearchCombo(combo.accommodationId || "all", getVietnamToday())}
                       className="flex-1 py-3 bg-[#1b4332] hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer shadow-md text-center"
                     >
                       Đặt Combo Ngay
